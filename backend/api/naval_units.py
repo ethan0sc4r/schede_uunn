@@ -18,7 +18,7 @@ from utils.export import create_naval_unit_pdf, create_naval_unit_image
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "../uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".svg"}
 
 def save_uploaded_file(file: UploadFile, subfolder: str) -> str:
@@ -278,7 +278,7 @@ def export_unit_pdf(
             }
     
     # Create output directory if it doesn't exist
-    export_dir = "exports"
+    export_dir = "../exports"
     os.makedirs(export_dir, exist_ok=True)
     
     # Generate filename
@@ -337,7 +337,7 @@ def export_unit_png(
             }
     
     # Create output directory if it doesn't exist
-    export_dir = "exports"
+    export_dir = "../exports"
     os.makedirs(export_dir, exist_ok=True)
     
     # Generate filename

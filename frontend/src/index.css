@@ -12,18 +12,18 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-apple-blue text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-apple-blue focus:ring-opacity-50 shadow-apple;
+    @apply bg-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-lg;
   }
   
   .btn-secondary {
-    @apply bg-white text-apple-gray-700 border border-apple-gray-300 px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-apple-gray-50 focus:outline-none focus:ring-2 focus:ring-apple-blue focus:ring-opacity-50 shadow-apple;
+    @apply bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 shadow-lg;
   }
   
   .card {
-    @apply bg-white rounded-2xl shadow-apple-lg border border-apple-gray-200 overflow-hidden;
+    @apply bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden;
   }
   
   .input-field {
-    @apply block w-full px-4 py-3 border border-apple-gray-300 rounded-xl focus:ring-2 focus:ring-apple-blue focus:border-transparent transition-all duration-200 bg-white;
+    @apply block w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white;
   }
 }

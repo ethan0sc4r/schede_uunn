@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Ship, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { LoginRequest } from '../types';
+import type { LoginRequest } from '../types/index';
 
 const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -38,24 +38,24 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-apple-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="flex items-center space-x-3">
-            <Ship className="h-10 w-10 text-apple-blue" />
-            <h1 className="text-2xl font-bold text-apple-gray-900">
+            <Ship className="h-10 w-10 text-blue-500" />
+            <h1 className="text-2xl font-bold text-gray-900">
               Naval Units
             </h1>
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-medium text-apple-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-medium text-gray-900">
           Sign in to your account
         </h2>
-        <p className="mt-2 text-center text-sm text-apple-gray-600">
+        <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link
             to="/register"
-            className="font-medium text-apple-blue hover:text-blue-600 transition-colors"
+            className="font-medium text-blue-500 hover:text-blue-600 transition-colors"
           >
             create a new account
           </Link>
@@ -63,7 +63,7 @@ const Login: React.FC = () => {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="card py-8 px-6 shadow-apple-lg sm:px-10">
+        <div className="card py-8 px-6 shadow-lg sm:px-10">
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="flex">
@@ -77,12 +77,12 @@ const Login: React.FC = () => {
 
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-apple-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-apple-gray-400" />
+                  <Mail className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   {...register('email', {
@@ -104,12 +104,12 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-apple-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-apple-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   {...register('password', {

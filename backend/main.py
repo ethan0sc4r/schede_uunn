@@ -1,15 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
-from datetime import timedelta
 
-from app.database import SessionLocal, engine, Base
-from app.schemas import *
-from models.user import User
-from models.naval_unit import NavalUnit, UnitCharacteristic
-from models.group import Group, GroupMembership
-from utils.auth import *
+from app.database import engine, Base
 from api import auth, naval_units, groups, admin
 
 # Create database tables
@@ -24,14 +17,19 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5174", "http://127.0.0.1:5174", 
+        "http://localhost:5175", "http://127.0.0.1:5175",
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Static files for uploaded images
-app.mount("/static", StaticFiles(directory="uploads"), name="static")
+app.mount("/static", StaticFiles(directory="../uploads"), name="static")
 
 # Include API routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pyjwt
+python-dotenv
+pillow
+aiofiles
+pydantic[email]

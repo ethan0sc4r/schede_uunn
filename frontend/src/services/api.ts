@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import {
+import type {
   User,
   NavalUnit,
   Group,
@@ -11,9 +11,9 @@ import {
   SearchResponse,
   FileUploadResponse,
   ApiError,
-} from '../types';
+} from '../types/index.ts';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,10 +23,7 @@ const api = axios.create({
 });
 
 // Auth token management
-let authToken: string | null = null;
-
 export const setAuthToken = (token: string | null) => {
-  authToken = token;
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     localStorage.setItem('auth_token', token);

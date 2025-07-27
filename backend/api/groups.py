@@ -14,7 +14,7 @@ from utils.auth import get_current_active_user
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "../uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".svg"}
 
 def save_uploaded_file(file: UploadFile, subfolder: str) -> str:

@@ -21,6 +21,8 @@ export interface NavalUnit {
   silhouette_zoom: string;
   silhouette_position_x: string;
   silhouette_position_y: string;
+  template_name?: string;
+  template_id?: string;
   created_by: number;
   created_at: string;
   updated_at?: string;

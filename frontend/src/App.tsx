@@ -1,4 +1,4 @@
-import React from 'react';
+// React import removed as it's not needed in React 17+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
@@ -6,12 +6,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
-
-// Placeholder components - these will be implemented
-const NavalUnits = () => <div className="p-6"><h1 className="text-2xl font-bold">Naval Units</h1><p>Naval units management coming soon...</p></div>;
-const Groups = () => <div className="p-6"><h1 className="text-2xl font-bold">Groups</h1><p>Groups management coming soon...</p></div>;
-const Search = () => <div className="p-6"><h1 className="text-2xl font-bold">Search</h1><p>Search functionality coming soon...</p></div>;
-const Admin = () => <div className="p-6"><h1 className="text-2xl font-bold">Admin Panel</h1><p>Admin panel coming soon...</p></div>;
+import NavalUnits from './pages/NavalUnits';
+import Groups from './pages/Groups';
+import Templates from './pages/Templates';
+import Search from './pages/Search';
+import Admin from './pages/Admin';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +42,7 @@ function App() {
             >
               <Route path="units" element={<NavalUnits />} />
               <Route path="groups" element={<Groups />} />
+              <Route path="templates" element={<Templates />} />
               <Route path="search" element={<Search />} />
               <Route
                 path="admin"

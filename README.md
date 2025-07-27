@@ -47,17 +47,17 @@ cd schede_uunn
 ### 2. Backend Setup
 
 ```bash
-# Create virtual environment
+# Create virtual environment (se non già presente)
 python -m venv venv
 
 # Activate virtual environment
 # Windows:
 venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
 
 # Install dependencies
-pip install -r backend/requirements.txt
+cd backend
+pip install -r requirements.txt
+cd ..
 ```
 
 ### 3. Frontend Setup
@@ -70,22 +70,35 @@ cd ..
 
 ### 4. Run Development Servers
 
-#### Option A: Use the automated script (Recommended)
+#### Option A: Windows - Script Separati (Consigliato)
 
-```bash
-python run_dev.py
+```cmd
+# Apri due terminali separati:
+
+# Terminal 1 - Backend:
+start_backend.bat
+
+# Terminal 2 - Frontend:
+start_frontend.bat
 ```
 
-#### Option B: Run manually
+#### Option B: Windows - Script Combinato
+
+```cmd
+start_servers.bat
+```
+
+#### Option C: Manuale
 
 **Terminal 1 - Backend:**
-```bash
+```cmd
+venv\Scripts\activate
 cd backend
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **Terminal 2 - Frontend:**
-```bash
+```cmd
 cd frontend
 npm run dev
 ```
@@ -198,6 +211,20 @@ The API documentation is automatically generated and available at `/docs` when r
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
+
+## 🐛 Known Issues & Solutions
+
+### SQLAlchemy + Python 3.13 Compatibility
+- **Issue**: SQLAlchemy ha conflitti con Python 3.13 multiprocessing
+- **Soluzione**: Usa `start_backend.bat` (senza auto-reload) per operazione stabile
+- **Alternativa**: Usa `start_backend_dev.bat` per sviluppo (può essere instabile)
+
+### Auto-reload Disabilitato
+- Il server funziona senza auto-reload per evitare crash
+- Riavvia il server manualmente dopo modifiche al codice
+
+### Windows Terminal Encoding  
+- Alcuni emoji non si visualizzano correttamente (risolto negli script)
 
 ## 📄 License
 

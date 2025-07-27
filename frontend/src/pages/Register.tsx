@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Ship, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { RegisterRequest } from '../types';
+import type { RegisterRequest } from '../types/index';
 
 const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
   const { register: registerUser } = useAuth();
-  const navigate = useNavigate();
 
   const {
     register,
@@ -45,14 +44,14 @@ const Register: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-apple-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="card py-8 px-6 shadow-apple-lg sm:px-10 text-center">
+          <div className="card py-8 px-6 shadow-lg sm:px-10 text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-medium text-apple-gray-900 mb-2">
+            <h2 className="text-2xl font-medium text-gray-900 mb-2">
               Registration Successful!
             </h2>
-            <p className="text-apple-gray-600 mb-6">
+            <p className="text-gray-600 mb-6">
               Your account has been created and is pending admin approval. 
               You'll be able to sign in once an administrator activates your account.
             </p>
@@ -69,24 +68,24 @@ const Register: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-apple-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="flex items-center space-x-3">
-            <Ship className="h-10 w-10 text-apple-blue" />
-            <h1 className="text-2xl font-bold text-apple-gray-900">
+            <Ship className="h-10 w-10 text-blue-500" />
+            <h1 className="text-2xl font-bold text-gray-900">
               Naval Units
             </h1>
           </div>
         </div>
-        <h2 className="mt-6 text-center text-3xl font-medium text-apple-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-medium text-gray-900">
           Create your account
         </h2>
-        <p className="mt-2 text-center text-sm text-apple-gray-600">
+        <p className="mt-2 text-center text-sm text-gray-600">
           Or{' '}
           <Link
             to="/login"
-            className="font-medium text-apple-blue hover:text-blue-600 transition-colors"
+            className="font-medium text-blue-500 hover:text-blue-600 transition-colors"
           >
             sign in to your existing account
           </Link>
@@ -94,7 +93,7 @@ const Register: React.FC = () => {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="card py-8 px-6 shadow-apple-lg sm:px-10">
+        <div className="card py-8 px-6 shadow-lg sm:px-10">
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="flex">
@@ -109,12 +108,12 @@ const Register: React.FC = () => {
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="first_name" className="block text-sm font-medium text-apple-gray-700 mb-2">
+                <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-2">
                   First Name
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-apple-gray-400" />
+                    <User className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     {...register('first_name', {
@@ -132,7 +131,7 @@ const Register: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="last_name" className="block text-sm font-medium text-apple-gray-700 mb-2">
+                <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-2">
                   Last Name
                 </label>
                 <input
@@ -151,12 +150,12 @@ const Register: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-apple-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-apple-gray-400" />
+                  <Mail className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   {...register('email', {
@@ -178,12 +177,12 @@ const Register: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-apple-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-apple-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   {...register('password', {
@@ -205,12 +204,12 @@ const Register: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-apple-gray-700 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
                 Confirm Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-apple-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   {...register('confirmPassword', {
@@ -250,15 +249,15 @@ const Register: React.FC = () => {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-apple-gray-300" />
+                <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-apple-gray-500">
+                <span className="px-2 bg-white text-gray-500">
                   Account pending approval
                 </span>
               </div>
             </div>
-            <p className="mt-3 text-xs text-apple-gray-600 text-center">
+            <p className="mt-3 text-xs text-gray-600 text-center">
               After registration, your account will need to be activated by an administrator 
               before you can sign in.
             </p>
