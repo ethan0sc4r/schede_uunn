@@ -1,7 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Palette, Save, Upload } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template } from './TemplateManager';
+import { getImageUrl } from '../utils/imageUtils';
 
 interface CanvasElement {
   id: string;
@@ -107,79 +108,106 @@ const PREDEFINED_FLAGS = [
 ];
 
 export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorProps) {
-  // Initialize elements from unit's layout_config or default template
-  const [elements, setElements] = useState<CanvasElement[]>(() => {
-    if (unit?.layout_config?.elements) {
-      return unit.layout_config.elements;
+  // Initialize elements state - start with empty and let useEffect handle the initialization
+  const [elements, setElements] = useState<CanvasElement[]>([]);
+
+  // Update elements when unit changes (e.g., when opening a different unit)
+  useEffect(() => {
+    console.log('🔍 useEffect triggered - unit ID:', unit?.id, 'layout_config exists:', !!unit?.layout_config?.elements);
+    console.log('🔍 Full unit object:', unit);
+    
+    if (!unit) {
+      console.log('🔍 No unit provided');
+      return;
     }
-    return [
-    // Fixed fields that always remain
-    {
-      id: 'unit_class',
-      type: 'unit_class',
-      x: 160,
-      y: 30,
-      width: 400,
-      height: 40,
-      content: `CLASSE UNITA': ${unit?.unit_class || '[Inserire classe]'}`,
-      isFixed: true,
-      style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-    },
-    {
-      id: 'unit_name',
-      type: 'unit_name',
-      x: 160,
-      y: 80,
-      width: 400,
-      height: 40,
-      content: `NOME UNITA' NAVALE: ${unit?.name || '[Inserire nome]'}`,
-      isFixed: true,
-      style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-    },
-    // Default template elements
-    {
-      id: 'logo',
-      type: 'logo',
-      x: 20,
-      y: 20,
-      width: 120,
-      height: 120,
-      style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-    },
-    {
-      id: 'flag',
-      type: 'flag', 
-      x: CANVAS_WIDTH - 140,
-      y: 20,
-      width: 120,
-      height: 80,
-      style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-    },
-    {
-      id: 'silhouette',
-      type: 'silhouette',
-      x: 20,
-      y: 180,
-      width: CANVAS_WIDTH - 40,
-      height: 300,
-      style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-    },
-    {
-      id: 'characteristics-table',
-      type: 'table',
-      x: 20,
-      y: 500,
-      width: CANVAS_WIDTH - 40,
-      height: 200,
-      style: { backgroundColor: '#f3f4f6' },
-      tableData: [
-        ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
-        ['MOTORI', 'XXX', 'RADAR', 'XXX'],
-        ['ARMA', 'XXX', 'MITRAGLIERA', 'XXX']
-      ]
+    
+    if (unit?.layout_config?.elements && unit.layout_config.elements.length > 0) {
+      console.log('🔍 Found layout_config elements:', unit.layout_config.elements);
+      console.log('🔍 Current elements state before update:', elements);
+      
+      // Force a completely new array with new objects to ensure React sees the change
+      const newElements = unit.layout_config.elements.map(el => ({ ...el }));
+      console.log('🔍 Setting new elements:', newElements);
+      setElements(newElements);
+      
+      console.log('🔍 Elements state update completed');
+    } else {
+      console.log('🔍 Creating default template for unit:', unit.id);
+      // Create default template with existing image paths if available
+      const defaultElements = [
+        // Fixed fields that always remain
+        {
+          id: 'unit_class',
+          type: 'unit_class',
+          x: 160,
+          y: 30,
+          width: 400,
+          height: 40,
+          content: unit?.unit_class || '[Inserire classe]',
+          isFixed: true,
+          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
+        },
+        {
+          id: 'unit_name',
+          type: 'unit_name',
+          x: 160,
+          y: 80,
+          width: 400,
+          height: 40,
+          content: unit?.name || '[Inserire nome]',
+          isFixed: true,
+          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
+        },
+        // Default template elements
+        {
+          id: 'logo',
+          type: 'logo',
+          x: 20,
+          y: 20,
+          width: 120,
+          height: 120,
+          image: unit?.logo_path || undefined,
+          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
+        },
+        {
+          id: 'flag',
+          type: 'flag', 
+          x: CANVAS_WIDTH - 140,
+          y: 20,
+          width: 120,
+          height: 80,
+          image: unit?.flag_path || undefined,
+          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
+        },
+        {
+          id: 'silhouette',
+          type: 'silhouette',
+          x: 20,
+          y: 180,
+          width: CANVAS_WIDTH - 40,
+          height: 300,
+          image: unit?.silhouette_path || undefined,
+          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
+        },
+        {
+          id: 'characteristics-table',
+          type: 'table',
+          x: 20,
+          y: 500,
+          width: CANVAS_WIDTH - 40,
+          height: 200,
+          style: { backgroundColor: '#f3f4f6' },
+          tableData: [
+            ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
+            ['MOTORI', 'XXX', 'RADAR', 'XXX'],
+            ['ARMA', 'XXX', 'MITRAGLIERA', 'XXX']
+          ]
+        }
+      ];
+      console.log('🔍 Setting default elements:', defaultElements);
+      setElements(defaultElements);
     }
-    ];
-  });
+  }, [unit?.id]);
 
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -202,7 +230,19 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     unit?.layout_config?.canvasBorderColor || '#000000'
   );
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [nationUpdateKey, setNationUpdateKey] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Function to get nation from flag element
+  const getNationFromFlag = (): string => {
+    const flagElement = elements.find(el => el.type === 'flag' && el.image);
+    if (!flagElement?.image) return unit?.nation || '';
+    
+    // Extract nation name from flag URL or find matching predefined flag
+    const allFlags = [...PREDEFINED_FLAGS, ...customFlags];
+    const matchingFlag = allFlags.find(flag => flag.url === flagElement.image);
+    return matchingFlag?.name || unit?.nation || '';
+  };
 
   const handleElementClick = (elementId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -290,28 +330,79 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     }
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
-  const handleImageUpload = (elementId: string, file: File) => {
-    // Convert to base64 instead of blob URL for persistence
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64String = e.target?.result as string;
+  const handleImageUpload = async (elementId: string, file: File) => {
+    try {
+      // Determine element type for appropriate subfolder
+      const element = elements.find(el => el.id === elementId);
+      const elementType = element?.type || 'general';
+      
+      // Upload to backend with appropriate subfolder
+      const formData = new FormData();
+      formData.append('image', file);
+      const subfolder = elementType === 'silhouette' ? 'silhouettes' : 
+                      elementType === 'logo' ? 'logos' : 
+                      elementType === 'flag' ? 'flags' : 'general';
+      formData.append('subfolder', subfolder);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const data = await response.json();
+      // Store only the relative path, getImageUrl will convert it to absolute URL
+      const imagePath = data.file_path;
+      
       setElements(prev => prev.map(el => 
-        el.id === elementId ? { ...el, image: base64String } : el
+        el.id === elementId ? { ...el, image: imagePath } : el
       ));
-    };
-    reader.readAsDataURL(file);
+      
+      // Force re-render of nation detection if it's a flag
+      if (element?.type === 'flag') {
+        setNationUpdateKey(prev => prev + 1);
+      }
+      
+      console.log('✅ Image uploaded successfully:', imagePath);
+      
+    } catch (error) {
+      console.error('❌ Image upload failed:', error);
+      alert('Errore durante l\'upload dell\'immagine');
+    }
   };
 
-  const handleCustomFlagUpload = (file: File) => {
-    // Convert to base64 for persistence
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64String = e.target?.result as string;
+  const handleCustomFlagUpload = async (file: File) => {
+    try {
+      // Upload to backend with flags subfolder
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('subfolder', 'flags');
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const data = await response.json();
+      // Use getImageUrl to convert relative path to absolute URL for display
+      const imagePath = getImageUrl(data.file_path);
       const flagName = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
-      const newFlag = { name: flagName, url: base64String };
+      const newFlag = { name: flagName, url: imagePath };
+      
       setCustomFlags(prev => [...prev, newFlag]);
-    };
-    reader.readAsDataURL(file);
+      console.log('✅ Custom flag uploaded successfully:', imagePath);
+      
+    } catch (error) {
+      console.error('❌ Flag upload failed:', error);
+      alert('Errore durante l\'upload della bandiera');
+    }
   };
 
   const getFilteredFlags = () => {
@@ -380,6 +471,10 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     const isSelected = selectedElement === element.id;
     const isFixed = element.isFixed || element.type === 'unit_name' || element.type === 'unit_class';
     
+    // Debug: log actual rendering values with more detail
+    console.log(`🔍 Rendering element ${element.type} (${element.id}): x=${element.x}, y=${element.y}, width=${element.width}, height=${element.height}`);
+    console.log(`🔍 Element object:`, element);
+    
     return (
       <div
         key={element.id}
@@ -407,11 +502,17 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         {/* Content based on element type */}
         {(element.type === 'text' || element.type === 'unit_name' || element.type === 'unit_class') && (
           <div
-            className="w-full h-full flex items-center justify-start px-2 cursor-move"
+            className="w-full h-full flex items-center px-2 cursor-move"
             style={{
-              fontSize: element.style?.fontSize,
-              fontWeight: element.style?.fontWeight,
-              color: element.style?.color,
+              fontSize: element.style?.fontSize || 16,
+              fontWeight: element.style?.fontWeight || 'normal',
+              fontStyle: element.style?.fontStyle || 'normal',
+              fontFamily: element.style?.fontFamily || 'Arial',
+              color: element.style?.color || '#000000',
+              textDecoration: element.style?.textDecoration || 'none',
+              textAlign: element.style?.textAlign || 'left',
+              justifyContent: element.style?.textAlign === 'center' ? 'center' : 
+                             element.style?.textAlign === 'right' ? 'flex-end' : 'flex-start',
               whiteSpace: element.style?.whiteSpace as any,
             }}
             onMouseDown={(e) => handleMouseDown(element.id, e)}
@@ -422,15 +523,25 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 onChange={(e) => handleTextEdit(element.id, e.target.value)}
                 className="w-full h-full bg-transparent border-none outline-none resize-none"
                 style={{
-                  fontSize: element.style?.fontSize,
-                  fontWeight: element.style?.fontWeight,
-                  color: element.style?.color,
+                  fontSize: element.style?.fontSize || 16,
+                  fontWeight: element.style?.fontWeight || 'normal',
+                  fontStyle: element.style?.fontStyle || 'normal',
+                  fontFamily: element.style?.fontFamily || 'Arial',
+                  color: element.style?.color || '#000000',
+                  textDecoration: element.style?.textDecoration || 'none',
+                  textAlign: element.style?.textAlign || 'left',
                 }}
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <div style={{ whiteSpace: 'pre-line' }}>{element.content}</div>
+              <div style={{ 
+                whiteSpace: 'pre-line',
+                width: '100%',
+                textAlign: element.style?.textAlign || 'left'
+              }}>
+                {element.content}
+              </div>
             )}
           </div>
         )}
@@ -442,7 +553,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           >
             {element.image ? (
               <img
-                src={element.image}
+                src={getImageUrl(element.image)}
                 alt={element.type}
                 className="max-w-full max-h-full object-contain"
               />
@@ -471,7 +582,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           >
             {element.image ? (
               <img
-                src={element.image}
+                src={getImageUrl(element.image)}
                 alt="Flag"
                 className="max-w-full max-h-full object-cover"
               />
@@ -652,6 +763,14 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             </div>
           </div>
 
+          {/* Auto-detected Nation */}
+          <div key={nationUpdateKey} className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Nazione Rilevata</h3>
+            <div className="text-sm text-gray-600">
+              {getNationFromFlag() || 'Aggiungi una bandiera per rilevare automaticamente la nazione'}
+            </div>
+          </div>
+
           <div className="space-y-2 mb-4">
             <button
               onClick={() => setShowTemplateManager(true)}
@@ -668,7 +787,10 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 Annulla
               </button>
               <button
-                onClick={() => onSave({ elements, canvasBackground, canvasBorderWidth, canvasBorderColor })}
+                onClick={() => {
+                  console.log('🔍 CanvasEditor saving elements:', elements);
+                  onSave({ elements, canvasBackground, canvasBorderWidth, canvasBorderColor, nation: getNationFromFlag() });
+                }}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
                 <Save className="h-4 w-4 mr-2" />
@@ -746,25 +868,322 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Testo</label>
+                        <textarea
+                          value={element.content || ''}
+                          onChange={(e) => handleTextEdit(element.id, e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          rows={3}
+                        />
+                      </div>
+                      
+                      {/* Font Family */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Carattere</label>
+                        <select
+                          value={element.style?.fontFamily || 'Arial'}
+                          onChange={(e) => setElements(prev => prev.map(el => 
+                            el.id === selectedElement 
+                              ? { ...el, style: { ...el.style, fontFamily: e.target.value } }
+                              : el
+                          ))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="Arial">Arial</option>
+                          <option value="Helvetica">Helvetica</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Verdana">Verdana</option>
+                          <option value="Courier New">Courier New</option>
+                          <option value="Impact">Impact</option>
+                          <option value="Comic Sans MS">Comic Sans MS</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Font Size */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dimensione</label>
+                          <input
+                            type="number"
+                            min="8"
+                            max="72"
+                            value={element.style?.fontSize || 16}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, fontSize: parseInt(e.target.value) || 16 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+
+                        {/* Text Color */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                          <input
+                            type="color"
+                            value={element.style?.color || '#000000'}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, color: e.target.value } }
+                                : el
+                            ))}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Text Formatting */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Formato</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontWeight: el.style?.fontWeight === 'bold' ? 'normal' : 'bold' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm font-bold border rounded transition-colors ${
+                              element.style?.fontWeight === 'bold'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            B
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontStyle: el.style?.fontStyle === 'italic' ? 'normal' : 'italic' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm italic border rounded transition-colors ${
+                              element.style?.fontStyle === 'italic'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            I
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      textDecoration: el.style?.textDecoration === 'underline' ? 'none' : 'underline' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm underline border rounded transition-colors ${
+                              element.style?.textDecoration === 'underline'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            U
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Text Alignment */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Allineamento</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'left' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'left' || !element.style?.textAlign
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ⇤
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'center' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'center'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ↔
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'right' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'right'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ⇥
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {(element.type === 'unit_name' || element.type === 'unit_class') && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {element.type === 'unit_name' ? 'Nome Unità' : 'Classe Unità'}
+                        </label>
                         <input
                           type="text"
                           value={element.content || ''}
                           onChange={(e) => handleTextEdit(element.id, e.target.value)}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          placeholder={element.type === 'unit_name' ? 'Inserisci nome unità...' : 'Inserisci classe unità...'}
                         />
                       </div>
+                      
+                      {/* Font controls for fixed fields */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Dimensione Font</label>
-                        <input
-                          type="number"
-                          value={element.style?.fontSize || 16}
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Carattere</label>
+                        <select
+                          value={element.style?.fontFamily || 'Arial'}
                           onChange={(e) => setElements(prev => prev.map(el => 
                             el.id === selectedElement 
-                              ? { ...el, style: { ...el.style, fontSize: parseInt(e.target.value) || 16 } }
+                              ? { ...el, style: { ...el.style, fontFamily: e.target.value } }
                               : el
                           ))}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        />
+                        >
+                          <option value="Arial">Arial</option>
+                          <option value="Helvetica">Helvetica</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Verdana">Verdana</option>
+                          <option value="Courier New">Courier New</option>
+                          <option value="Impact">Impact</option>
+                          <option value="Comic Sans MS">Comic Sans MS</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dimensione</label>
+                          <input
+                            type="number"
+                            min="8"
+                            max="72"
+                            value={element.style?.fontSize || 20}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, fontSize: parseInt(e.target.value) || 20 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                          <input
+                            type="color"
+                            value={element.style?.color || '#000000'}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, color: e.target.value } }
+                                : el
+                            ))}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Formato</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontWeight: el.style?.fontWeight === 'bold' ? 'normal' : 'bold' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm font-bold border rounded transition-colors ${
+                              element.style?.fontWeight === 'bold'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            B
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontStyle: el.style?.fontStyle === 'italic' ? 'normal' : 'italic' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm italic border rounded transition-colors ${
+                              element.style?.fontStyle === 'italic'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            I
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      textDecoration: el.style?.textDecoration === 'underline' ? 'none' : 'underline' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm underline border rounded transition-colors ${
+                              element.style?.textDecoration === 'underline'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            U
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}
@@ -1090,6 +1509,64 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           </div>
         </div>
       </div>
+
+      {/* Flag Selector Modal */}
+      {showFlagSelector && selectedElement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Seleziona Bandiera</h2>
+              <button
+                onClick={() => setShowFlagSelector(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-auto">
+              {/* Search */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Cerca bandiera..."
+                  value={flagSearchTerm}
+                  onChange={(e) => setFlagSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              {/* Flags Grid */}
+              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                {getFilteredFlags().map((flag, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      setElements(prev => prev.map(el => 
+                        el.id === selectedElement 
+                          ? { ...el, image: flag.url }
+                          : el
+                      ));
+                      setNationUpdateKey(prev => prev + 1); // Force re-render of nation detection
+                      setShowFlagSelector(false);
+                    }}
+                    className="flex flex-col items-center p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
+                  >
+                    <img
+                      src={flag.url}
+                      alt={flag.name}
+                      className="w-12 h-8 object-cover rounded border"
+                    />
+                    <span className="text-xs font-medium text-gray-700 mt-2 text-center">
+                      {flag.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

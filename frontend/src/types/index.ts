@@ -23,7 +23,9 @@ export interface NavalUnit {
   silhouette_position_y: string;
   template_name?: string;
   template_id?: string;
+  notes?: string; // Rich text notes field
   created_by: number;
+  creator?: User; // User who created this unit
   created_at: string;
   updated_at?: string;
   characteristics: UnitCharacteristic[];
@@ -41,12 +43,28 @@ export interface Group {
   id: number;
   name: string;
   description?: string;
+  parent_group_id?: number;
   logo_path?: string;
   flag_path?: string;
+  template_logo_path?: string;
+  template_flag_path?: string;
+  override_logo: boolean;
+  override_flag: boolean;
+  presentation_config?: PresentationConfig;
   created_by: number;
   created_at: string;
   updated_at?: string;
   naval_units: NavalUnit[];
+  subgroups?: Group[];
+}
+
+export interface PresentationConfig {
+  mode: 'single' | 'grid';
+  interval?: number; // seconds for single mode
+  grid_rows?: number;
+  grid_cols?: number;
+  auto_advance?: boolean;
+  page_duration?: number; // seconds for grid mode
 }
 
 export interface CreateNavalUnitRequest {
@@ -70,7 +88,13 @@ export interface CreateCharacteristicRequest {
 export interface CreateGroupRequest {
   name: string;
   description?: string;
+  parent_group_id?: number;
   naval_unit_ids: number[];
+  template_logo_path?: string;
+  template_flag_path?: string;
+  override_logo?: boolean;
+  override_flag?: boolean;
+  presentation_config?: PresentationConfig;
 }
 
 export interface LoginRequest {

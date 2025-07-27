@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { Download, Share2, FileImage, Printer, ExternalLink } from 'lucide-react';
+import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye, FileText } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import { navalUnitsApi } from '../services/api';
+import { getImageUrl } from '../utils/imageUtils';
 
 interface NavalUnitCardProps {
   unit: NavalUnit;
   onEdit: () => void;
   onDelete: () => void;
+  onEditNotes?: () => void;
 }
 
-export default function NavalUnitCard({ unit, onEdit, onDelete }: NavalUnitCardProps) {
+export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardProps) {
   const [showActions, setShowActions] = useState(false);
 
   const handlePrint = async () => {
@@ -74,7 +76,7 @@ export default function NavalUnitCard({ unit, onEdit, onDelete }: NavalUnitCardP
             return (
               <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
                 <img
-                  src={`/api/static/${unit.silhouette_path}`}
+                  src={getImageUrl(unit.silhouette_path)}
                   alt={`${unit.name} silhouette`}
                   className="max-h-full max-w-full object-contain"
                 />
@@ -170,25 +172,36 @@ export default function NavalUnitCard({ unit, onEdit, onDelete }: NavalUnitCardP
           </div>
         )}
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-center">
           <button
             onClick={() => window.open(`/units/${unit.id}/view`, '_blank')}
-            className="flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors flex items-center justify-center"
+            className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center"
+            title="Visualizza"
           >
-            <ExternalLink className="h-4 w-4 mr-1" />
-            Visualizza
+            <Eye className="h-4 w-4" />
           </button>
           <button
             onClick={onEdit}
-            className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+            className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center"
+            title="Modifica"
           >
-            Modifica
+            <Edit3 className="h-4 w-4" />
           </button>
+          {onEditNotes && (
+            <button
+              onClick={onEditNotes}
+              className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
+              title="Note"
+            >
+              <FileText className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={onDelete}
-            className="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
+            title="Elimina"
           >
-            Elimina
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       </div>

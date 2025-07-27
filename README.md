@@ -5,11 +5,14 @@ A complete web application for creating, managing, viewing, and exporting naval 
 ## 🚀 Features
 
 - **User Management**: Registration, authentication, and admin approval system
-- **Naval Unit Cards**: Create and edit A4-formatted information sheets
-- **Image Management**: Upload logos, silhouettes, and flags with zoom controls
-- **Groups/Exercises**: Organize units into groups with override capabilities
+- **Naval Unit Cards**: Create and edit A4-formatted information sheets with advanced canvas editor
+- **Image Management**: Upload logos, silhouettes, and flags with backend storage
+- **Advanced Groups**: Organize units with subgroups, template overrides, and presentation modes
+- **Presentation Mode**: Full-screen slideshow with single/grid layouts and auto-advance
+- **Template System**: Group-level logo/flag overrides for presentations
+- **Search & Filter**: Advanced search by name, class, nation, and creator
+- **Notes System**: WYSIWYG editor for rich text notes on each unit
 - **Export Options**: PDF and PNG export functionality
-- **Search**: Find units by name, class, or nation
 - **Admin Panel**: User management and activation controls
 - **Responsive Design**: Apple-inspired UI with clean typography and spacing
 
@@ -108,6 +111,22 @@ npm run dev
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
+
+## 📁 Data Structure
+
+All application data is stored in the `data/` directory:
+
+```
+data/
+├── naval_units.db          # Main SQLite database
+├── uploads/               # User uploaded images
+│   ├── logos/            # Unit logos
+│   ├── silhouettes/      # Ship silhouettes  
+│   └── flags/            # Nation flags
+└── exports/              # Generated PDF/PNG exports
+```
+
+**Important**: The `data/` directory contains all user data and should be backed up regularly. It's excluded from git to prevent accidental commits of sensitive data.
 
 ## 👤 First Admin User
 

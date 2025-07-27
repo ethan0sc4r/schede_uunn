@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -10,7 +10,19 @@ class Group(Base):
     name = Column(String, nullable=False, index=True)
     description = Column(String, nullable=True)
     
-    # Group images
+    # Hierarchy support for subgroups
+    parent_group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
+    
+    # Template override settings
+    template_logo_path = Column(String, nullable=True)
+    template_flag_path = Column(String, nullable=True)
+    override_logo = Column(Boolean, default=False)
+    override_flag = Column(Boolean, default=False)
+    
+    # Presentation settings
+    presentation_config = Column(JSON, nullable=True)  # Store presentation settings
+    
+    # Group images (for the group itself, not template)
     logo_path = Column(String, nullable=True)
     flag_path = Column(String, nullable=True)
     
@@ -23,6 +35,9 @@ class Group(Base):
     # Relationships
     creator = relationship("User", back_populates="groups")
     memberships = relationship("GroupMembership", back_populates="group", cascade="all, delete-orphan")
+    
+    # Self-referential relationship for subgroups
+    parent_group = relationship("Group", remote_side=[id], backref="subgroups")
 
 class GroupMembership(Base):
     __tablename__ = "group_memberships"

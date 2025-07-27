@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Download, Share2, FileImage, Printer } from 'lucide-react';
+import { Download, Share2, FileImage, Printer, Presentation } from 'lucide-react';
 import { navalUnitsApi } from '../services/api';
 import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
+import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
 
 export default function UnitView() {
@@ -66,6 +67,28 @@ export default function UnitView() {
     } catch (error: any) {
       console.error('PNG export error:', error);
       alert(`Errore durante l'esportazione PNG: ${error.message || error}`);
+    }
+  };
+
+  const handleExportPowerPoint = () => {
+    if (!unit) {
+      alert('Errore: Unità non disponibile per l\'esportazione');
+      return;
+    }
+    
+    console.log('Starting PowerPoint export for unit:', unit.id);
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const exportUrl = `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`;
+      
+      // Open the export URL directly in the same window to trigger download
+      window.location.href = exportUrl;
+      
+      console.log('PowerPoint export initiated successfully');
+    } catch (error: any) {
+      console.error('PowerPoint export error:', error);
+      alert(`Errore durante l'esportazione PowerPoint: ${error.message || error}`);
     }
   };
 
@@ -137,7 +160,7 @@ export default function UnitView() {
                 <div className="w-full h-full flex items-center justify-center">
                   {element.image ? (
                     <img
-                      src={element.image}
+                      src={getImageUrl(element.image)}
                       alt={element.type}
                       className="max-w-full max-h-full object-contain"
                       style={{ display: 'block' }}
@@ -162,7 +185,7 @@ export default function UnitView() {
                 <div className="w-full h-full flex items-center justify-center">
                   {element.image ? (
                     <img
-                      src={element.image}
+                      src={getImageUrl(element.image)}
                       alt="Flag"
                       className="max-w-full max-h-full object-cover"
                       style={{ display: 'block' }}
@@ -256,6 +279,13 @@ export default function UnitView() {
             >
               <FileImage className="h-3 w-3 mr-1" />
               PNG
+            </button>
+            <button
+              onClick={handleExportPowerPoint}
+              className="flex items-center px-3 py-1.5 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 transition-colors"
+            >
+              <Presentation className="h-3 w-3 mr-1" />
+              PowerPoint
             </button>
             <button
               onClick={handlePrint}

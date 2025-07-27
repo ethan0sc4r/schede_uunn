@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import List, Optional
 import os
@@ -18,7 +18,7 @@ from utils.export import create_naval_unit_pdf, create_naval_unit_image
 
 router = APIRouter()
 
-UPLOAD_DIR = "../uploads"
+UPLOAD_DIR = "../data/uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".svg"}
 
 def save_uploaded_file(file: UploadFile, subfolder: str) -> str:
@@ -46,7 +46,7 @@ def get_naval_units(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    units = db.query(NavalUnit).offset(skip).limit(limit).all()
+    units = db.query(NavalUnit).options(joinedload(NavalUnit.creator)).offset(skip).limit(limit).all()
     return units
 
 @router.get("/{unit_id}", response_model=NavalUnitResponse)
@@ -277,7 +277,7 @@ def export_unit_pdf(
             }
     
     # Create output directory if it doesn't exist
-    export_dir = "../exports"
+    export_dir = "../data/exports"
     os.makedirs(export_dir, exist_ok=True)
     
     # Generate filename
@@ -336,7 +336,7 @@ def export_unit_png(
             }
     
     # Create output directory if it doesn't exist
-    export_dir = "../exports"
+    export_dir = "../data/exports"
     os.makedirs(export_dir, exist_ok=True)
     
     # Generate filename

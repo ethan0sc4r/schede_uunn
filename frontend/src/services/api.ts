@@ -22,6 +22,9 @@ const api = axios.create({
   },
 });
 
+// Export API_BASE_URL for static file URLs
+export { API_BASE_URL };
+
 // Auth token management
 export const setAuthToken = (token: string | null) => {
   if (token) {
@@ -98,27 +101,21 @@ export const navalUnitsApi = {
   uploadLogo: async (id: number, file: File): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post(`/api/units/${id}/upload-logo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post(`/api/units/${id}/upload-logo`, formData);
     return response.data;
   },
 
   uploadSilhouette: async (id: number, file: File): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post(`/api/units/${id}/upload-silhouette`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post(`/api/units/${id}/upload-silhouette`, formData);
     return response.data;
   },
 
   uploadFlag: async (id: number, file: File): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post(`/api/units/${id}/upload-flag`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post(`/api/units/${id}/upload-flag`, formData);
     return response.data;
   },
 
@@ -169,17 +166,20 @@ export const groupsApi = {
   uploadLogo: async (id: number, file: File): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post(`/api/groups/${id}/upload-logo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post(`/api/groups/${id}/upload-logo`, formData);
     return response.data;
   },
 
   uploadFlag: async (id: number, file: File): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post(`/api/groups/${id}/upload-flag`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    const response = await api.post(`/api/groups/${id}/upload-flag`, formData);
+    return response.data;
+  },
+
+  exportPowerPoint: async (id: number): Promise<Blob> => {
+    const response = await api.get(`/api/groups/${id}/export/powerpoint`, { 
+      responseType: 'blob' 
     });
     return response.data;
   },

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
 import shutil
 from uuid import uuid4
+import tempfile
 
 from app.database import get_db
 from app.schemas import *
@@ -11,6 +13,7 @@ from models.user import User
 from models.group import Group, GroupMembership
 from models.naval_unit import NavalUnit
 from utils.auth import get_current_active_user
+from utils.powerpoint_export import create_group_powerpoint
 
 router = APIRouter()
 
@@ -202,3 +205,90 @@ def upload_group_flag(
     db.commit()
     
     return {"message": "Group flag uploaded successfully", "file_path": file_path}
+
+@router.get("/{group_id}/export/powerpoint")
+def export_group_powerpoint(
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Export a group's naval units to PowerPoint presentation"""
+    
+    # Get the group with all related data
+    db_group = db.query(Group).filter(Group.id == group_id).first()
+    if not db_group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    
+    # Load naval units with full layout data
+    naval_units = []
+    for membership in db_group.memberships:
+        unit = membership.naval_unit
+        # Convert unit to dict with all necessary data
+        unit_data = {
+            'id': unit.id,
+            'name': unit.name,
+            'unit_class': unit.unit_class,
+            'nation': unit.nation,
+            'layout_config': unit.layout_config,
+            'creator': {
+                'first_name': unit.creator.first_name if unit.creator else '',
+                'last_name': unit.creator.last_name if unit.creator else ''
+            }
+        }
+        naval_units.append(unit_data)
+    
+    # Prepare group data for PowerPoint export
+    group_data = {
+        'id': db_group.id,
+        'name': db_group.name,
+        'description': db_group.description,
+        'naval_units': naval_units,
+        'presentation_config': db_group.presentation_config or {
+            'mode': 'single',
+            'interval': 5,
+            'grid_rows': 3,
+            'grid_cols': 3,
+            'auto_advance': True,
+            'page_duration': 10
+        },
+        'override_logo': db_group.override_logo,
+        'override_flag': db_group.override_flag,
+        'template_logo_path': db_group.template_logo_path,
+        'template_flag_path': db_group.template_flag_path
+    }
+    
+    # Create temporary file for PowerPoint
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
+        output_path = tmp_file.name
+    
+    try:
+        # Generate PowerPoint presentation
+        created_path = create_group_powerpoint(group_data, output_path)
+        
+        # Create exports directory if it doesn't exist
+        exports_dir = "./data/exports"
+        os.makedirs(exports_dir, exist_ok=True)
+        
+        # Create final filename
+        safe_name = "".join(c for c in db_group.name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        final_filename = f"{safe_name}_presentation.pptx"
+        final_path = os.path.join(exports_dir, final_filename)
+        
+        # Move file to exports directory
+        shutil.move(created_path, final_path)
+        
+        # Return file response
+        return FileResponse(
+            path=final_path,
+            filename=final_filename,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+        
+    except Exception as e:
+        # Clean up temp file on error
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error creating PowerPoint presentation: {str(e)}"
+        )

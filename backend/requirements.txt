@@ -10,3 +10,5 @@ aiofiles
 pydantic
 pydantic-settings
 python-dotenv
+python-pptx
+requests

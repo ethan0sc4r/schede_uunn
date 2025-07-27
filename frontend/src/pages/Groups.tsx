@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { groupsApi } from '../services/api';
-import type { Group } from '../types/index.ts';
+import { groupsApi, navalUnitsApi } from '../services/api';
+import type { Group, CreateGroupRequest } from '../types/index.ts';
 import GroupCard from '../components/GroupCard';
-import GroupModal from '../components/GroupModal';
+import GroupModalAdvanced from '../components/GroupModalAdvanced';
+import PresentationMode from '../components/PresentationMode';
 
 export default function Groups() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
+  const [presentationGroup, setPresentationGroup] = useState<Group | null>(null);
   const queryClient = useQueryClient();
 
   const { data: groups, isLoading, error } = useQuery({
@@ -15,8 +18,27 @@ export default function Groups() {
     queryFn: () => groupsApi.getAll(),
   });
 
+  const { data: navalUnits } = useQuery({
+    queryKey: ['navalUnits'],
+    queryFn: () => navalUnitsApi.getAll(),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: groupsApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: groupsApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: CreateGroupRequest }) => groupsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     },
@@ -46,6 +68,59 @@ export default function Groups() {
   const handleModalClose = () => {
     setIsModalOpen(false);
     setSelectedGroup(null);
+  };
+
+  const handleGroupSave = async (groupData: CreateGroupRequest) => {
+    try {
+      if (selectedGroup) {
+        await updateMutation.mutateAsync({ id: selectedGroup.id, data: groupData });
+      } else {
+        await createMutation.mutateAsync(groupData);
+      }
+      handleModalClose();
+    } catch (error) {
+      console.error('Errore durante il salvataggio:', error);
+      alert('Errore durante il salvataggio del gruppo');
+    }
+  };
+
+  const handlePresentation = (group: Group) => {
+    setPresentationGroup(group);
+    setIsPresentationOpen(true);
+  };
+
+  const handlePresentationClose = () => {
+    setIsPresentationOpen(false);
+    setPresentationGroup(null);
+  };
+
+  const handleExportPowerPoint = async (group: Group) => {
+    try {
+      console.log('Starting PowerPoint export for group:', group.id);
+      const blob = await groupsApi.exportPowerPoint(group.id);
+      console.log('PowerPoint export successful, blob size:', blob.size);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Create safe filename
+      const safeName = group.name.replace(/[^a-zA-Z0-9\s\-_]/g, '');
+      link.download = `${safeName}_presentation.pptx`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Errore durante l\'export PowerPoint:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      alert(`Errore durante l'export PowerPoint: ${error.response?.data?.detail || error.message}`);
+    }
   };
 
   if (isLoading) {
@@ -98,19 +173,29 @@ export default function Groups() {
               group={group}
               onEdit={() => handleEdit(group)}
               onDelete={() => handleDelete(group.id)}
+              onPresentation={() => handlePresentation(group)}
+              onExportPowerPoint={() => handleExportPowerPoint(group)}
             />
           ))}
         </div>
       )}
 
       {isModalOpen && (
-        <GroupModal
+        <GroupModalAdvanced
+          isOpen={isModalOpen}
           group={selectedGroup}
           onClose={handleModalClose}
-          onSave={() => {
-            queryClient.invalidateQueries({ queryKey: ['groups'] });
-            handleModalClose();
-          }}
+          onSave={handleGroupSave}
+          availableUnits={navalUnits || []}
+          availableGroups={groups || []}
+        />
+      )}
+
+      {isPresentationOpen && presentationGroup && (
+        <PresentationMode
+          group={presentationGroup}
+          isOpen={isPresentationOpen}
+          onClose={handlePresentationClose}
         />
       )}
     </div>

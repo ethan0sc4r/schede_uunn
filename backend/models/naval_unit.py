@@ -25,6 +25,9 @@ class NavalUnit(Base):
     silhouette_position_x = Column(String, default="0")
     silhouette_position_y = Column(String, default="0")
     
+    # Rich text notes
+    notes = Column(Text, nullable=True)
+    
     # User who created this unit
     created_by = Column(Integer, ForeignKey("users.id"))
     

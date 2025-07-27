@@ -1,0 +1,16 @@
+# Data directory - contains user uploads, database, and exports
+# This directory should be backed up regularly but not committed to git
+
+# Database files
+*.db
+*.db-journal
+
+# User uploads
+uploads/
+
+# Exported files
+exports/
+
+# Keep the directory structure but ignore contents
+*
+!.gitignore
