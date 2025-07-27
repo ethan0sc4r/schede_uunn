@@ -11,6 +11,7 @@ import Groups from './pages/Groups';
 import Templates from './pages/Templates';
 import Search from './pages/Search';
 import Admin from './pages/Admin';
+import UnitView from './pages/UnitView';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +31,7 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/units/:id/view" element={<UnitView />} />
             
             {/* Protected routes */}
             <Route

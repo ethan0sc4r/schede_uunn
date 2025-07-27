@@ -291,17 +291,27 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
   const handleImageUpload = (elementId: string, file: File) => {
-    const url = URL.createObjectURL(file);
-    setElements(prev => prev.map(el => 
-      el.id === elementId ? { ...el, image: url } : el
-    ));
+    // Convert to base64 instead of blob URL for persistence
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64String = e.target?.result as string;
+      setElements(prev => prev.map(el => 
+        el.id === elementId ? { ...el, image: base64String } : el
+      ));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCustomFlagUpload = (file: File) => {
-    const url = URL.createObjectURL(file);
-    const flagName = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
-    const newFlag = { name: flagName, url: url };
-    setCustomFlags(prev => [...prev, newFlag]);
+    // Convert to base64 for persistence
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64String = e.target?.result as string;
+      const flagName = file.name.replace(/\.[^/.]+$/, ""); // Remove file extension
+      const newFlag = { name: flagName, url: base64String };
+      setCustomFlags(prev => [...prev, newFlag]);
+    };
+    reader.readAsDataURL(file);
   };
 
   const getFilteredFlags = () => {
@@ -1040,7 +1050,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
       {/* Canvas Area */}
       <div className="flex-1 p-8 overflow-auto">
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden" style={{ borderWidth: canvasBorderWidth, borderColor: canvasBorderColor, borderStyle: 'solid' }}>
+        <div className="bg-white shadow-xl rounded-lg overflow-auto max-h-screen">
           <div 
             style={{ 
               width: CANVAS_WIDTH * zoomLevel, 
