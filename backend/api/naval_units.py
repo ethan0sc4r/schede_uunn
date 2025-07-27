@@ -52,8 +52,7 @@ def get_naval_units(
 @router.get("/{unit_id}", response_model=NavalUnitResponse)
 def get_naval_unit(
     unit_id: int, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     unit = db.query(NavalUnit).filter(NavalUnit.id == unit_id).first()
     if not unit:

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Download, Share2, FileImage, Printer, ExternalLink } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import { navalUnitsApi } from '../services/api';
-import { exportCanvasToPNG, exportCanvasToPDF } from '../utils/exportUtils';
 
 interface NavalUnitCardProps {
   unit: NavalUnit;

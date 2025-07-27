@@ -32,16 +32,16 @@ export default function UnitView() {
   }, [id]);
 
   const handlePrint = async () => {
-    if (!unit || !containerRef.current) {
-      alert('Errore: Container non disponibile per la stampa');
+    if (!unit || !canvasRef.current) {
+      alert('Errore: Canvas non disponibile per la stampa');
       return;
     }
     
     console.log('Starting print for:', unit.name);
-    console.log('Container ref element:', containerRef.current);
+    console.log('Canvas ref element:', canvasRef.current);
     
     try {
-      await printCanvas(containerRef.current);
+      await printCanvas(canvasRef.current);
       console.log('Print initiated successfully');
     } catch (error: any) {
       console.error('Print error:', error);
@@ -50,18 +50,18 @@ export default function UnitView() {
   };
 
   const handleExportPNG = async () => {
-    if (!unit || !containerRef.current) {
-      alert('Errore: Container non disponibile per l\'esportazione');
+    if (!unit || !canvasRef.current) {
+      alert('Errore: Canvas non disponibile per l\'esportazione');
       return;
     }
     
     console.log('Starting PNG export for:', unit.name);
-    console.log('Container ref element:', containerRef.current);
-    console.log('Container dimensions:', containerRef.current.offsetWidth, 'x', containerRef.current.offsetHeight);
+    console.log('Canvas ref element:', canvasRef.current);
+    console.log('Canvas dimensions:', canvasRef.current.offsetWidth, 'x', canvasRef.current.offsetHeight);
     
     try {
       const filename = `${unit.name.replace(/\s+/g, '_')}_scheda.png`;
-      await exportCanvasToPNG(containerRef.current, filename);
+      await exportCanvasToPNG(canvasRef.current, filename);
       console.log('PNG export completed successfully');
     } catch (error: any) {
       console.error('PNG export error:', error);
