@@ -113,26 +113,38 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
   // Update elements when unit changes (e.g., when opening a different unit)
   useEffect(() => {
-    console.log('🔍 useEffect triggered - unit ID:', unit?.id, 'layout_config exists:', !!unit?.layout_config?.elements);
-    console.log('🔍 Full unit object:', unit);
+    console.log('🔍 CanvasEditor useEffect triggered');
+    console.log('🔍 Unit ID:', unit?.id);
+    console.log('🔍 Unit object:', unit);
+    console.log('🔍 Layout config exists:', !!unit?.layout_config?.elements);
+    console.log('🔍 Layout config elements:', unit?.layout_config?.elements);
+    console.log('🔍 Current elements state:', elements);
     
     if (!unit) {
-      console.log('🔍 No unit provided');
+      console.log('🔍 No unit provided, returning');
       return;
     }
     
     if (unit?.layout_config?.elements && unit.layout_config.elements.length > 0) {
-      console.log('🔍 Found layout_config elements:', unit.layout_config.elements);
+      console.log('🔍 Found layout_config with', unit.layout_config.elements.length, 'elements');
+      
+      // Log each element's position
+      unit.layout_config.elements.forEach((el, index) => {
+        console.log(`🔍 Element ${index + 1} (${el.type}): x=${el.x}, y=${el.y}, width=${el.width}, height=${el.height}`);
+      });
+      
       console.log('🔍 Current elements state before update:', elements);
       
       // Force a completely new array with new objects to ensure React sees the change
       const newElements = unit.layout_config.elements.map(el => ({ ...el }));
-      console.log('🔍 Setting new elements:', newElements);
+      console.log('🔍 Setting new elements with positions:', newElements);
       setElements(newElements);
       
-      console.log('🔍 Elements state update completed');
+      // Verify the state was updated
+      console.log('🔍 setElements called, elements should now be updated');
+      
     } else {
-      console.log('🔍 Creating default template for unit:', unit.id);
+      console.log('🔍 No layout_config elements found, creating default template for unit:', unit.id);
       // Create default template with existing image paths if available
       const defaultElements = [
         // Fixed fields that always remain
@@ -208,6 +220,17 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       setElements(defaultElements);
     }
   }, [unit?.id]);
+
+  // Add a separate useEffect to log when elements state actually changes
+  useEffect(() => {
+    console.log('🔍 Elements state changed! New elements:', elements);
+    if (elements.length > 0) {
+      console.log('🔍 Elements positions after state change:');
+      elements.forEach((el, index) => {
+        console.log(`🔍 State element ${index + 1} (${el.type}): x=${el.x}, y=${el.y}, width=${el.width}, height=${el.height}`);
+      });
+    }
+  }, [elements]);
 
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -472,8 +495,14 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     const isFixed = element.isFixed || element.type === 'unit_name' || element.type === 'unit_class';
     
     // Debug: log actual rendering values with more detail
-    console.log(`🔍 Rendering element ${element.type} (${element.id}): x=${element.x}, y=${element.y}, width=${element.width}, height=${element.height}`);
-    console.log(`🔍 Element object:`, element);
+    console.log(`🔍 RENDER: ${element.type} (${element.id}) at x=${element.x}, y=${element.y}, w=${element.width}, h=${element.height}`);
+    console.log(`🔍 RENDER: Element full object:`, element);
+    console.log(`🔍 RENDER: Style will be applied:`, {
+      left: element.x,
+      top: element.y,
+      width: element.width,
+      height: element.height,
+    });
     
     return (
       <div

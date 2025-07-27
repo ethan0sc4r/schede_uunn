@@ -206,7 +206,21 @@ class SimpleDatabase:
             cursor.execute('''
                 SELECT * FROM naval_units ORDER BY created_at DESC LIMIT ? OFFSET ?
             ''', (limit, skip))
-            return [dict(row) for row in cursor.fetchall()]
+            
+            units = []
+            for row in cursor.fetchall():
+                unit = dict(row)
+                
+                # Parse JSON fields (same as get_naval_unit_by_id)
+                if unit['layout_config']:
+                    try:
+                        unit['layout_config'] = json.loads(unit['layout_config'])
+                    except:
+                        unit['layout_config'] = {}
+                
+                units.append(unit)
+            
+            return units
     
     @staticmethod
     def get_naval_unit_by_id(unit_id: int) -> Optional[Dict]:

@@ -66,7 +66,7 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
             return (
               <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
                 <img
-                  src={silhouetteImage}
+                  src={getImageUrl(silhouetteImage)}
                   alt={`${unit.name} silhouette`}
                   className="max-h-full max-w-full object-contain"
                 />

@@ -59,6 +59,9 @@ export default function NavalUnits() {
   };
 
   const handleEdit = (unit: NavalUnit) => {
+    console.log('🔍 NavalUnits handleEdit called with unit:', unit);
+    console.log('🔍 Unit layout_config:', unit.layout_config);
+    console.log('🔍 Unit layout_config elements:', unit.layout_config?.elements);
     setSelectedUnit(unit);
     setShowEditor(true);
   };
