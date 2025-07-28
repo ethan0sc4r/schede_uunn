@@ -858,6 +858,9 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   };
 
   const applyTemplate = (template: Template, preserveContent = false) => {
+    console.log('🎨 Applying template:', template.name, 'preserveContent:', preserveContent);
+    console.log('📋 Unit data:', { name: unit?.name, unit_class: unit?.unit_class });
+    
     // Preserve images from database
     const preservedImages = {
       logo: unit?.logo_path,
@@ -904,12 +907,12 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           preservedElement.image = currentContent.get(`${templateEl.type}_image`);
         }
 
-        // Always preserve unit name and class content
-        if (templateEl.type === 'unit_name' && unit?.name) {
-          preservedElement.content = unit.name;
+        // Always preserve unit name and class content from actual unit data
+        if (templateEl.type === 'unit_name') {
+          preservedElement.content = unit?.name || templateEl.content || '[Nome Unità]';
         }
-        if (templateEl.type === 'unit_class' && unit?.unit_class) {
-          preservedElement.content = unit.unit_class;
+        if (templateEl.type === 'unit_class') {
+          preservedElement.content = unit?.unit_class || templateEl.content || '[Classe Unità]';
         }
 
         return preservedElement;
@@ -931,12 +934,12 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           newEl.image = preservedImages.silhouette;
         }
         
-        // Still preserve unit name and class from actual unit data
-        if (el.type === 'unit_name' && unit?.name) {
-          newEl.content = unit.name;
+        // Always populate unit name and class from actual unit data or fallback
+        if (el.type === 'unit_name') {
+          newEl.content = unit?.name || el.content || '[Nome Unità]';
         }
-        if (el.type === 'unit_class' && unit?.unit_class) {
-          newEl.content = unit.unit_class;
+        if (el.type === 'unit_class') {
+          newEl.content = unit?.unit_class || el.content || '[Classe Unità]';
         }
         return newEl;
       });
@@ -1267,31 +1270,6 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             </div>
           </div>
 
-          {/* Template Selector */}
-          {templateStatesLoaded && (
-            <div className="mb-4 p-3 bg-purple-50 rounded-lg">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Template Attivo</h3>
-              <div className="space-y-2">
-                <select
-                  value={currentTemplateId}
-                  onChange={(e) => changeTemplate(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  {allTemplates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} {!template.isDefault ? '(Personalizzato)' : ''}
-                    </option>
-                  ))}
-                </select>
-                <div className="text-xs text-gray-500">
-                  {allTemplates.find(t => t.id === currentTemplateId)?.description}
-                </div>
-                <div className="text-xs text-green-600 font-medium">
-                  ✨ Gli elementi vengono nascosti/mostrati, non eliminati
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Auto-detected Nation */}
           <div key={nationUpdateKey} className="mb-4 p-3 bg-blue-50 rounded-lg">

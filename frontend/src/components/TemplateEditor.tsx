@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Save, Settings, RotateCcw, Move, Trash2, Plus } from 'lucide-react';
-import { X } from 'lucide-react';
+import { Save, Settings, RotateCcw, Move, Trash2, Plus, X } from 'lucide-react';
 import { templatesApi } from '../services/api';
 import LayoutSettingsModal from './LayoutSettingsModal';
 
@@ -65,6 +64,12 @@ const FIXED_CHARACTERISTICS_TABLE = {
 const DEFAULT_CANVAS_WIDTH = CANVAS_PRESETS.A4_LANDSCAPE.width;
 const DEFAULT_CANVAS_HEIGHT = CANVAS_PRESETS.A4_LANDSCAPE.height;
 
+// Dummy getImageUrl for frontend display - replace with actual backend URL if needed
+const getImageUrl = (path: string) => {
+  if (path.startsWith('http')) return path;
+  return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/static/uploads/${path}`;
+};
+
 export default function TemplateEditor({ templateId, onSave, onCancel }: TemplateEditorProps) {
   const [elements, setElements] = useState<TemplateElement[]>([]);
   const [canvasWidth, setCanvasWidth] = useState(DEFAULT_CANVAS_WIDTH);
@@ -78,7 +83,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0, initialElement: null as any, direction: '' }); // Store initial element state for resizing
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -179,104 +184,109 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
     setSelectedElement(null);
   };
 
-  const handleMouseDown = (elementId: string, e: React.MouseEvent) => {
-    const element = elements.find(el => el.id === elementId);
-    if (element?.isFixed) return; // Prevent dragging fixed elements
-
-    e.preventDefault();
-    e.stopPropagation();
-    setSelectedElement(elementId);
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !selectedElement) return;
+    if (!selectedElement || (!isDragging && !isResizing)) return;
+
     const scale = zoomLevel / 100;
-    const deltaX = (e.clientX - dragStart.x) / scale;
-    const deltaY = (e.clientY - dragStart.y) / scale;
+    const dx = (e.clientX - dragStart.x) / scale;
+    const dy = (e.clientY - dragStart.y) / scale;
 
-    setElements(prev => prev.map(el => 
-      el.id === selectedElement ? { ...el, x: Math.round(el.x + deltaX), y: Math.round(el.y + deltaY) } : el
-    ));
-    setDragStart({ x: e.clientX, y: e.clientY });
-  }, [isDragging, selectedElement, dragStart, zoomLevel]);
+    setElements(prev => prev.map(el => {
+      if (el.id === selectedElement) {
+        if (isDragging) {
+          return { ...el, x: Math.round(el.x + dx), y: Math.round(el.y + dy) };
+        } else if (isResizing && dragStart.initialElement) {
+          let newX = dragStart.initialElement.x;
+          let newY = dragStart.initialElement.y;
+          let newWidth = dragStart.initialElement.width;
+          let newHeight = dragStart.initialElement.height;
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    setIsResizing(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
-
-  const handleResize = useCallback((elementId: string, e: MouseEvent, direction: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-    setSelectedElement(elementId);
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startElement = elements.find(el => el.id === elementId);
-    if (!startElement) return;
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const scale = zoomLevel / 100;
-      const dx = (moveEvent.clientX - startX) / scale;
-      const dy = (moveEvent.clientY - startY) / scale;
-
-      setElements(prevElements => prevElements.map(el => {
-        if (el.id === elementId) {
-          let newX = el.x;
-          let newY = el.y;
-          let newWidth = el.width;
-          let newHeight = el.height;
-
-          switch (direction) {
+          switch (dragStart.direction) {
             case 'se':
-              newWidth = Math.max(10, startElement.width + dx);
-              newHeight = Math.max(10, startElement.height + dy);
+              newWidth = Math.max(10, dragStart.initialElement.width + dx);
+              newHeight = Math.max(10, dragStart.initialElement.height + dy);
               break;
             case 'ne':
-              newWidth = Math.max(10, startElement.width + dx);
-              newHeight = Math.max(10, startElement.height - dy);
-              newY = startElement.y + dy;
+              newWidth = Math.max(10, dragStart.initialElement.width + dx);
+              newHeight = Math.max(10, dragStart.initialElement.height - dy);
+              newY = dragStart.initialElement.y + dy;
               break;
             case 'nw':
-              newWidth = Math.max(10, startElement.width - dx);
-              newHeight = Math.max(10, startElement.height - dy);
-              newX = startElement.x + dx;
-              newY = startElement.y + dy;
+              newWidth = Math.max(10, dragStart.initialElement.width - dx);
+              newHeight = Math.max(10, dragStart.initialElement.height - dy);
+              newX = dragStart.initialElement.x + dx;
+              newY = dragStart.initialElement.y + dy;
               break;
             case 'sw':
-              newWidth = Math.max(10, startElement.width - dx);
-              newHeight = Math.max(10, startElement.height + dy);
-              newX = startElement.x + dx;
+              newWidth = Math.max(10, dragStart.initialElement.width - dx);
+              newHeight = Math.max(10, dragStart.initialElement.height + dy);
+              newX = dragStart.initialElement.x + dx;
               break;
           }
           return { ...el, x: newX, y: newY, width: newWidth, height: newHeight };
         }
-        return el;
-      }));
-    };
+      }
+      return el;
+    }));
+    
+    // Only update dragStart position for dragging, not for resizing
+    if (isDragging) {
+      setDragStart({ x: e.clientX, y: e.clientY, initialElement: dragStart.initialElement, direction: dragStart.direction });
+    }
+  }, [isDragging, isResizing, selectedElement, dragStart, zoomLevel]);
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setIsResizing(false);
+    setDragStart({ x: 0, y: 0, initialElement: null, direction: '' }); // Reset dragStart state
+  }, []);
 
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [elements, zoomLevel, handleMouseUp]);
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => handleMouseMove(e);
+    const onMouseUp = () => handleMouseUp();
+
+    if (isDragging || isResizing) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setIsResizing(false);
+          setIsDragging(false);
+        }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
+
+  const handleMouseDown = (elementId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedElement(elementId);
+    setIsDragging(true);
+    setDragStart({ x: e.clientX, y: e.clientY, initialElement: null, direction: '' }); // Reset initialElement for dragging
+  };
+
+  const handleResizeMouseDown = useCallback((elementId: string, e: React.MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedElement(elementId);
+    setIsResizing(true);
+    const element = elements.find(el => el.id === elementId);
+    if (element) {
+      setDragStart({ // Reusing dragStart to store initial mouse position and element dimensions
+        x: e.clientX,
+        y: e.clientY,
+        initialElement: { x: element.x, y: element.y, width: element.width, height: element.height },
+        direction: direction
+      });
+    }
+  }, [elements]);
 
   const handleTextEdit = (elementId: string, newText: string) => {
     setElements(prev => prev.map(el => 
@@ -284,9 +294,49 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
     ));
   };
 
+  const handleImageUpload = async (elementId: string, file: File) => {
+    try {
+      const element = elements.find(el => el.id === elementId);
+      const elementType = element?.type || 'general';
+      
+      const formData = new FormData();
+      formData.append('image', file);
+      const subfolder = elementType === 'silhouette' ? 'silhouettes' : 
+                      elementType === 'logo' ? 'logos' : 
+                      elementType === 'flag' ? 'flags' : 'general';
+      formData.append('subfolder', subfolder);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const data = await response.json();
+      const imagePath = data.file_path;
+      
+      setElements(prev => prev.map(el => 
+        el.id === elementId ? { ...el, image: imagePath } : el
+      ));
+      
+      console.log('Image uploaded successfully:', imagePath);
+      
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      alert('Errore durante l\'upload dell\'immagine');
+    }
+  };
+
   const deleteElement = (elementId: string) => {
     const element = elements.find(el => el.id === elementId);
-    if (element?.isFixed) return; // Prevent deleting fixed elements
+    if (element?.isFixed) {
+      if (!confirm('Questo è un elemento fisso del template. Sei sicuro di volerlo eliminare? Non potrà essere riaggiunto se non ripristinando il template.')) {
+        return;
+      }
+    }
     setElements(prev => prev.filter(el => el.id !== elementId));
     setSelectedElement(null);
   };
@@ -391,7 +441,11 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
 
         {(element.type === 'logo' || element.type === 'silhouette' || element.type === 'flag') && (
           <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300" style={element.style}>
-            <span className="text-gray-500 text-sm select-none">{element.type.replace('_', ' ').toUpperCase()}</span>
+            {element.image ? (
+              <img src={getImageUrl(element.image)} alt={element.type} className="max-w-full max-h-full object-contain" />
+            ) : (
+              <span className="text-gray-500 text-sm select-none">{element.type.replace('_', ' ').toUpperCase()}</span>
+            )}
           </div>
         )}
 
@@ -417,12 +471,12 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
           </div>
         )}
 
-        {isSelected && !isFixed && (
+        {isSelected && (
           <>
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 cursor-se-resize" onMouseDown={(e) => handleResize(element.id, e, 'se')} />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 cursor-ne-resize" onMouseDown={(e) => handleResize(element.id, e, 'ne')} />
-            <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 cursor-nw-resize" onMouseDown={(e) => handleResize(element.id, e, 'nw')} />
-            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 cursor-sw-resize" onMouseDown={(e) => handleResize(element.id, e, 'sw')} />
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 cursor-se-resize" onMouseDown={(e) => handleResizeMouseDown(element.id, e, 'se')} />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 cursor-ne-resize" onMouseDown={(e) => handleResizeMouseDown(element.id, e, 'ne')} />
+            <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 cursor-nw-resize" onMouseDown={(e) => handleResizeMouseDown(element.id, e, 'nw')} />
+            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 cursor-sw-resize" onMouseDown={(e) => handleResizeMouseDown(element.id, e, 'sw')} />
           </>
         )}
       </div>
@@ -463,32 +517,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
             </button>
         </div>
 
-        <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Elementi Visibili</h3>
-          <div className="space-y-2">
-            {elements.map((element) => (
-                <div key={element.id} className="flex items-center justify-between bg-white p-2 rounded-md shadow-sm">
-                  <label className="flex items-center space-x-3 cursor-pointer w-full">
-                    <input type="checkbox" checked={visibleElements[element.id] !== false} onChange={(e) => setVisibleElements(prev => ({...prev, [element.id]: e.target.checked}))} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
-                    <span className="text-sm text-gray-800 font-medium">{element.type.charAt(0).toUpperCase() + element.type.slice(1).replace('_', ' ')}</span>
-                  </label>
-                </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Aggiungi Elementi</h3>
-          <div className="space-y-2">
-            <button onClick={() => addElement('text')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Testo</button>
-            <button onClick={() => addElement('logo')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Logo</button>
-            <button onClick={() => addElement('flag')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Bandiera</button>
-            <button onClick={() => addElement('silhouette')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Silhouette</button>
-            <button onClick={() => addElement('table')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Tabella</button>
-          </div>
-        </div>
-
-        {selectedElement && !elements.find(el => el.id === selectedElement)?.isFixed && (
+        {selectedElement && (
           <div className="mb-6 p-3 bg-yellow-50 rounded-lg">
             <h3 className="text-sm font-medium text-gray-700 mb-3">🔧 Proprietà Elemento</h3>
             {(() => {
@@ -611,7 +640,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                             onChange={(e) => setElements(prev => prev.map(el => 
                               el.id === selectedElement 
                                 ? { ...el, style: { ...el.style, color: e.target.value } }
-                                : el
+                              : el
                             ))}
                             className="w-full h-8 border border-gray-300 rounded cursor-pointer"
                           />
@@ -745,6 +774,12 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                         ))}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                         placeholder="URL immagine"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => e.target.files?.[0] && handleImageUpload(element.id, e.target.files[0])}
+                        className="w-full text-xs mt-2 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
                     </div>
                   )}
@@ -887,7 +922,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                 className="relative w-full h-full"
                 style={{ 
                     backgroundColor: canvasBackground,
-                    backgroundImage: 'url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAyMCAwIEwgMCAwIDAgMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2QwZDBkMCIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiIC8+PC9zdmc+)',
+                    backgroundImage: 'url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAyMCAwIEwgMCAwIDAgMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2QwZDBkMCIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L2BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiIC8+PC9zdmc+)',
                     backgroundSize: '20px 20px'
                 }}
                 onClick={handleCanvasClick}
