@@ -1,6 +1,18 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Save, Palette, Plus, X, Move, RotateCcw } from 'lucide-react';
+import { Save, Settings, RotateCcw, Move, Trash2, Plus } from 'lucide-react';
+import { X } from 'lucide-react';
 import { templatesApi } from '../services/api';
+import LayoutSettingsModal from './LayoutSettingsModal';
+
+// Re-defining CANVAS_PRESETS here as it's used by the modal
+const CANVAS_PRESETS = {
+  A4_LANDSCAPE: { width: 1123, height: 794, name: 'A4 Orizzontale' },
+  A4_PORTRAIT: { width: 794, height: 1123, name: 'A4 Verticale' },
+  A3_LANDSCAPE: { width: 1587, height: 1123, name: 'A3 Orizzontale' },
+  A3_PORTRAIT: { width: 1123, height: 1587, name: 'A3 Verticale' },
+  PRESENTATION: { width: 1280, height: 720, name: 'Presentazione (16:9)' },
+  CUSTOM: { width: 1200, height: 800, name: 'Personalizzato' }
+};
 
 interface TemplateElement {
   id: string;
@@ -12,6 +24,7 @@ interface TemplateElement {
   content?: string;
   image?: string;
   tableData?: string[][];
+  isFixed?: boolean;
   style?: {
     fontSize?: number;
     fontWeight?: string;
@@ -32,10 +45,9 @@ interface TemplateEditorProps {
   onCancel: () => void;
 }
 
-// Caratteristiche table come elemento fisso
 const FIXED_CHARACTERISTICS_TABLE = {
   id: 'characteristics-table',
-  type: 'table',
+  type: 'table' as const,
   x: 20,
   y: 500,
   width: 1083,
@@ -50,19 +62,8 @@ const FIXED_CHARACTERISTICS_TABLE = {
   ]
 };
 
-// Default canvas dimensions - now configurable
-const DEFAULT_CANVAS_WIDTH = 1123; // A4 landscape at 96 DPI
-const DEFAULT_CANVAS_HEIGHT = 794;
-
-// Canvas size presets
-const CANVAS_PRESETS = {
-  A4_LANDSCAPE: { width: 1123, height: 794, name: 'A4 Orizzontale' },
-  A4_PORTRAIT: { width: 794, height: 1123, name: 'A4 Verticale' },
-  A3_LANDSCAPE: { width: 1587, height: 1123, name: 'A3 Orizzontale' },
-  A3_PORTRAIT: { width: 1123, height: 1587, name: 'A3 Verticale' },
-  PRESENTATION: { width: 1280, height: 720, name: 'Presentazione (16:9)' },
-  CUSTOM: { width: 1200, height: 800, name: 'Personalizzato' }
-};
+const DEFAULT_CANVAS_WIDTH = CANVAS_PRESETS.A4_LANDSCAPE.width;
+const DEFAULT_CANVAS_HEIGHT = CANVAS_PRESETS.A4_LANDSCAPE.height;
 
 export default function TemplateEditor({ templateId, onSave, onCancel }: TemplateEditorProps) {
   const [elements, setElements] = useState<TemplateElement[]>([]);
@@ -83,17 +84,30 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
   const [isLoading, setIsLoading] = useState(false);
   const [isExistingTemplate, setIsExistingTemplate] = useState(false);
   const [visibleElements, setVisibleElements] = useState<{[key: string]: boolean}>({});
+  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Carica template esistente se templateId è fornito
+  const initializeDefaultTemplate = useCallback(() => {
+    const defaultElements: TemplateElement[] = [
+      { id: 'unit_name', type: 'unit_name', x: 160, y: 30, width: 400, height: 40, content: '[NOME UNITÀ]', isFixed: true, style: { fontSize: 20, fontWeight: 'bold', color: '#000' } },
+      { id: 'unit_class', type: 'unit_class', x: 160, y: 80, width: 400, height: 40, content: '[CLASSE UNITÀ]', isFixed: true, style: { fontSize: 20, fontWeight: 'bold', color: '#000' } },
+      { id: 'logo', type: 'logo', x: 20, y: 20, width: 120, height: 120, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' } },
+      { id: 'flag', type: 'flag', x: canvasWidth - 140, y: 20, width: 120, height: 80, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' } },
+      { id: 'silhouette', type: 'silhouette', x: 20, y: 180, width: canvasWidth - 40, height: 300, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' } },
+      { ...FIXED_CHARACTERISTICS_TABLE, width: canvasWidth - 40 }
+    ];
+    setElements(defaultElements);
+    const initialVisibility: { [key: string]: boolean } = {};
+    defaultElements.forEach(el => { initialVisibility[el.id] = true; });
+    setVisibleElements(initialVisibility);
+  }, [canvasWidth, setVisibleElements]);
+
   useEffect(() => {
     const loadTemplate = async () => {
       if (templateId) {
         setIsLoading(true);
         try {
-          // Carica dal database via API
           const template = await templatesApi.getById(templateId);
-          
           if (template) {
             setTemplateName(template.name || '');
             setTemplateDescription(template.description || '');
@@ -103,117 +117,51 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
             setCanvasBackground(template.canvasBackground || '#ffffff');
             setCanvasBorderWidth(template.canvasBorderWidth || 2);
             setCanvasBorderColor(template.canvasBorderColor || '#000000');
-            
-            // Determina il preset basato sulle dimensioni
-            const preset = Object.entries(CANVAS_PRESETS).find(
-              ([_, size]) => size.width === template.canvasWidth && size.height === template.canvasHeight
-            );
-            setSelectedPreset(preset ? preset[0] : 'CUSTOM');
-            setIsExistingTemplate(true); // Marca come template esistente
-            
-            console.log('✅ Template caricato:', template.name);
+            const preset = Object.keys(CANVAS_PRESETS).find(key => {
+                const p = CANVAS_PRESETS[key as keyof typeof CANVAS_PRESETS];
+                return p.width === template.canvasWidth && p.height === template.canvasHeight;
+            }) || 'CUSTOM';
+            setSelectedPreset(preset);
+            setIsExistingTemplate(true);
+            const initialVisibility: { [key: string]: boolean } = {};
+            (template.elements || []).forEach((el: TemplateElement) => { initialVisibility[el.id] = true; });
+            setVisibleElements(initialVisibility);
+
           } else {
-            console.warn('⚠️ Template non trovato:', templateId);
             setIsExistingTemplate(false);
             initializeDefaultTemplate();
           }
         } catch (error) {
-          console.error('❌ Errore caricamento template:', error);
+          console.error('Error loading template:', error);
           setIsExistingTemplate(false);
           initializeDefaultTemplate();
         } finally {
           setIsLoading(false);
         }
       } else {
-        // Nuovo template
         setIsExistingTemplate(false);
         initializeDefaultTemplate();
       }
     };
-
-    const initializeDefaultTemplate = () => {
-      const defaultElements = [
-        {
-          id: 'unit_name',
-          type: 'unit_name',
-          x: 160,
-          y: 30,
-          width: 400,
-          height: 40,
-          content: '[NOME UNITÀ]',
-          isFixed: true,
-          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-        },
-        {
-          id: 'unit_class',
-          type: 'unit_class',
-          x: 160,
-          y: 80,
-          width: 400,
-          height: 40,
-          content: '[CLASSE UNITÀ]',
-          isFixed: true,
-          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-        },
-        {
-          id: 'logo',
-          type: 'logo',
-          x: 20,
-          y: 20,
-          width: 120,
-          height: 120,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'flag',
-          type: 'flag',
-          x: canvasWidth - 140,
-          y: 20,
-          width: 120,
-          height: 80,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'silhouette',
-          type: 'silhouette',
-          x: 20,
-          y: 180,
-          width: canvasWidth - 40,
-          height: 300,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        // Caratteristiche table come elemento fisso
-        {
-          ...FIXED_CHARACTERISTICS_TABLE,
-          width: canvasWidth - 40
-        }
-      ];
-      
-      setElements(defaultElements);
-    };
-
     loadTemplate();
-  }, [templateId]);
+  }, [templateId, initializeDefaultTemplate]);
 
-  // Gestione cambio preset canvas
-  const handlePresetChange = (presetKey: string) => {
-    setSelectedPreset(presetKey);
-    if (presetKey !== 'CUSTOM') {
-      const preset = CANVAS_PRESETS[presetKey as keyof typeof CANVAS_PRESETS];
-      setCanvasWidth(preset.width);
-      setCanvasHeight(preset.height);
-    }
+  const handleLayoutSave = (settings: any) => {
+    setCanvasWidth(settings.canvasWidth);
+    setCanvasHeight(settings.canvasHeight);
+    setCanvasBackground(settings.canvasBackground);
+    setCanvasBorderWidth(settings.canvasBorderWidth);
+    setCanvasBorderColor(settings.canvasBorderColor);
+    setSelectedPreset(settings.selectedPreset);
+    setIsLayoutModalOpen(false);
   };
 
-  // Auto-resize elements when canvas changes
   useEffect(() => {
     if (elements.length > 0) {
       setElements(prevElements => prevElements.map(el => {
-        // Adatta la posizione del flag al nuovo canvas width
         if (el.id === 'flag' && el.type === 'flag') {
           return { ...el, x: canvasWidth - 140 };
         }
-        // Adatta la larghezza di elementi full-width
         if (el.id === 'silhouette' || (el.id === 'characteristics-table' && el.isFixed)) {
           return { ...el, width: canvasWidth - 40 };
         }
@@ -232,6 +180,9 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
   };
 
   const handleMouseDown = (elementId: string, e: React.MouseEvent) => {
+    const element = elements.find(el => el.id === elementId);
+    if (element?.isFixed) return; // Prevent dragging fixed elements
+
     e.preventDefault();
     e.stopPropagation();
     setSelectedElement(elementId);
@@ -241,25 +192,23 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !selectedElement) return;
-
-    const deltaX = e.clientX - dragStart.x;
-    const deltaY = e.clientY - dragStart.y;
+    const scale = zoomLevel / 100;
+    const deltaX = (e.clientX - dragStart.x) / scale;
+    const deltaY = (e.clientY - dragStart.y) / scale;
 
     setElements(prev => prev.map(el => 
-      el.id === selectedElement 
-        ? { ...el, x: Math.max(0, el.x + deltaX), y: Math.max(0, el.y + deltaY) }
-        : el
+      el.id === selectedElement ? { ...el, x: Math.round(el.x + deltaX), y: Math.round(el.y + deltaY) } : el
     ));
-
     setDragStart({ x: e.clientX, y: e.clientY });
-  }, [isDragging, selectedElement, dragStart]);
+  }, [isDragging, selectedElement, dragStart, zoomLevel]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    setIsResizing(false);
   }, []);
 
-  React.useEffect(() => {
-    if (isDragging) {
+  useEffect(() => {
+    if (isDragging || isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -267,7 +216,67 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
+
+  const handleResize = useCallback((elementId: string, e: MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setSelectedElement(elementId);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startElement = elements.find(el => el.id === elementId);
+    if (!startElement) return;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const scale = zoomLevel / 100;
+      const dx = (moveEvent.clientX - startX) / scale;
+      const dy = (moveEvent.clientY - startY) / scale;
+
+      setElements(prevElements => prevElements.map(el => {
+        if (el.id === elementId) {
+          let newX = el.x;
+          let newY = el.y;
+          let newWidth = el.width;
+          let newHeight = el.height;
+
+          switch (direction) {
+            case 'se':
+              newWidth = Math.max(10, startElement.width + dx);
+              newHeight = Math.max(10, startElement.height + dy);
+              break;
+            case 'ne':
+              newWidth = Math.max(10, startElement.width + dx);
+              newHeight = Math.max(10, startElement.height - dy);
+              newY = startElement.y + dy;
+              break;
+            case 'nw':
+              newWidth = Math.max(10, startElement.width - dx);
+              newHeight = Math.max(10, startElement.height - dy);
+              newX = startElement.x + dx;
+              newY = startElement.y + dy;
+              break;
+            case 'sw':
+              newWidth = Math.max(10, startElement.width - dx);
+              newHeight = Math.max(10, startElement.height + dy);
+              newX = startElement.x + dx;
+              break;
+          }
+          return { ...el, x: newX, y: newY, width: newWidth, height: newHeight };
+        }
+        return el;
+      }));
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [elements, zoomLevel, handleMouseUp]);
 
   const handleTextEdit = (elementId: string, newText: string) => {
     setElements(prev => prev.map(el => 
@@ -276,74 +285,15 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
   };
 
   const deleteElement = (elementId: string) => {
-    // Don't allow deletion of fixed elements
     const element = elements.find(el => el.id === elementId);
-    if (element?.isFixed || elementId === 'unit_name' || elementId === 'unit_class' || elementId === 'characteristics-table') {
-      return;
-    }
+    if (element?.isFixed) return; // Prevent deleting fixed elements
     setElements(prev => prev.filter(el => el.id !== elementId));
     setSelectedElement(null);
   };
 
   const resetTemplate = () => {
     if (confirm('Sei sicuro di voler ripristinare il template alle impostazioni predefinite? Tutte le modifiche andranno perse.')) {
-      const defaultElements = [
-        {
-          id: 'unit_name',
-          type: 'unit_name',
-          x: 160,
-          y: 30,
-          width: 400,
-          height: 40,
-          content: '[NOME UNITÀ]',
-          isFixed: true,
-          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-        },
-        {
-          id: 'unit_class',
-          type: 'unit_class',
-          x: 160,
-          y: 80,
-          width: 400,
-          height: 40,
-          content: '[CLASSE UNITÀ]',
-          isFixed: true,
-          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-        },
-        {
-          id: 'logo',
-          type: 'logo',
-          x: 20,
-          y: 20,
-          width: 120,
-          height: 120,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'flag',
-          type: 'flag',
-          x: canvasWidth - 140,
-          y: 20,
-          width: 120,
-          height: 80,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'silhouette',
-          type: 'silhouette',
-          x: 20,
-          y: 180,
-          width: canvasWidth - 40,
-          height: 300,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          ...FIXED_CHARACTERISTICS_TABLE,
-          width: canvasWidth - 40
-        }
-      ];
-      
-      setElements(defaultElements);
+      initializeDefaultTemplate();
       setSelectedElement(null);
     }
   };
@@ -353,70 +303,53 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
       alert('Inserisci il nome del template');
       return;
     }
-
-    const templateData = {
-      id: templateId || `template-${Date.now()}`,
-      name: templateName,
-      description: templateDescription,
-      elements: elements,
-      canvasWidth,
-      canvasHeight,
-      canvasBackground,
-      canvasBorderWidth,
-      canvasBorderColor,
-      createdAt: templateId ? undefined : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isDefault: false
-    };
-
+    const templateData = { id: templateId || `template-${Date.now()}`, name: templateName, description: templateDescription, elements, canvasWidth, canvasHeight, canvasBackground, canvasBorderWidth, canvasBorderColor, createdAt: templateId ? undefined : new Date().toISOString(), updatedAt: new Date().toISOString(), isDefault: false };
     try {
-      console.log('💾 Salvando template:', templateData);
-      console.log('📋 Template esistente:', isExistingTemplate, 'Template ID:', templateId);
-      
       if (templateId && isExistingTemplate) {
-        // Aggiorna template esistente nel database
         await templatesApi.update(templateId, templateData);
-        console.log('🔄 Template aggiornato:', templateId);
       } else {
-        // Crea nuovo template
         const result = await templatesApi.create(templateData);
         templateData.id = result.template_id;
-        console.log('🆕 Nuovo template creato:', templateData.id);
       }
-      
-      console.log('✅ Template salvato con successo');
       onSave(templateData);
     } catch (error) {
-      console.error('❌ Errore salvataggio template:', error);
+      console.error('Error saving template:', error);
       alert('Errore nel salvare il template. Riprova.');
     }
   };
 
-  const renderElement = (element: TemplateElement) => {
-    const isSelected = selectedElement === element.id;
-    const isFixed = element.isFixed || element.type === 'unit_name' || element.type === 'unit_class' || element.id === 'characteristics-table';
-    
-    // Check if element is visible
-    const isVisible = visibleElements[element.id] !== false;
-    if (!isVisible) {
-      return null;
+  const addElement = (type: TemplateElement['type']) => {
+    const newId = `${type}-${Date.now()}`;
+    const newElement: TemplateElement = {
+      id: newId,
+      type,
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 100,
+      content: type === 'text' ? 'Nuovo Testo' : '',
+      style: {},
+      isFixed: false
+    };
+    if (type === 'table') {
+      newElement.width = 400;
+      newElement.height = 150;
+      newElement.tableData = [['Col 1', 'Col 2'], ['Row 1, Cell 1', 'Row 1, Cell 2']];
     }
-    
+    setElements(prev => [...prev, newElement]);
+    setSelectedElement(newId);
+  };
+
+  const renderElement = (element: TemplateElement) => {
+    if (visibleElements[element.id] === false) return null;
+    const isSelected = selectedElement === element.id;
+    const isFixed = element.isFixed;
+
     return (
       <div
         key={element.id}
-        className={`absolute cursor-move ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isFixed ? 'ring-2 ring-yellow-400' : ''}`}
-        style={{
-          left: element.x,
-          top: element.y,
-          width: element.width,
-          height: element.height,
-          backgroundColor: element.style?.backgroundColor,
-          borderRadius: element.style?.borderRadius,
-          borderWidth: element.style?.borderWidth || 0,
-          borderColor: element.style?.borderColor || '#000000',
-          borderStyle: element.style?.borderStyle || 'solid',
-        }}
+        className={`absolute ${!isFixed ? 'cursor-move' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}
+        style={{ left: element.x, top: element.y, width: element.width, height: element.height }}
         onClick={(e) => handleElementClick(element.id, e)}
         onMouseDown={(e) => handleMouseDown(element.id, e)}
       >
@@ -427,10 +360,9 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
           </div>
         )}
 
-        {/* Content based on element type */}
         {(element.type === 'text' || element.type === 'unit_name' || element.type === 'unit_class') && (
           <div
-            className="w-full h-full flex items-center justify-start px-2 cursor-move"
+            className="w-full h-full flex items-center justify-start px-2"
             style={{
               fontSize: element.style?.fontSize,
               fontWeight: element.style?.fontWeight,
@@ -457,41 +389,27 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
           </div>
         )}
 
-        {(element.type === 'logo' || element.type === 'silhouette') && (
-          <div className="w-full h-full flex items-center justify-center cursor-move">
-            <div className="text-gray-600 text-center text-sm font-bold">
-              {element.type === 'logo' && 'LOGO'}
-              {element.type === 'silhouette' && 'SILHOUETTE NAVE'}
-            </div>
-          </div>
-        )}
-
-        {element.type === 'flag' && (
-          <div className="w-full h-full flex items-center justify-center cursor-move">
-            <div className="text-gray-600 text-center text-sm font-bold">BANDIERA</div>
+        {(element.type === 'logo' || element.type === 'silhouette' || element.type === 'flag') && (
+          <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300" style={element.style}>
+            <span className="text-gray-500 text-sm select-none">{element.type.replace('_', ' ').toUpperCase()}</span>
           </div>
         )}
 
         {element.type === 'table' && (
-          <div className="w-full h-full bg-white border border-gray-400 cursor-move overflow-auto">
+          <div className="w-full h-full bg-white border border-gray-400 overflow-auto">
             <div className="p-2">
               <div className="text-xs font-bold mb-2">CARATTERISTICHE</div>
               <div className="text-xs">
                 {element.tableData?.map((row, rowIndex) => (
                   <div key={rowIndex} className="flex border-b border-gray-300">
-                    {row.map((cell, colIndex) => {
-                      const isHeader = rowIndex === 0;
-                      const bgColor = colIndex % 2 === 0 ? 'bg-gray-100' : 'bg-white';
-                      
-                      return (
-                        <div
-                          key={colIndex}
-                          className={`flex-1 p-2 border-r border-gray-300 ${bgColor} ${isHeader ? 'font-medium' : ''}`}
-                        >
-                          <span>{cell}</span>
-                        </div>
-                      );
-                    })}
+                    {row.map((cell, colIndex) => (
+                      <div
+                        key={colIndex}
+                        className={`flex-1 p-2 border-r border-gray-300 ${rowIndex === 0 ? 'font-medium bg-gray-100' : ''}`}
+                      >
+                        <span>{cell}</span>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -499,386 +417,446 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
           </div>
         )}
 
-        {/* Resize handles for selected element */}
         {isSelected && !isFixed && (
           <>
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 cursor-se-resize" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 cursor-ne-resize" />
-            <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 cursor-nw-resize" />
-            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 cursor-sw-resize" />
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 cursor-se-resize" onMouseDown={(e) => handleResize(element.id, e, 'se')} />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 cursor-ne-resize" onMouseDown={(e) => handleResize(element.id, e, 'ne')} />
+            <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 cursor-nw-resize" onMouseDown={(e) => handleResize(element.id, e, 'nw')} />
+            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 cursor-sw-resize" onMouseDown={(e) => handleResize(element.id, e, 'sw')} />
           </>
         )}
       </div>
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Caricamento template...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      {/* Sidebar Tools */}
-      <div className="w-80 bg-white shadow-lg p-6 overflow-y-auto max-h-screen">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Editor Template</h2>
+    <div className="h-full flex bg-gray-100">
+      <div className="w-96 bg-white shadow-lg p-6 overflow-y-auto flex-shrink-0 flex flex-col">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Editor Template</h2>
+          <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200"><X className="h-6 w-6" /></button>
+        </div>
+        
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Informazioni</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Template</label>
+              <input type="text" value={templateName} onChange={(e) => setTemplateName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="Es. Template Standard" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione</label>
+              <textarea value={templateDescription} onChange={(e) => setTemplateDescription(e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="Breve descrizione..." />
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
             <button
-              onClick={resetTemplate}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-              title="Ripristina template"
+                onClick={() => setIsLayoutModalOpen(true)}
+                className="w-full flex items-center justify-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
             >
-              <RotateCcw className="h-4 w-4" />
+                <Settings className="h-5 w-5 mr-2" />
+                Modifica Layout
             </button>
-          </div>
-          
-          {/* Template Info */}
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Informazioni Template</h3>
-            <div className="space-y-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Nome Template</label>
-                <input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Es. Template Standard"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Descrizione</label>
-                <textarea
-                  value={templateDescription}
-                  onChange={(e) => setTemplateDescription(e.target.value)}
-                  rows={2}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Breve descrizione..."
-                />
-              </div>
-            </div>
-          </div>
-          {/* Canvas Configuration */}
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Configurazione Canvas</h3>
-            <div className="space-y-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Formato Predefinito</label>
-                <select
-                  value={selectedPreset}
-                  onChange={(e) => handlePresetChange(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {Object.entries(CANVAS_PRESETS).map(([key, preset]) => (
-                    <option key={key} value={key}>
-                      {preset.name} ({preset.width} × {preset.height})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Larghezza</label>
-                  <input
-                    type="number"
-                    min="400"
-                    max="3000"
-                    value={canvasWidth}
-                    onChange={(e) => {
-                      setCanvasWidth(parseInt(e.target.value) || 400);
-                      setSelectedPreset('CUSTOM');
-                    }}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Altezza</label>
-                  <input
-                    type="number"
-                    min="300"
-                    max="3000"
-                    value={canvasHeight}
-                    onChange={(e) => {
-                      setCanvasHeight(parseInt(e.target.value) || 300);
-                      setSelectedPreset('CUSTOM');
-                    }}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Sfondo Canvas</label>
-                <input
-                  type="color"
-                  value={canvasBackground}
-                  onChange={(e) => setCanvasBackground(e.target.value)}
-                  className="w-full h-8 border border-gray-300 rounded"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Bordo Canvas</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={canvasBorderWidth}
-                    onChange={(e) => setCanvasBorderWidth(parseInt(e.target.value) || 0)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Colore Bordo</label>
-                  <input
-                    type="color"
-                    value={canvasBorderColor}
-                    onChange={(e) => setCanvasBorderColor(e.target.value)}
-                    className="w-full h-8 border border-gray-300 rounded"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+        </div>
 
-          {/* Visibilità Elementi */}
-          <div className="mb-4 p-3 bg-green-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Visibilità Elementi</h3>
-            <div className="space-y-2">
-              {elements.map((element) => {
-                const isVisible = visibleElements[element.id] !== false;
-                return (
-                  <div key={element.id} className="flex items-center justify-between">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isVisible}
-                        onChange={(e) => {
-                          setVisibleElements(prev => ({
-                            ...prev,
-                            [element.id]: e.target.checked
-                          }));
-                        }}
-                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                      />
-                      <span className="text-xs text-gray-700">
-                        {element.type === 'unit_name' ? 'Nome Unità' :
-                         element.type === 'unit_class' ? 'Classe Unità' :
-                         element.type === 'characteristics-table' ? 'Tabella Caratteristiche' :
-                         element.type.charAt(0).toUpperCase() + element.type.slice(1)}
-                      </span>
-                    </label>
+        <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Elementi Visibili</h3>
+          <div className="space-y-2">
+            {elements.map((element) => (
+                <div key={element.id} className="flex items-center justify-between bg-white p-2 rounded-md shadow-sm">
+                  <label className="flex items-center space-x-3 cursor-pointer w-full">
+                    <input type="checkbox" checked={visibleElements[element.id] !== false} onChange={(e) => setVisibleElements(prev => ({...prev, [element.id]: e.target.checked}))} className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"/>
+                    <span className="text-sm text-gray-800 font-medium">{element.type.charAt(0).toUpperCase() + element.type.slice(1).replace('_', ' ')}</span>
+                  </label>
+                </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Aggiungi Elementi</h3>
+          <div className="space-y-2">
+            <button onClick={() => addElement('text')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Testo</button>
+            <button onClick={() => addElement('logo')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Logo</button>
+            <button onClick={() => addElement('flag')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Bandiera</button>
+            <button onClick={() => addElement('silhouette')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Silhouette</button>
+            <button onClick={() => addElement('table')} className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"><Plus className="h-4 w-4 mr-2" /> Aggiungi Tabella</button>
+          </div>
+        </div>
+
+        {selectedElement && !elements.find(el => el.id === selectedElement)?.isFixed && (
+          <div className="mb-6 p-3 bg-yellow-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">🔧 Proprietà Elemento</h3>
+            {(() => {
+              const element = elements.find(el => el.id === selectedElement);
+              if (!element) return null;
+
+              return (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
+                    <div className="text-xs text-gray-600 capitalize">{element.type.replace('_', ' ')}</div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          <div className="space-y-2 mb-4">
-            <div className="flex space-x-2">
-              <button
-                onClick={onCancel}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Salva
-              </button>
-            </div>
-          </div>
-
-          {selectedElement && (
-            <div className="mb-6 p-3 bg-yellow-50 rounded-lg">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">🔧 Proprietà Elemento</h3>
-              {(() => {
-                const element = elements.find(el => el.id === selectedElement);
-                if (!element) return null;
-
-                const isFixed = element.type === 'unit_name' || element.type === 'unit_class';
-
-                return (
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                      <div className="text-xs text-gray-600 capitalize">{element.type.replace('_', ' ')}</div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">X</label>
+                      <input
+                        type="number"
+                        value={element.x}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement ? { ...el, x: parseInt(e.target.value) || 0 } : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">X</label>
-                        <input
-                          type="number"
-                          value={element.x}
-                          onChange={(e) => setElements(prev => prev.map(el => 
-                            el.id === selectedElement ? { ...el, x: parseInt(e.target.value) || 0 } : el
-                          ))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Y</label>
-                        <input
-                          type="number"
-                          value={element.y}
-                          onChange={(e) => setElements(prev => prev.map(el => 
-                            el.id === selectedElement ? { ...el, y: parseInt(e.target.value) || 0 } : el
-                          ))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Y</label>
+                      <input
+                        type="number"
+                        value={element.y}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement ? { ...el, y: parseInt(e.target.value) || 0 } : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Larghezza</label>
-                        <input
-                          type="number"
-                          value={element.width}
-                          onChange={(e) => setElements(prev => prev.map(el => 
-                            el.id === selectedElement ? { ...el, width: parseInt(e.target.value) || 0 } : el
-                          ))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Altezza</label>
-                        <input
-                          type="number"
-                          value={element.height}
-                          onChange={(e) => setElements(prev => prev.map(el => 
-                            el.id === selectedElement ? { ...el, height: parseInt(e.target.value) || 0 } : el
-                          ))}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {!isFixed && (
-                      <div className="pt-4 border-t border-gray-200">
-                        <button
-                          onClick={() => deleteElement(element.id)}
-                          className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs"
-                        >
-                          🗑️ Elimina Elemento
-                        </button>
-                      </div>
-                    )}
                   </div>
-                );
-              })()}
-            </div>
-          )}
 
-          <div className="p-3 bg-purple-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">➕ Aggiungi Elementi</h3>
-            <div className="space-y-2">
-            <button
-              onClick={() => {
-                const newElement: TemplateElement = {
-                  id: `text-${Date.now()}`,
-                  type: 'text',
-                  x: 100,
-                  y: 100,
-                  width: 200,
-                  height: 30,
-                  content: 'Nuovo testo',
-                  style: { fontSize: 16, color: '#000' }
-                };
-                setElements(prev => [...prev, newElement]);
-              }}
-              className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-            >
-              + Aggiungi Testo
-            </button>
-            <button
-              onClick={() => {
-                const newElement: TemplateElement = {
-                  id: `logo-${Date.now()}`,
-                  type: 'logo',
-                  x: 50,
-                  y: 50,
-                  width: 100,
-                  height: 100,
-                  style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-                };
-                setElements(prev => [...prev, newElement]);
-              }}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            >
-              + Aggiungi Logo
-            </button>
-            <button
-              onClick={() => {
-                const newElement: TemplateElement = {
-                  id: `flag-${Date.now()}`,
-                  type: 'flag',
-                  x: 200,
-                  y: 50,
-                  width: 100,
-                  height: 60,
-                  style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-                };
-                setElements(prev => [...prev, newElement]);
-              }}
-              className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
-            >
-              + Aggiungi Bandiera
-            </button>
-            <button
-              onClick={() => {
-                const newElement: TemplateElement = {
-                  id: `table-${Date.now()}`,
-                  type: 'table',
-                  x: 100,
-                  y: 400,
-                  width: 400,
-                  height: 150,
-                  style: { backgroundColor: '#f9fafb', borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' },
-                  tableData: [
-                    ['CARATTERISTICA', 'VALORE'],
-                    ['Nuovo campo', 'Nuovo valore']
-                  ]
-                };
-                setElements(prev => [...prev, newElement]);
-              }}
-              className="w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm"
-            >
-              + Aggiungi Tabella
-            </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Larghezza</label>
+                      <input
+                        type="number"
+                        value={element.width}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement ? { ...el, width: parseInt(e.target.value) || 0 } : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Altezza</label>
+                      <input
+                        type="number"
+                        value={element.height}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement ? { ...el, height: parseInt(e.target.value) || 0 } : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {element.type === 'text' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Testo</label>
+                        <textarea
+                          value={element.content || ''}
+                          onChange={(e) => handleTextEdit(element.id, e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          rows={3}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Carattere</label>
+                        <select
+                          value={element.style?.fontFamily || 'Arial'}
+                          onChange={(e) => setElements(prev => prev.map(el => 
+                            el.id === selectedElement 
+                              ? { ...el, style: { ...el.style, fontFamily: e.target.value } }
+                              : el
+                          ))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="Arial">Arial</option>
+                          <option value="Helvetica">Helvetica</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Verdana">Verdana</option>
+                          <option value="Courier New">Courier New</option>
+                          <option value="Impact">Impact</option>
+                          <option value="Comic Sans MS">Comic Sans MS</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dimensione</label>
+                          <input
+                            type="number"
+                            min="8"
+                            max="72"
+                            value={element.style?.fontSize || 16}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, fontSize: parseInt(e.target.value) || 16 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                          <input
+                            type="color"
+                            value={element.style?.color || '#000000'}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, color: e.target.value } }
+                                : el
+                            ))}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Formato</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontWeight: el.style?.fontWeight === 'bold' ? 'normal' : 'bold' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm font-bold border rounded transition-colors ${
+                              element.style?.fontWeight === 'bold'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            B
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontStyle: el.style?.fontStyle === 'italic' ? 'normal' : 'italic' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm italic border rounded transition-colors ${
+                              element.style?.fontStyle === 'italic'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            I
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      textDecoration: el.style?.textDecoration === 'underline' ? 'none' : 'underline' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm underline border rounded transition-colors ${
+                              element.style?.textDecoration === 'underline'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            U
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Allineamento</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'left' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'left' || !element.style?.textAlign
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ⇤
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'center' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'center'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ↔
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'right' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'right'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ⇥
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {(element.type === 'logo' || element.type === 'flag' || element.type === 'silhouette') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Immagine (URL)</label>
+                      <input
+                        type="text"
+                        value={element.image || ''}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement ? { ...el, image: e.target.value } : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                        placeholder="URL immagine"
+                      />
+                    </div>
+                  )}
+
+                  {element.type === 'table' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Dati Tabella (JSON)</label>
+                      <textarea
+                        value={JSON.stringify(element.tableData) || ''}
+                        onChange={(e) => {
+                          try {
+                            setElements(prev => prev.map(el => 
+                              el.id === selectedElement ? { ...el, tableData: JSON.parse(e.target.value) } : el
+                            ));
+                          } catch (error) {
+                            console.error("Invalid JSON for table data", error);
+                          }
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                        rows={5}
+                      />
+                    </div>
+                  )}
+
+                  {/* Border Controls - Available for all elements */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Bordo</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Spessore (px)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="20"
+                          value={element.style?.borderWidth || 0}
+                          onChange={(e) => setElements(prev => prev.map(el => 
+                            el.id === selectedElement 
+                              ? { ...el, style: { ...el.style, borderWidth: parseInt(e.target.value) || 0 } }
+                              : el
+                          ))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                        <input
+                          type="color"
+                          value={element.style?.borderColor || '#000000'}
+                          onChange={(e) => setElements(prev => prev.map(el => 
+                            el.id === selectedElement 
+                              ? { ...el, style: { ...el.style, borderColor: e.target.value } }
+                              : el
+                          ))}
+                          className="w-full h-8 border border-gray-300 rounded"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Stile</label>
+                      <select
+                        value={element.style?.borderStyle || 'solid'}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement 
+                            ? { ...el, style: { ...el.style, borderStyle: e.target.value } }
+                            : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      >
+                        <option value="none">Nessuno</option>
+                        <option value="solid">Solido</option>
+                        <option value="dashed">Tratteggiato</option>
+                        <option value="dotted">Punteggiato</option>
+                        <option value="double">Doppio</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => deleteElement(element.id)}
+                      className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs"
+                    >
+                      🗑️ Elimina Elemento
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
+        )}
+
+        <div className="mt-auto space-y-3 pt-4">
+          <button onClick={handleSave} className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-base shadow-lg">
+            <Save className="h-5 w-5 mr-2" />
+            Salva Template
+          </button>
         </div>
       </div>
 
-      {/* Canvas Area */}
-      <div className="flex-1 p-8 overflow-auto">
-        <div className="bg-white shadow-xl rounded-lg overflow-auto max-h-screen">
-          {/* Zoom Controls */}
-          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+      <div className="flex-1 flex flex-col bg-gray-100">
+        <div className="p-2 text-center border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+            <div className="flex items-center justify-center space-x-2">
               <span className="text-sm font-medium text-gray-700">Zoom:</span>
               <button
-                onClick={() => setZoomLevel(prev => Math.max(25, prev - 25))}
+                onClick={() => setZoomLevel(prev => Math.max(10, prev - 10))}
                 className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
               >
                 -
               </button>
               <span className="text-sm font-medium min-w-16 text-center">{zoomLevel}%</span>
               <button
-                onClick={() => setZoomLevel(prev => Math.min(200, prev + 25))}
+                onClick={() => setZoomLevel(prev => Math.min(200, prev + 10))}
                 className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
               >
                 +
@@ -890,66 +868,48 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                 100%
               </button>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-xs text-gray-500">
-                {canvasWidth} × {canvasHeight}px
-              </div>
-              <div className="text-xs text-gray-500">
-                {elements.filter(el => visibleElements[el.id] !== false).length} elementi visibili
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-8 min-h-full flex items-center justify-center">
+        </div>
+        <div className="flex-1 overflow-auto p-8">
             <div 
-              className="bg-white shadow-xl rounded-lg overflow-hidden transition-transform origin-center"
+              className="bg-white shadow-xl rounded-lg mx-auto"
               style={{ 
+                width: canvasWidth,
+                height: canvasHeight,
                 transform: `scale(${zoomLevel / 100})`,
-                transformOrigin: 'center'
+                transformOrigin: 'center top',
+                borderWidth: canvasBorderWidth,
+                borderColor: canvasBorderColor,
+                borderStyle: 'solid'
               }}
             >
-              {/* Canvas Info Bar */}
-              <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
-                <div className="text-sm text-gray-600">
-                  {CANVAS_PRESETS[selectedPreset as keyof typeof CANVAS_PRESETS]?.name || 'Personalizzato'}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {elements.filter(el => visibleElements[el.id] !== false).length} visibili • {elements.filter(el => el.isFixed).length} fissi
-                </div>
-              </div>
-              
               <div
                 ref={canvasRef}
-                className="relative"
+                className="relative w-full h-full"
                 style={{ 
-                  width: canvasWidth, 
-                  height: canvasHeight,
-                  backgroundColor: canvasBackground,
-                  borderWidth: canvasBorderWidth,
-                  borderColor: canvasBorderColor,
-                  borderStyle: 'solid'
+                    backgroundColor: canvasBackground,
+                    backgroundImage: 'url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAyMCAwIEwgMCAwIDAgMjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2QwZDBkMCIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiIC8+PC9zdmc+)',
+                    backgroundSize: '20px 20px'
                 }}
                 onClick={handleCanvasClick}
               >
                 {elements.map(renderElement)}
-                
-                {/* Canvas grid for alignment */}
-                <div className="absolute inset-0 pointer-events-none opacity-20">
-                  <svg width="100%" height="100%">
-                    <defs>
-                      <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" strokeWidth="1"/>
-                      </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                  </svg>
-                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-      </div>
+        <LayoutSettingsModal
+          isOpen={isLayoutModalOpen}
+          onClose={() => setIsLayoutModalOpen(false)}
+          onSave={handleLayoutSave}
+          initialSettings={{
+            canvasWidth,
+            canvasHeight,
+            canvasBackground,
+            canvasBorderWidth,
+            canvasBorderColor,
+            selectedPreset
+          }}
+        />
     </div>
   );
 }
