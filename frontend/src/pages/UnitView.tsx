@@ -79,20 +79,31 @@ export default function UnitView() {
     console.log('Starting PowerPoint export for unit:', unit.id);
     
     try {
-      const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      
+      console.log('🔍 PowerPoint export starting from View:', {
+        unitId: unit.id,
+        apiUrl: `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`
+      });
       
       const response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({}), // Empty template config for default export
       });
 
       if (!response.ok) {
-        throw new Error('Errore durante l\'export PowerPoint');
+        const errorText = await response.text();
+        console.error('PowerPoint export error response:', response.status, errorText);
+        
+        if (response.status === 401) {
+          alert('Sessione scaduta. Ricarica la pagina e rieffettua il login.');
+          return;
+        }
+        
+        throw new Error(`Errore durante l'export PowerPoint: ${response.status} - ${errorText}`);
       }
 
       // Get the blob and create download link

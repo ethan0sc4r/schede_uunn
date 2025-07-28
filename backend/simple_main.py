@@ -311,7 +311,7 @@ async def upload_flag(unit_id: int, file: UploadFile = File(...), user: dict = D
     return {"message": "Flag uploaded successfully", "file_path": file_path}
 
 @app.post("/api/units/{unit_id}/export/powerpoint")
-async def export_unit_powerpoint(unit_id: int, template_config: dict = None, user: dict = Depends(get_current_user)):
+async def export_unit_powerpoint(unit_id: int, template_config: dict = None):
     """Export a single naval unit to PowerPoint presentation"""
     
     try:
