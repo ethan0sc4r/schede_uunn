@@ -7,15 +7,35 @@ export interface Template {
   description: string;
   thumbnail?: string;
   elements: any[];
+  canvasWidth?: number;
+  canvasHeight?: number;
+  canvasBackground?: string;
+  canvasBorderWidth?: number;
+  canvasBorderColor?: string;
   createdAt: string;
   isDefault?: boolean;
 }
 
 interface TemplateManagerProps {
-  onSelectTemplate: (template: Template) => void;
+  onSelectTemplate: (template: Template, preserveContent?: boolean) => void;
   onClose: () => void;
   currentElements: any[];
+  currentCanvasWidth?: number;
+  currentCanvasHeight?: number;
+  currentCanvasBackground?: string;
+  currentCanvasBorderWidth?: number;
+  currentCanvasBorderColor?: string;
 }
+
+// Dimensioni foglio standard
+export const CANVAS_SIZES = {
+  A4_LANDSCAPE: { width: 1123, height: 794, name: 'A4 Orizzontale' },
+  A4_PORTRAIT: { width: 794, height: 1123, name: 'A4 Verticale' },
+  A3_LANDSCAPE: { width: 1587, height: 1123, name: 'A3 Orizzontale' },
+  A3_PORTRAIT: { width: 1123, height: 1587, name: 'A3 Verticale' },
+  CUSTOM: { width: 1200, height: 800, name: 'Personalizzato' },
+  PRESENTATION: { width: 1280, height: 720, name: 'Presentazione (16:9)' }
+};
 
 // Template predefiniti
 const DEFAULT_TEMPLATES: Template[] = [
@@ -24,6 +44,11 @@ const DEFAULT_TEMPLATES: Template[] = [
     name: 'Scheda Navale Standard',
     description: 'Layout classico con logo, bandiera, silhouette e tabella caratteristiche',
     isDefault: true,
+    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
+    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
+    canvasBackground: '#ffffff',
+    canvasBorderWidth: 2,
+    canvasBorderColor: '#000000',
     createdAt: new Date().toISOString(),
     elements: [
       {
@@ -79,6 +104,11 @@ const DEFAULT_TEMPLATES: Template[] = [
     name: 'Scheda Navale Minimalista',
     description: 'Layout semplificato con solo silhouette e informazioni essenziali',
     isDefault: true,
+    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
+    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
+    canvasBackground: '#f8fafc',
+    canvasBorderWidth: 1,
+    canvasBorderColor: '#e2e8f0',
     createdAt: new Date().toISOString(),
     elements: [
       {
@@ -117,6 +147,11 @@ const DEFAULT_TEMPLATES: Template[] = [
     name: 'Scheda Navale Dettagliata',
     description: 'Layout completo con sezioni multiple per informazioni estese',
     isDefault: true,
+    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
+    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
+    canvasBackground: '#ffffff',
+    canvasBorderWidth: 3,
+    canvasBorderColor: '#1f2937',
     createdAt: new Date().toISOString(),
     elements: [
       {
@@ -195,10 +230,97 @@ const DEFAULT_TEMPLATES: Template[] = [
         style: { fontSize: 14, fontWeight: 'normal', color: '#6b7280', whiteSpace: 'pre-line' }
       }
     ]
+  },
+  {
+    id: 'naval-card-powerpoint',
+    name: 'Template PowerPoint',
+    description: 'Formato ottimizzato per presentazioni PowerPoint (16:9)',
+    isDefault: true,
+    canvasWidth: CANVAS_SIZES.PRESENTATION.width,
+    canvasHeight: CANVAS_SIZES.PRESENTATION.height,
+    canvasBackground: '#ffffff',
+    canvasBorderWidth: 2,
+    canvasBorderColor: '#1e40af',
+    createdAt: new Date().toISOString(),
+    elements: [
+      {
+        id: 'logo',
+        type: 'logo',
+        x: 50,
+        y: 30,
+        width: 100,
+        height: 100,
+        style: { backgroundColor: '#1e40af', borderRadius: 8 }
+      },
+      {
+        id: 'flag',
+        type: 'flag',
+        x: 1130,
+        y: 30,
+        width: 100,
+        height: 67,
+        style: { backgroundColor: '#1e40af', borderRadius: 8 }
+      },
+      {
+        id: 'unit_name',
+        type: 'unit_name',
+        x: 170,
+        y: 30,
+        width: 500,
+        height: 40,
+        content: '[NOME UNITÀ]',
+        isFixed: true,
+        style: { fontSize: 28, fontWeight: 'bold', color: '#1e40af' }
+      },
+      {
+        id: 'unit_class',
+        type: 'unit_class',
+        x: 170,
+        y: 80,
+        width: 500,
+        height: 30,
+        content: '[CLASSE]',
+        isFixed: true,
+        style: { fontSize: 20, fontWeight: 'normal', color: '#374151' }
+      },
+      {
+        id: 'silhouette',
+        type: 'silhouette',
+        x: 50,
+        y: 150,
+        width: 1180,
+        height: 300,
+        style: { backgroundColor: '#3b82f6', borderRadius: 8 }
+      },
+      {
+        id: 'characteristics-table',
+        type: 'table',
+        x: 50,
+        y: 480,
+        width: 1180,
+        height: 200,
+        tableData: [
+          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
+          ['LUNGHEZZA', 'XXX m', 'LARGHEZZA', 'XXX m'],
+          ['DISLOCAMENTO', 'XXX t', 'VELOCITÀ', 'XXX kn'],
+          ['EQUIPAGGIO', 'XXX', 'ARMA', 'XXX']
+        ],
+        style: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' }
+      }
+    ]
   }
 ];
 
-export default function TemplateManager({ onSelectTemplate, onClose, currentElements }: TemplateManagerProps) {
+export default function TemplateManager({ 
+  onSelectTemplate, 
+  onClose, 
+  currentElements,
+  currentCanvasWidth,
+  currentCanvasHeight,
+  currentCanvasBackground,
+  currentCanvasBorderWidth,
+  currentCanvasBorderColor
+}: TemplateManagerProps) {
   const [templates, setTemplates] = useState<Template[]>(() => {
     const saved = localStorage.getItem('naval-templates');
     const userTemplates = saved ? JSON.parse(saved) : [];
@@ -217,6 +339,11 @@ export default function TemplateManager({ onSelectTemplate, onClose, currentElem
       name: templateName,
       description: templateDescription,
       elements: currentElements,
+      canvasWidth: currentCanvasWidth || CANVAS_SIZES.A4_LANDSCAPE.width,
+      canvasHeight: currentCanvasHeight || CANVAS_SIZES.A4_LANDSCAPE.height,
+      canvasBackground: currentCanvasBackground || '#ffffff',
+      canvasBorderWidth: currentCanvasBorderWidth || 2,
+      canvasBorderColor: currentCanvasBorderColor || '#000000',
       createdAt: new Date().toISOString(),
       isDefault: false
     };
@@ -326,10 +453,18 @@ export default function TemplateManager({ onSelectTemplate, onClose, currentElem
                     </div>
                     <div className="flex space-x-1">
                       <button
-                        onClick={() => onSelectTemplate(template)}
-                        className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                        onClick={() => onSelectTemplate(template, false)}
+                        className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                        title="Applica template (sostituisce tutto)"
                       >
-                        Usa
+                        Applica
+                      </button>
+                      <button
+                        onClick={() => onSelectTemplate(template, true)}
+                        className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors"
+                        title="Applica formato mantenendo contenuti"
+                      >
+                        Formato
                       </button>
                       
                       <button

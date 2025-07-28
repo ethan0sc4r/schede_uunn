@@ -3,6 +3,7 @@ import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye,
 import type { NavalUnit } from '../types/index.ts';
 import { navalUnitsApi } from '../services/api';
 import { getImageUrl } from '../utils/imageUtils';
+import PowerPointTemplateSelector from './PowerPointTemplateSelector';
 
 interface NavalUnitCardProps {
   unit: NavalUnit;
@@ -13,6 +14,7 @@ interface NavalUnitCardProps {
 
 export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardProps) {
   const [showActions, setShowActions] = useState(false);
+  const [showPowerPointSelector, setShowPowerPointSelector] = useState(false);
 
   const handlePrint = async () => {
     try {
@@ -52,27 +54,49 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
     }
   };
 
+  const handlePowerPointExport = async (templateConfig: any) => {
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(templateConfig)
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'export PowerPoint');
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${unit.name}_${unit.unit_class}.pptx`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      alert(`PowerPoint di "${unit.name}" esportato con successo!`);
+    } catch (error) {
+      console.error('Errore export PowerPoint:', error);
+      alert('Errore durante l\'export PowerPoint');
+    }
+  };
+
   return (
     <div className="card hover:shadow-xl transition-shadow duration-200 relative" 
          onMouseEnter={() => setShowActions(true)}
          onMouseLeave={() => setShowActions(false)}>
       <div className="relative">
         {(() => {
-          // Find silhouette element in layout_config
-          const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
-          const silhouetteImage = silhouetteElement?.image;
-          
-          if (silhouetteImage) {
-            return (
-              <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
-                <img
-                  src={getImageUrl(silhouetteImage)}
-                  alt={`${unit.name} silhouette`}
-                  className="max-h-full max-w-full object-contain"
-                />
-              </div>
-            );
-          } else if (unit.silhouette_path) {
+          // Use silhouette_path from database first, then check layout_config as fallback
+          if (unit.silhouette_path) {
             return (
               <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
                 <img
@@ -83,17 +107,34 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
               </div>
             );
           } else {
-            return (
-              <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
-                <div className="text-center text-gray-400">
-                  <svg className="h-16 w-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v1c0 1.11.89 2 2 2h1v9c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-9h1c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zM8 20H6v-8h2v8zm6 0h-4v-6.5c0-.28.22-.5.5-.5h3c.28 0 .5.22.5.5V20zm4 0h-2v-8h2v8z"/>
-                  </svg>
-                  <span className="text-sm">Nessuna silhouette</span>
+            // Find silhouette element in layout_config as fallback
+            const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
+            const silhouetteImage = silhouetteElement?.image;
+            
+            if (silhouetteImage) {
+              return (
+                <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
+                  <img
+                    src={getImageUrl(silhouetteImage)}
+                    alt={`${unit.name} silhouette`}
+                    className="max-h-full max-w-full object-contain"
+                  />
                 </div>
-              </div>
-            );
+              );
+            }
           }
+          
+          // No image found
+          return (
+            <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
+              <div className="text-center text-gray-400">
+                <svg className="h-16 w-16 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-2 .89-2 2v1c0 1.11.89 2 2 2h1v9c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-9h1c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zM8 20H6v-8h2v8zm6 0h-4v-6.5c0-.28.22-.5.5-.5h3c.28 0 .5.22.5.5V20zm4 0h-2v-8h2v8z"/>
+                </svg>
+                <span className="text-sm">Nessuna silhouette</span>
+              </div>
+            </div>
+          );
         })()}
         {/* Template indicator */}
         {unit.template_name && (
@@ -134,6 +175,16 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
               title="Stampa"
             >
               <Printer className="h-3 w-3" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPowerPointSelector(true);
+              }}
+              className="p-1 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-colors"
+              title="Esporta PowerPoint"
+            >
+              <Download className="h-3 w-3" />
             </button>
           </div>
         )}
@@ -205,6 +256,14 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
           </button>
         </div>
       </div>
+      
+      {/* PowerPoint Template Selector */}
+      <PowerPointTemplateSelector
+        isOpen={showPowerPointSelector}
+        onClose={() => setShowPowerPointSelector(false)}
+        onExport={handlePowerPointExport}
+        unitName={unit.name}
+      />
     </div>
   );
 }

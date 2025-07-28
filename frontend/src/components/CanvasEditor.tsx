@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Palette, Save, Upload } from 'lucide-react';
+import { Palette, Save } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
-import TemplateManager, { type Template } from './TemplateManager';
+import TemplateManager, { type Template, CANVAS_SIZES } from './TemplateManager';
 import { getImageUrl } from '../utils/imageUtils';
 
 interface CanvasElement {
@@ -35,8 +35,9 @@ interface CanvasEditorProps {
   onCancel: () => void;
 }
 
-const CANVAS_WIDTH = 1123; // A4 landscape at 96 DPI: 11.7" * 96
-const CANVAS_HEIGHT = 794;  // A4 landscape at 96 DPI: 8.3" * 96
+// Default canvas dimensions (can be changed by templates)
+const DEFAULT_CANVAS_WIDTH = CANVAS_SIZES.A4_LANDSCAPE.width;
+const DEFAULT_CANVAS_HEIGHT = CANVAS_SIZES.A4_LANDSCAPE.height;
 
 // Predefined flags
 const PREDEFINED_FLAGS = [
@@ -113,38 +114,16 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
   // Update elements when unit changes (e.g., when opening a different unit)
   useEffect(() => {
-    console.log('🔍 CanvasEditor useEffect triggered');
-    console.log('🔍 Unit ID:', unit?.id);
-    console.log('🔍 Unit object:', unit);
-    console.log('🔍 Layout config exists:', !!unit?.layout_config?.elements);
-    console.log('🔍 Layout config elements:', unit?.layout_config?.elements);
-    console.log('🔍 Current elements state:', elements);
-    
     if (!unit) {
-      console.log('🔍 No unit provided, returning');
       return;
     }
     
     if (unit?.layout_config?.elements && unit.layout_config.elements.length > 0) {
-      console.log('🔍 Found layout_config with', unit.layout_config.elements.length, 'elements');
-      
-      // Log each element's position
-      unit.layout_config.elements.forEach((el, index) => {
-        console.log(`🔍 Element ${index + 1} (${el.type}): x=${el.x}, y=${el.y}, width=${el.width}, height=${el.height}`);
-      });
-      
-      console.log('🔍 Current elements state before update:', elements);
-      
       // Force a completely new array with new objects to ensure React sees the change
       const newElements = unit.layout_config.elements.map(el => ({ ...el }));
-      console.log('🔍 Setting new elements with positions:', newElements);
       setElements(newElements);
       
-      // Verify the state was updated
-      console.log('🔍 setElements called, elements should now be updated');
-      
     } else {
-      console.log('🔍 No layout_config elements found, creating default template for unit:', unit.id);
       // Create default template with existing image paths if available
       const defaultElements = [
         // Fixed fields that always remain
@@ -184,7 +163,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         {
           id: 'flag',
           type: 'flag', 
-          x: CANVAS_WIDTH - 140,
+          x: DEFAULT_CANVAS_WIDTH - 140,
           y: 20,
           width: 120,
           height: 80,
@@ -196,7 +175,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           type: 'silhouette',
           x: 20,
           y: 180,
-          width: CANVAS_WIDTH - 40,
+          width: DEFAULT_CANVAS_WIDTH - 40,
           height: 300,
           image: unit?.silhouette_path || undefined,
           style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
@@ -206,7 +185,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           type: 'table',
           x: 20,
           y: 500,
-          width: CANVAS_WIDTH - 40,
+          width: DEFAULT_CANVAS_WIDTH - 40,
           height: 200,
           style: { backgroundColor: '#f3f4f6' },
           tableData: [
@@ -216,21 +195,27 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           ]
         }
       ];
-      console.log('🔍 Setting default elements:', defaultElements);
       setElements(defaultElements);
     }
   }, [unit?.id]);
 
-  // Add a separate useEffect to log when elements state actually changes
+  // Update canvas properties when unit changes
   useEffect(() => {
-    console.log('🔍 Elements state changed! New elements:', elements);
-    if (elements.length > 0) {
-      console.log('🔍 Elements positions after state change:');
-      elements.forEach((el, index) => {
-        console.log(`🔍 State element ${index + 1} (${el.type}): x=${el.x}, y=${el.y}, width=${el.width}, height=${el.height}`);
-      });
+    if (unit?.layout_config) {
+      setCanvasWidth(unit.layout_config.canvasWidth || DEFAULT_CANVAS_WIDTH);
+      setCanvasHeight(unit.layout_config.canvasHeight || DEFAULT_CANVAS_HEIGHT);
+      setCanvasBackground(unit.layout_config.canvasBackground || '#ffffff');
+      setCanvasBorderWidth(unit.layout_config.canvasBorderWidth || 4);
+      setCanvasBorderColor(unit.layout_config.canvasBorderColor || '#000000');
+    } else {
+      // Reset to defaults when no layout config exists
+      setCanvasWidth(DEFAULT_CANVAS_WIDTH);
+      setCanvasHeight(DEFAULT_CANVAS_HEIGHT);
+      setCanvasBackground('#ffffff');
+      setCanvasBorderWidth(4);
+      setCanvasBorderColor('#000000');
     }
-  }, [elements]);
+  }, [unit?.id]);
 
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -243,6 +228,12 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   const [customFlags, setCustomFlags] = useState<Array<{name: string, url: string}>>([]);
   
   // Initialize canvas properties from unit's layout_config
+  const [canvasWidth, setCanvasWidth] = useState(
+    unit?.layout_config?.canvasWidth || DEFAULT_CANVAS_WIDTH
+  );
+  const [canvasHeight, setCanvasHeight] = useState(
+    unit?.layout_config?.canvasHeight || DEFAULT_CANVAS_HEIGHT
+  );
   const [canvasBackground, setCanvasBackground] = useState(
     unit?.layout_config?.canvasBackground || '#ffffff'
   );
@@ -442,8 +433,65 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     ));
   };
 
-  const applyTemplate = (template: Template) => {
-    setElements(template.elements.map(el => ({ ...el })));
+  const applyTemplate = (template: Template, preserveContent = false) => {
+    if (preserveContent) {
+      // Preserve content from existing elements when applying template format
+      const currentContent = new Map();
+      elements.forEach(el => {
+        if (el.content) currentContent.set(el.type, el.content);
+        if (el.image) currentContent.set(`${el.type}_image`, el.image);
+        if (el.tableData) currentContent.set(`${el.type}_table`, el.tableData);
+      });
+
+      const updatedElements = template.elements.map(templateEl => {
+        const preservedElement = { ...templateEl };
+        
+        // Preserve content for same type elements
+        if (currentContent.has(templateEl.type)) {
+          preservedElement.content = currentContent.get(templateEl.type);
+        }
+        if (currentContent.has(`${templateEl.type}_image`)) {
+          preservedElement.image = currentContent.get(`${templateEl.type}_image`);
+        }
+        if (currentContent.has(`${templateEl.type}_table`)) {
+          preservedElement.tableData = currentContent.get(`${templateEl.type}_table`);
+        }
+
+        // Always preserve unit name and class content
+        if (templateEl.type === 'unit_name' && unit?.name) {
+          preservedElement.content = unit.name;
+        }
+        if (templateEl.type === 'unit_class' && unit?.unit_class) {
+          preservedElement.content = unit.unit_class;
+        }
+
+        return preservedElement;
+      });
+
+      setElements(updatedElements);
+    } else {
+      // Standard template application - replace everything
+      const newElements = template.elements.map(el => {
+        const newEl = { ...el };
+        // Still preserve unit name and class from actual unit data
+        if (el.type === 'unit_name' && unit?.name) {
+          newEl.content = unit.name;
+        }
+        if (el.type === 'unit_class' && unit?.unit_class) {
+          newEl.content = unit.unit_class;
+        }
+        return newEl;
+      });
+      setElements(newElements);
+    }
+
+    // Apply canvas settings from template
+    if (template.canvasWidth) setCanvasWidth(template.canvasWidth);
+    if (template.canvasHeight) setCanvasHeight(template.canvasHeight);
+    if (template.canvasBackground) setCanvasBackground(template.canvasBackground);
+    if (template.canvasBorderWidth !== undefined) setCanvasBorderWidth(template.canvasBorderWidth);
+    if (template.canvasBorderColor) setCanvasBorderColor(template.canvasBorderColor);
+
     setSelectedElement(null);
     setShowTemplateManager(false);
   };
@@ -494,15 +542,6 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     const isSelected = selectedElement === element.id;
     const isFixed = element.isFixed || element.type === 'unit_name' || element.type === 'unit_class';
     
-    // Debug: log actual rendering values with more detail
-    console.log(`🔍 RENDER: ${element.type} (${element.id}) at x=${element.x}, y=${element.y}, w=${element.width}, h=${element.height}`);
-    console.log(`🔍 RENDER: Element full object:`, element);
-    console.log(`🔍 RENDER: Style will be applied:`, {
-      left: element.x,
-      top: element.y,
-      width: element.width,
-      height: element.height,
-    });
     
     return (
       <div
@@ -817,8 +856,15 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               </button>
               <button
                 onClick={() => {
-                  console.log('🔍 CanvasEditor saving elements:', elements);
-                  onSave({ elements, canvasBackground, canvasBorderWidth, canvasBorderColor, nation: getNationFromFlag() });
+                  onSave({ 
+                    elements, 
+                    canvasWidth, 
+                    canvasHeight, 
+                    canvasBackground, 
+                    canvasBorderWidth, 
+                    canvasBorderColor, 
+                    nation: getNationFromFlag() 
+                  });
                 }}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
@@ -1492,6 +1538,11 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             onSelectTemplate={applyTemplate}
             onClose={() => setShowTemplateManager(false)}
             currentElements={elements}
+            currentCanvasWidth={canvasWidth}
+            currentCanvasHeight={canvasHeight}
+            currentCanvasBackground={canvasBackground}
+            currentCanvasBorderWidth={canvasBorderWidth}
+            currentCanvasBorderColor={canvasBorderColor}
           />
         )}
       </div>
@@ -1501,8 +1552,8 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         <div className="bg-white shadow-xl rounded-lg overflow-auto max-h-screen">
           <div 
             style={{ 
-              width: CANVAS_WIDTH * zoomLevel, 
-              height: CANVAS_HEIGHT * zoomLevel,
+              width: canvasWidth * zoomLevel, 
+              height: canvasHeight * zoomLevel,
               overflow: 'visible'
             }}
           >
@@ -1510,8 +1561,8 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               ref={canvasRef}
               className="relative"
               style={{ 
-                width: CANVAS_WIDTH, 
-                height: CANVAS_HEIGHT,
+                width: canvasWidth, 
+                height: canvasHeight,
                 backgroundColor: canvasBackground,
                 borderWidth: canvasBorderWidth,
                 borderColor: canvasBorderColor,

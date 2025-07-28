@@ -94,7 +94,12 @@ export const getImageUrl = (imagePath: string): string => {
 
 // Migrate all base64 images in layout_config to backend files
 export const migrateLayoutConfigImages = async (layoutConfig: any): Promise<any> => {
-  if (!layoutConfig?.elements) {
+  if (!layoutConfig) {
+    return layoutConfig;
+  }
+  
+  // If no elements, return layoutConfig as-is to preserve other properties
+  if (!layoutConfig.elements) {
     return layoutConfig;
   }
   

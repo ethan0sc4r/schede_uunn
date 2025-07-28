@@ -15,7 +15,7 @@ import hashlib
 import tempfile
 
 from app.simple_database import SimpleDatabase, init_database
-from utils.powerpoint_export import create_group_powerpoint
+from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint
 
 app = FastAPI(
     title="Naval Units Management System",
@@ -310,8 +310,8 @@ async def upload_flag(unit_id: int, file: UploadFile = File(...), user: dict = D
     SimpleDatabase.update_naval_unit_flag(unit_id, file_path)
     return {"message": "Flag uploaded successfully", "file_path": file_path}
 
-@app.get("/api/units/{unit_id}/export/powerpoint")
-async def export_unit_powerpoint(unit_id: int):
+@app.post("/api/units/{unit_id}/export/powerpoint")
+async def export_unit_powerpoint(unit_id: int, template_config: dict = None, user: dict = Depends(get_current_user)):
     """Export a single naval unit to PowerPoint presentation"""
     
     try:
@@ -325,36 +325,15 @@ async def export_unit_powerpoint(unit_id: int):
         
         print(f"Unit found: {unit['name']}")
         
-        # Create a minimal group data structure for single unit export
-        group_data = {
-            'id': f"unit_{unit_id}",
-            'name': f"{unit['name']} - {unit['unit_class']}",
-            'description': f"Scheda singola per {unit['name']}",
-            'naval_units': [unit],  # Single unit in array
-            'presentation_config': {
-                'mode': 'single',
-                'interval': 5,
-                'grid_rows': 1,
-                'grid_cols': 1,
-                'auto_advance': False,
-                'page_duration': 10
-            },
-            'override_logo': False,
-            'override_flag': False,
-            'template_logo_path': None,
-            'template_flag_path': None
-        }
-        
-        print(f"Group data prepared for single unit export")
-        
         # Create temporary file for PowerPoint
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
             output_path = tmp_file.name
         
         print(f"Temporary file created: {output_path}")
+        print(f"Template config: {template_config}")
         
-        # Generate PowerPoint presentation
-        created_path = create_group_powerpoint(group_data, output_path)
+        # Generate PowerPoint presentation using single unit function
+        created_path = create_unit_powerpoint(unit, output_path, template_config)
         print(f"PowerPoint created successfully: {created_path}")
         
         # Create exports directory if it doesn't exist

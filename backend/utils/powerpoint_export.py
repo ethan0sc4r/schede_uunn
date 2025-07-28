@@ -10,6 +10,61 @@ import requests
 import tempfile
 from typing import List, Dict, Any, Optional
 
+def create_unit_powerpoint(unit_data: Dict[str, Any], output_path: str, template_config: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Create a PowerPoint presentation from a single naval unit
+    
+    Args:
+        unit_data: Unit data including layout config
+        output_path: Path where to save the PowerPoint file
+        template_config: Optional template configuration for presentation format
+    
+    Returns:
+        Path to the created PowerPoint file
+    """
+    
+    try:
+        print(f"Creating PowerPoint for unit: {unit_data.get('name', 'Unknown')}")
+        
+        # Create new presentation
+        prs = Presentation()
+        
+        # Apply template configuration if provided
+        if template_config:
+            canvas_width = template_config.get('canvasWidth', 1123)
+            canvas_height = template_config.get('canvasHeight', 794)
+            
+            # Convert canvas dimensions to PowerPoint slide dimensions
+            # Assuming 96 DPI for canvas and converting to inches
+            slide_width_inches = canvas_width / 96.0
+            slide_height_inches = canvas_height / 96.0
+            
+            prs.slide_width = Inches(slide_width_inches)
+            prs.slide_height = Inches(slide_height_inches)
+            
+            print(f"Applied template dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
+        else:
+            # Default to 16:9 widescreen
+            prs.slide_width = Inches(13.33)
+            prs.slide_height = Inches(7.5)
+            print(f"Using default widescreen dimensions")
+        
+        # Create the unit slide
+        slide = _create_unit_slide(prs, unit_data, {})
+        
+        # Save presentation
+        print(f"Saving presentation to: {output_path}")
+        prs.save(output_path)
+        print(f"PowerPoint saved successfully")
+        
+        return output_path
+        
+    except Exception as e:
+        print(f"Error in create_unit_powerpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
 def create_group_powerpoint(group_data: Dict[str, Any], output_path: str) -> str:
     """
     Create a PowerPoint presentation from a group's naval units
@@ -132,6 +187,29 @@ def _create_unit_slide(prs: Presentation, unit: Dict[str, Any], group_data: Dict
             fill.fore_color.rgb = _hex_to_rgb(canvas_background)
         except Exception as bg_error:
             print(f"Failed to set background color: {bg_error}")
+        
+        # Add canvas border if specified
+        canvas_border_width = layout_config.get('canvasBorderWidth', 0)
+        canvas_border_color = layout_config.get('canvasBorderColor', '#000000')
+        
+        if canvas_border_width > 0:
+            try:
+                # Add border as a rectangle shape
+                border_shape = slide.shapes.add_shape(
+                    1,  # Rectangle auto shape
+                    Inches(0), Inches(0),
+                    _pixels_to_inches(layout_config.get('canvasWidth', 1123)),
+                    _pixels_to_inches(layout_config.get('canvasHeight', 794))
+                )
+                
+                # Configure border
+                border_shape.fill.background()  # No fill, just border
+                border_shape.line.color.rgb = _hex_to_rgb(canvas_border_color)
+                border_shape.line.width = Pt(canvas_border_width)
+                
+                print(f"Added canvas border: {canvas_border_width}pt, color: {canvas_border_color}")
+            except Exception as border_error:
+                print(f"Failed to add canvas border: {border_error}")
         
         # Process each element from the canvas
         for i, element in enumerate(elements):
@@ -265,6 +343,28 @@ def _add_element_to_slide(slide: Any, element: Dict[str, Any], unit: Dict[str, A
             paragraph.alignment = PP_ALIGN.CENTER
         elif text_align == 'right':
             paragraph.alignment = PP_ALIGN.RIGHT
+        
+        # Apply background color and borders
+        if style.get('backgroundColor'):
+            text_box.fill.solid()
+            text_box.fill.fore_color.rgb = _hex_to_rgb(style.get('backgroundColor'))
+        
+        # Apply borders
+        border_width = style.get('borderWidth', 0)
+        if border_width > 0:
+            text_box.line.color.rgb = _hex_to_rgb(style.get('borderColor', '#000000'))
+            text_box.line.width = Pt(border_width)
+            border_style = style.get('borderStyle', 'solid')
+            # PowerPoint supports different line styles, but solid is most compatible
+        
+        # Apply border radius (limited support in PowerPoint)
+        border_radius = style.get('borderRadius', 0)
+        if border_radius > 0:
+            # PowerPoint has limited border radius support, this is approximate
+            try:
+                text_box.adjustments[0] = border_radius / 100.0  # Approximate conversion
+            except:
+                pass  # Ignore if adjustments not available
     
     elif element_type in ['logo', 'flag', 'silhouette']:
         # Handle images - with remote URL support

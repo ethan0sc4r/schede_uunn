@@ -70,7 +70,7 @@ export default function UnitView() {
     }
   };
 
-  const handleExportPowerPoint = () => {
+  const handleExportPowerPoint = async () => {
     if (!unit) {
       alert('Errore: Unità non disponibile per l\'esportazione');
       return;
@@ -79,13 +79,35 @@ export default function UnitView() {
     console.log('Starting PowerPoint export for unit:', unit.id);
     
     try {
+      const token = localStorage.getItem('token');
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
-      const exportUrl = `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`;
       
-      // Open the export URL directly in the same window to trigger download
-      window.location.href = exportUrl;
+      const response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({}), // Empty template config for default export
+      });
+
+      if (!response.ok) {
+        throw new Error('Errore durante l\'export PowerPoint');
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${unit.name}_${unit.unit_class}.pptx`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
       
-      console.log('PowerPoint export initiated successfully');
+      console.log('PowerPoint export completed successfully');
+      alert(`PowerPoint di "${unit.name}" esportato con successo!`);
     } catch (error: any) {
       console.error('PowerPoint export error:', error);
       alert(`Errore durante l'esportazione PowerPoint: ${error.message || error}`);
@@ -106,8 +128,91 @@ export default function UnitView() {
   };
 
   const renderCanvas = () => {
-    if (!unit?.layout_config?.elements) return null;
-
+    if (!unit) return null;
+    
+    // Use layout_config if available, otherwise create basic elements from direct fields
+    const elements = unit.layout_config?.elements || [];
+    const canvasConfig = unit.layout_config || {
+      canvasWidth: 1123,
+      canvasHeight: 794,
+      canvasBackground: '#ffffff',
+      canvasBorderWidth: 4,
+      canvasBorderColor: '#000000'
+    };
+    
+    // If no elements but unit has direct image fields, create basic elements
+    if (elements.length === 0 && (unit.logo_path || unit.flag_path || unit.silhouette_path)) {
+      const basicElements = [];
+      
+      if (unit.logo_path) {
+        basicElements.push({
+          id: 'logo',
+          type: 'logo',
+          x: 20,
+          y: 20,
+          width: 120,
+          height: 120,
+          image: unit.logo_path,
+          style: { backgroundColor: '#ffffff', borderRadius: 8 }
+        });
+      }
+      
+      if (unit.flag_path) {
+        basicElements.push({
+          id: 'flag',
+          type: 'flag',
+          x: 983,
+          y: 20,
+          width: 120,
+          height: 80,
+          image: unit.flag_path,
+          style: { backgroundColor: '#ffffff', borderRadius: 8 }
+        });
+      }
+      
+      if (unit.silhouette_path) {
+        basicElements.push({
+          id: 'silhouette',
+          type: 'silhouette',
+          x: 20,
+          y: 180,
+          width: 1083,
+          height: 300,
+          image: unit.silhouette_path,
+          style: { backgroundColor: '#ffffff', borderRadius: 8 }
+        });
+      }
+      
+      // Add basic unit info
+      basicElements.push({
+        id: 'unit_name',
+        type: 'unit_name',
+        x: 160,
+        y: 30,
+        width: 400,
+        height: 40,
+        content: unit.name,
+        style: { fontSize: 24, fontWeight: 'bold', color: '#000' }
+      });
+      
+      basicElements.push({
+        id: 'unit_class',
+        type: 'unit_class',
+        x: 160,
+        y: 80,
+        width: 400,
+        height: 40,
+        content: unit.unit_class,
+        style: { fontSize: 20, fontWeight: 'normal', color: '#000' }
+      });
+      
+      return renderCanvasWithElements(basicElements, canvasConfig);
+    }
+    
+    return renderCanvasWithElements(elements, canvasConfig);
+  };
+  
+  const renderCanvasWithElements = (elements: any[], canvasConfig: any) => {
     return (
       <div className="relative bg-white shadow-xl rounded-lg overflow-visible">
         <div 
@@ -115,17 +220,17 @@ export default function UnitView() {
           data-export-target="true"
           className="block"
           style={{ 
-            width: 1123, 
-            height: 794,
-            backgroundColor: unit.layout_config.canvasBackground || '#ffffff',
-            borderWidth: unit.layout_config.canvasBorderWidth || 4,
-            borderColor: unit.layout_config.canvasBorderColor || '#000000',
+            width: canvasConfig.canvasWidth || 1123, 
+            height: canvasConfig.canvasHeight || 794,
+            backgroundColor: canvasConfig.canvasBackground || '#ffffff',
+            borderWidth: canvasConfig.canvasBorderWidth || 4,
+            borderColor: canvasConfig.canvasBorderColor || '#000000',
             borderStyle: 'solid',
             position: 'relative',
             overflow: 'visible'
           }}
         >
-          {unit.layout_config.elements.map((element: any) => (
+          {elements.map((element: any) => (
             <div
               key={element.id}
               className="absolute"

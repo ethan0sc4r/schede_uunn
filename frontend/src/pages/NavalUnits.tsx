@@ -59,9 +59,6 @@ export default function NavalUnits() {
   };
 
   const handleEdit = (unit: NavalUnit) => {
-    console.log('🔍 NavalUnits handleEdit called with unit:', unit);
-    console.log('🔍 Unit layout_config:', unit.layout_config);
-    console.log('🔍 Unit layout_config elements:', unit.layout_config?.elements);
     setSelectedUnit(unit);
     setShowEditor(true);
   };
@@ -100,7 +97,6 @@ export default function NavalUnits() {
         id: selectedUnit.id,
         data: { notes }
       });
-      console.log('Note salvate con successo');
     } catch (error) {
       console.error('Errore salvando le note:', error);
       alert('Errore durante il salvataggio delle note');
@@ -266,24 +262,35 @@ export default function NavalUnits() {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
                             {(() => {
-                              const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
-                              const silhouetteImage = silhouetteElement?.image;
-                              
-                              if (silhouetteImage) {
+                              // Use silhouette_path from database first, then check layout_config as fallback
+                              if (unit.silhouette_path) {
                                 return (
                                   <img
-                                    src={getImageUrl(silhouetteImage)}
+                                    src={getImageUrl(unit.silhouette_path)}
                                     alt={`${unit.name} silhouette`}
                                     className="h-10 w-10 object-contain"
                                   />
                                 );
                               } else {
-                                return (
-                                  <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
-                                    <Ship className="h-6 w-6 text-gray-400" />
-                                  </div>
-                                );
+                                const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
+                                const silhouetteImage = silhouetteElement?.image;
+                                
+                                if (silhouetteImage) {
+                                  return (
+                                    <img
+                                      src={getImageUrl(silhouetteImage)}
+                                      alt={`${unit.name} silhouette`}
+                                      className="h-10 w-10 object-contain"
+                                    />
+                                  );
+                                }
                               }
+                              
+                              return (
+                                <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
+                                  <Ship className="h-6 w-6 text-gray-400" />
+                                </div>
+                              );
                             })()}
                           </div>
                           <div className="ml-4">
@@ -357,17 +364,15 @@ export default function NavalUnits() {
             unit={selectedUnit}
             onSave={async (canvasData) => {
               try {
-                console.log('🔍 Saving canvas data:', canvasData);
-                
                 // Convert any base64 images to backend files
                 const migratedLayoutConfig = await migrateLayoutConfigImages({
                   elements: canvasData.elements,
+                  canvasWidth: canvasData.canvasWidth,
+                  canvasHeight: canvasData.canvasHeight,
                   canvasBackground: canvasData.canvasBackground,
                   canvasBorderWidth: canvasData.canvasBorderWidth,
                   canvasBorderColor: canvasData.canvasBorderColor
                 });
-                
-                console.log('🔍 Migrated layout config:', migratedLayoutConfig);
                 
                 // Extract unit name and class from canvas elements
                 const unitNameElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'unit_name');
@@ -384,8 +389,6 @@ export default function NavalUnits() {
                   layout_config: migratedLayoutConfig,
                   characteristics: selectedUnit?.characteristics || []
                 };
-                
-                console.log('🔍 Final unit data being sent:', unitData);
 
                 if (selectedUnit) {
                   // Update existing unit
@@ -406,9 +409,8 @@ export default function NavalUnits() {
                   try {
                     const updatedUnit = await navalUnitsApi.getById(selectedUnit.id);
                     setSelectedUnit(updatedUnit);
-                    console.log('✅ Selected unit updated with fresh data from server');
                   } catch (error) {
-                    console.error('❌ Error fetching updated unit data:', error);
+                    console.error('Error fetching updated unit data:', error);
                   }
                 }
                 

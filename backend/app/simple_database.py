@@ -451,7 +451,6 @@ class SimpleDatabase:
     @staticmethod
     def update_naval_unit(unit_id: int, **kwargs) -> bool:
         """Update naval unit fields"""
-        print(f"🔍 DB update_naval_unit called with unit_id={unit_id}, kwargs={kwargs}")
         with get_db_connection() as conn:
             cursor = conn.cursor()
             
@@ -459,19 +458,16 @@ class SimpleDatabase:
             params = []
             
             for field, value in kwargs.items():
-                print(f"🔍 Processing field: {field} = {value}")
                 if field in ['name', 'unit_class', 'nation', 'background_color', 'silhouette_zoom', 
                            'silhouette_position_x', 'silhouette_position_y', 'notes']:
                     update_fields.append(f"{field} = ?")
                     params.append(value)
                 elif field == 'characteristics':
                     # Skip characteristics for now - they are handled separately
-                    print(f"🔍 Skipping characteristics field")
                     pass
                 elif field == 'layout_config':
                     update_fields.append("layout_config = ?")
                     params.append(json.dumps(value) if value else None)
-                    print(f"🔍 Layout config JSON: {json.dumps(value) if value else None}")
                     
                     # Also extract and update separate image path fields for backward compatibility
                     if value and 'elements' in value:
@@ -479,29 +475,19 @@ class SimpleDatabase:
                             if element.get('type') == 'silhouette' and element.get('image'):
                                 update_fields.append("silhouette_path = ?")
                                 params.append(element['image'])
-                                print(f"🔍 Updating silhouette_path: {element['image']}")
                             elif element.get('type') == 'logo' and element.get('image'):
                                 update_fields.append("logo_path = ?")
                                 params.append(element['image'])
-                                print(f"🔍 Updating logo_path: {element['image']}")
                             elif element.get('type') == 'flag' and element.get('image'):
                                 update_fields.append("flag_path = ?")
                                 params.append(element['image'])
-                                print(f"🔍 Updating flag_path: {element['image']}")
-            
-            print(f"🔍 Update fields: {update_fields}")
-            print(f"🔍 Params: {params}")
             
             if update_fields:
                 params.append(unit_id)
                 sql = f"UPDATE naval_units SET {', '.join(update_fields)} WHERE id = ?"
-                print(f"🔍 SQL: {sql}")
                 cursor.execute(sql, params)
                 conn.commit()
-                rowcount = cursor.rowcount
-                print(f"🔍 Rows affected: {rowcount}")
-                return rowcount > 0
-            print("🔍 No fields to update")
+                return cursor.rowcount > 0
             return False
     
     @staticmethod
