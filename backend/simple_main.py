@@ -686,14 +686,63 @@ async def get_template(template_id: str, user: dict = Depends(get_current_user))
 
 @app.put("/api/templates/{template_id}")
 async def update_template(template_id: str, template_data: dict, user: dict = Depends(get_current_user)):
-    """Update a template"""
+    """Update a template and automatically apply changes to all units using this template"""
     try:
+        # Update the template
         success = SimpleDatabase.update_template(template_id, template_data, user['id'])
         if not success:
             raise HTTPException(status_code=404, detail="Template not found")
-        return {"message": "Template updated successfully"}
+        
+        # Get all units using this template
+        units_using_template = SimpleDatabase.get_units_using_template(template_id)
+        print(f"🔄 Template {template_id} updated, propagating to {len(units_using_template)} units")
+        
+        # Update each unit that uses this template
+        updated_units = []
+        for unit in units_using_template:
+            try:
+                # Apply template changes to unit's layout_config
+                # The template visibility settings should drive the unit's presentation
+                updated_layout = unit.get('layout_config', {})
+                
+                # Update canvas settings from template
+                updated_layout.update({
+                    'canvasWidth': template_data.get('canvasWidth', 1123),
+                    'canvasHeight': template_data.get('canvasHeight', 794),
+                    'canvasBackground': template_data.get('canvasBackground', '#ffffff'),
+                    'canvasBorderWidth': template_data.get('canvasBorderWidth', 2),
+                    'canvasBorderColor': template_data.get('canvasBorderColor', '#000000'),
+                    'templateId': template_id
+                })
+                
+                # Update elements from template
+                if 'elements' in template_data:
+                    updated_layout['elements'] = template_data['elements']
+                
+                # Update the unit in database
+                SimpleDatabase.update_naval_unit(unit['id'], layout_config=updated_layout)
+                updated_units.append(unit['id'])
+                print(f"✅ Updated unit {unit['id']} ({unit['name']})")
+                
+            except Exception as unit_error:
+                print(f"❌ Error updating unit {unit['id']}: {unit_error}")
+        
+        return {
+            "message": "Template updated successfully", 
+            "units_updated": len(updated_units),
+            "updated_unit_ids": updated_units
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating template: {str(e)}")
+
+@app.get("/api/templates/{template_id}/units")
+async def get_units_using_template(template_id: str, user: dict = Depends(get_current_user)):
+    """Get all units currently using a specific template"""
+    try:
+        units = SimpleDatabase.get_units_using_template(template_id)
+        return {"units": units, "count": len(units)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching units: {str(e)}")
 
 @app.delete("/api/templates/{template_id}")
 async def delete_template(template_id: str, user: dict = Depends(get_current_user)):

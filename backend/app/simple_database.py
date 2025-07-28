@@ -127,6 +127,9 @@ def init_database():
                 canvas_background TEXT DEFAULT '#ffffff',
                 canvas_border_width INTEGER DEFAULT 2,
                 canvas_border_color TEXT DEFAULT '#000000',
+                logo_visible BOOLEAN DEFAULT 1,
+                flag_visible BOOLEAN DEFAULT 1,
+                silhouette_visible BOOLEAN DEFAULT 1,
                 created_by INTEGER NOT NULL,
                 is_default BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -134,6 +137,20 @@ def init_database():
                 FOREIGN KEY (created_by) REFERENCES users (id)
             )
         ''')
+        
+        # Add visibility columns to existing templates table if they don't exist
+        try:
+            cursor.execute('ALTER TABLE templates ADD COLUMN logo_visible BOOLEAN DEFAULT 1')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE templates ADD COLUMN flag_visible BOOLEAN DEFAULT 1')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE templates ADD COLUMN silhouette_visible BOOLEAN DEFAULT 1')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         conn.commit()
 
@@ -682,8 +699,9 @@ class SimpleDatabase:
                 cursor.execute('''
                     INSERT OR REPLACE INTO templates 
                     (id, name, description, elements, canvas_width, canvas_height, 
-                     canvas_background, canvas_border_width, canvas_border_color, created_by, is_default, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     canvas_background, canvas_border_width, canvas_border_color, 
+                     logo_visible, flag_visible, silhouette_visible, created_by, is_default, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ''', (
                     template_id,
                     template_data['name'],
@@ -694,6 +712,9 @@ class SimpleDatabase:
                     template_data.get('canvasBackground', '#ffffff'),
                     template_data.get('canvasBorderWidth', 2),
                     template_data.get('canvasBorderColor', '#000000'),
+                    template_data.get('logoVisible', True),
+                    template_data.get('flagVisible', True),
+                    template_data.get('silhouetteVisible', True),
                     user_id,
                     template_data.get('isDefault', False)
                 ))
@@ -725,6 +746,9 @@ class SimpleDatabase:
                     template['canvasBackground'] = template['canvas_background']
                     template['canvasBorderWidth'] = template['canvas_border_width']
                     template['canvasBorderColor'] = template['canvas_border_color']
+                    template['logoVisible'] = bool(template.get('logo_visible', True))
+                    template['flagVisible'] = bool(template.get('flag_visible', True))
+                    template['silhouetteVisible'] = bool(template.get('silhouette_visible', True))
                     template['isDefault'] = bool(template['is_default'])
                     template['createdAt'] = template['created_at']
                     templates.append(template)
@@ -755,6 +779,9 @@ class SimpleDatabase:
                     template['canvasBackground'] = template['canvas_background']
                     template['canvasBorderWidth'] = template['canvas_border_width']
                     template['canvasBorderColor'] = template['canvas_border_color']
+                    template['logoVisible'] = bool(template.get('logo_visible', True))
+                    template['flagVisible'] = bool(template.get('flag_visible', True))
+                    template['silhouetteVisible'] = bool(template.get('silhouette_visible', True))
                     template['isDefault'] = bool(template['is_default'])
                     template['createdAt'] = template['created_at']
                     return template
@@ -772,7 +799,8 @@ class SimpleDatabase:
                 cursor.execute('''
                     UPDATE templates SET 
                     name = ?, description = ?, elements = ?, canvas_width = ?, canvas_height = ?,
-                    canvas_background = ?, canvas_border_width = ?, canvas_border_color = ?, updated_at = CURRENT_TIMESTAMP
+                    canvas_background = ?, canvas_border_width = ?, canvas_border_color = ?,
+                    logo_visible = ?, flag_visible = ?, silhouette_visible = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND created_by = ?
                 ''', (
                     template_data['name'],
@@ -783,6 +811,9 @@ class SimpleDatabase:
                     template_data.get('canvasBackground', '#ffffff'),
                     template_data.get('canvasBorderWidth', 2),
                     template_data.get('canvasBorderColor', '#000000'),
+                    template_data.get('logoVisible', True),
+                    template_data.get('flagVisible', True),
+                    template_data.get('silhouetteVisible', True),
                     template_id,
                     user_id
                 ))
@@ -808,6 +839,33 @@ class SimpleDatabase:
         except Exception as e:
             print(f"Error deleting template: {e}")
             return False
+
+    @staticmethod
+    def get_units_using_template(template_id: str) -> List[Dict]:
+        """Get all naval units that are currently using a specific template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM naval_units 
+                    WHERE current_template_id = ?
+                ''', (template_id,))
+                
+                units = []
+                for row in cursor.fetchall():
+                    unit = dict(row)
+                    # Parse JSON fields
+                    if unit['layout_config']:
+                        try:
+                            unit['layout_config'] = json.loads(unit['layout_config'])
+                        except:
+                            unit['layout_config'] = {}
+                    units.append(unit)
+                
+                return units
+        except Exception as e:
+            print(f"Error getting units using template: {e}")
+            return []
 
 # Initialize database on import
 init_database()

@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Download, Share2, FileImage, Printer, Presentation } from 'lucide-react';
-import { navalUnitsApi } from '../services/api';
+import { Download, Share2, FileImage, Printer, Presentation, X } from 'lucide-react';
+import { navalUnitsApi, templatesApi } from '../services/api';
 import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
+import { CANVAS_SIZES } from '../components/TemplateManager';
 
 export default function UnitView() {
   const { id } = useParams<{ id: string }>();
   const [unit, setUnit] = useState<NavalUnit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +43,20 @@ export default function UnitView() {
 
     loadUnit();
   }, [id]);
+
+  // Load available templates
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const templates = await templatesApi.getAll();
+        setAvailableTemplates(templates);
+      } catch (error) {
+        console.error('Error loading templates:', error);
+        setAvailableTemplates([]);
+      }
+    };
+    loadTemplates();
+  }, []);
 
   const handlePrint = async () => {
     if (!unit || !canvasRef.current) {
@@ -79,20 +96,24 @@ export default function UnitView() {
     }
   };
 
-  const handleExportPowerPoint = async () => {
+  const handleExportPowerPointWithTemplate = async (templateConfig: any = null) => {
     if (!unit) {
       alert('Errore: Unità non disponibile per l\'esportazione');
       return;
     }
     
     console.log('Starting PowerPoint export for unit:', unit.id);
+    console.log('🎨 Template config being sent:', templateConfig);
+    console.log('📋 Unit layout config:', unit.layout_config);
     
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
       
+      const finalTemplateConfig = templateConfig || unit.layout_config || null;
       console.log('🔍 PowerPoint export starting from View:', {
         unitId: unit.id,
-        apiUrl: `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`
+        apiUrl: `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`,
+        finalTemplateConfig: finalTemplateConfig
       });
       
       // Try public endpoint first, then authenticated endpoint as fallback
@@ -103,7 +124,9 @@ export default function UnitView() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({}), // Empty template config for default export
+          body: JSON.stringify({
+            template_config: finalTemplateConfig
+          })
         });
       } catch (publicError) {
         console.log('Public export failed, trying authenticated endpoint...');
@@ -113,7 +136,9 @@ export default function UnitView() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           },
-          body: JSON.stringify({}), // Empty template config for default export
+          body: JSON.stringify({
+            template_config: finalTemplateConfig
+          })
         });
       }
 
@@ -146,6 +171,10 @@ export default function UnitView() {
       console.error('PowerPoint export error:', error);
       alert(`Errore durante l'esportazione PowerPoint: ${error.message || error}`);
     }
+  };
+
+  const handleExportPowerPoint = () => {
+    setShowTemplateSelector(true);
   };
 
   const handleShare = async () => {
@@ -443,6 +472,79 @@ export default function UnitView() {
           {renderCanvas()}
         </div>
       </div>
+
+      {/* Template Selector Modal */}
+      {showTemplateSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-medium text-gray-900">Scegli Template per PowerPoint</h3>
+              <button
+                onClick={() => setShowTemplateSelector(false)}
+                className="p-2 rounded-full hover:bg-gray-200"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto">
+                {/* Current template option */}
+                <div className="border-2 border-blue-500 rounded-lg p-4 bg-blue-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-gray-900">Template Attivo della Nave</h4>
+                      <p className="text-sm text-gray-600">Usa il template attualmente applicato a questa nave</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleExportPowerPointWithTemplate(null);
+                        setShowTemplateSelector(false);
+                      }}
+                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                    >
+                      Usa Questo
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Available templates */}
+                {availableTemplates.map((template) => (
+                  <div key={template.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{template.name}</h4>
+                        <p className="text-sm text-gray-600">{template.description}</p>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {template.canvasWidth}x{template.canvasHeight}px
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          handleExportPowerPointWithTemplate(template);
+                          setShowTemplateSelector(false);
+                        }}
+                        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                      >
+                        Usa Questo
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowTemplateSelector(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

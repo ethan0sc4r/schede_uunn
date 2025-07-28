@@ -318,6 +318,10 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
       const data = await response.json();
       const imagePath = data.file_path;
       
+      console.log('Upload response:', data);
+      console.log('Image path:', imagePath);
+      console.log('Full image URL:', getImageUrl(imagePath));
+      
       setElements(prev => prev.map(el => 
         el.id === elementId ? { ...el, image: imagePath } : el
       ));
@@ -804,6 +808,24 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                     </div>
                   )}
 
+                  {/* Background Color Control - Available for all elements */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Riempimento</h4>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Colore di Sfondo</label>
+                      <input
+                        type="color"
+                        value={element.style?.backgroundColor || '#ffffff'}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement 
+                            ? { ...el, style: { ...el.style, backgroundColor: e.target.value } }
+                            : el
+                        ))}
+                        className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
                   {/* Border Controls - Available for all elements */}
                   <div className="pt-3 border-t border-gray-200">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Bordo</h4>
@@ -911,7 +933,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                 width: canvasWidth,
                 height: canvasHeight,
                 transform: `scale(${zoomLevel / 100})`,
-                transformOrigin: 'center top',
+                transformOrigin: 'top left',
                 borderWidth: canvasBorderWidth,
                 borderColor: canvasBorderColor,
                 borderStyle: 'solid'

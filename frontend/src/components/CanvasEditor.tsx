@@ -326,6 +326,7 @@ const PREDEFINED_FLAGS = [
 export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorProps) {
   // Initialize elements state - start with empty and let useEffect handle the initialization
   const [elements, setElements] = useState<CanvasElement[]>([]);
+  const [visibleElements, setVisibleElements] = useState<{[key: string]: boolean}>({});
 
   // Initialize canvas properties from unit's layout_config
   const [canvasWidth, setCanvasWidth] = useState(
@@ -392,6 +393,11 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       // Force a completely new array with new objects to ensure React sees the change
       const newElements = unit.layout_config.elements.map(el => ({ ...el }));
       setElements(newElements);
+      
+      // Initialize visibility - all elements visible by default
+      const initialVisibility: {[key: string]: boolean} = {};
+      newElements.forEach(el => { initialVisibility[el.id] = true; });
+      setVisibleElements(initialVisibility);
       
     } else {
       // Create default template with existing image paths if available
@@ -466,6 +472,11 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         }
       ];
       setElements(defaultElements);
+      
+      // Initialize visibility - all elements visible by default
+      const initialVisibility: {[key: string]: boolean} = {};
+      defaultElements.forEach(el => { initialVisibility[el.id] = true; });
+      setVisibleElements(initialVisibility);
     }
   }, [unit?.id]);
 
@@ -921,29 +932,96 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       setElements([...updatedElements, ...customElements]);
       console.log(`✨ Applied template with ${customElements.length} preserved custom elements`);
     } else {
-      // Standard template application - replace everything but preserve database images
-      const newElements = template.elements.map(el => {
-        const newEl = { ...el };
+      // Standard template application - manage element visibility correctly
+      console.log('📋 Current elements before template application:', elements.length);
+      console.log('🎨 Template elements to apply:', template.elements.length);
+      
+      // Create maps for efficient lookups
+      const templateElementsByType = new Map(template.elements.map(el => [el.type, el]));
+      const currentElementsByType = new Map(elements.map(el => [el.type, el]));
+      
+      // Initialize visibility - start with current visibility state
+      const newVisibility: {[key: string]: boolean} = { ...visibleElements };
+      const updatedElements: CanvasElement[] = [];
+      
+      // Step 1: Process all current elements
+      elements.forEach(currentEl => {
+        const templateEl = templateElementsByType.get(currentEl.type);
         
-        // Always use database images as primary source
-        if (el.type === 'logo' && preservedImages.logo) {
-          newEl.image = preservedImages.logo;
-        } else if (el.type === 'flag' && preservedImages.flag) {
-          newEl.image = preservedImages.flag;
-        } else if (el.type === 'silhouette' && preservedImages.silhouette) {
-          newEl.image = preservedImages.silhouette;
+        if (templateEl) {
+          // Element exists in template - update it and make it visible
+          const updatedEl = {
+            ...templateEl, // Use template properties (position, size, style)
+            id: currentEl.id, // Keep original ID
+            content: currentEl.content, // Preserve existing content
+            image: currentEl.image, // Preserve existing image
+            tableData: currentEl.tableData // Preserve existing table data
+          };
+          
+          // Always use database images as primary source
+          if (templateEl.type === 'logo' && preservedImages.logo) {
+            updatedEl.image = preservedImages.logo;
+          } else if (templateEl.type === 'flag' && preservedImages.flag) {
+            updatedEl.image = preservedImages.flag;
+          } else if (templateEl.type === 'silhouette' && preservedImages.silhouette) {
+            updatedEl.image = preservedImages.silhouette;
+          }
+          
+          // Always populate unit name and class from actual unit data
+          if (templateEl.type === 'unit_name') {
+            updatedEl.content = unit?.name || templateEl.content || '[Nome Unità]';
+          }
+          if (templateEl.type === 'unit_class') {
+            updatedEl.content = unit?.unit_class || templateEl.content || '[Classe Unità]';
+          }
+          
+          updatedElements.push(updatedEl);
+          newVisibility[updatedEl.id] = true; // Make visible
+          console.log(`✅ Updated existing element: ${currentEl.type} (${currentEl.id})`);
+        } else {
+          // Element doesn't exist in template - hide it but keep it
+          updatedElements.push(currentEl);
+          newVisibility[currentEl.id] = false; // Hide element
+          console.log(`🙈 Hiding element not in template: ${currentEl.type} (${currentEl.id})`);
         }
-        
-        // Always populate unit name and class from actual unit data or fallback
-        if (el.type === 'unit_name') {
-          newEl.content = unit?.name || el.content || '[Nome Unità]';
-        }
-        if (el.type === 'unit_class') {
-          newEl.content = unit?.unit_class || el.content || '[Classe Unità]';
-        }
-        return newEl;
       });
-      setElements(newElements);
+      
+      // Step 2: Add new elements from template that don't exist in current elements
+      template.elements.forEach(templateEl => {
+        if (!currentElementsByType.has(templateEl.type)) {
+          const newEl = { ...templateEl };
+          
+          // Always use database images as primary source
+          if (templateEl.type === 'logo' && preservedImages.logo) {
+            newEl.image = preservedImages.logo;
+          } else if (templateEl.type === 'flag' && preservedImages.flag) {
+            newEl.image = preservedImages.flag;
+          } else if (templateEl.type === 'silhouette' && preservedImages.silhouette) {
+            newEl.image = preservedImages.silhouette;
+          }
+          
+          // Always populate unit name and class from actual unit data
+          if (templateEl.type === 'unit_name') {
+            newEl.content = unit?.name || templateEl.content || '[Nome Unità]';
+          }
+          if (templateEl.type === 'unit_class') {
+            newEl.content = unit?.unit_class || templateEl.content || '[Classe Unità]';
+          }
+          
+          updatedElements.push(newEl);
+          newVisibility[newEl.id] = true; // Make visible
+          console.log(`➕ Added new element from template: ${templateEl.type} (${templateEl.id})`);
+        }
+      });
+      
+      // Apply the changes
+      setElements(updatedElements);
+      setVisibleElements(newVisibility);
+      
+      console.log('🎨 Template application complete:');
+      console.log(`   📊 Total elements: ${updatedElements.length}`);
+      console.log(`   👁️ Visible elements: ${Object.values(newVisibility).filter(v => v).length}`);
+      console.log(`   🙈 Hidden elements: ${Object.values(newVisibility).filter(v => !v).length}`);
     }
 
     // Apply canvas settings from template
@@ -1000,9 +1078,17 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   };
 
   const renderElement = (element: CanvasElement) => {
+    // Check visibility - hide if not visible
+    if (visibleElements[element.id] === false) {
+      console.log(`🙈 Hiding element ${element.id} (${element.type})`);
+      return null;
+    }
+    
     const isSelected = selectedElement === element.id;
     const isFixed = element.isFixed || element.type === 'unit_name' || element.type === 'unit_class';
     
+    // Debug: show when element is rendered
+    console.log(`👀 Rendering element ${element.id} (${element.type}) - visible: ${visibleElements[element.id] !== false}`);
     
     return (
       <div
@@ -1085,6 +1171,19 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 src={getImageUrl(element.image)}
                 alt={element.type}
                 className="max-w-full max-h-full object-contain"
+                onError={(e) => {
+                  console.error(`❌ Failed to load image for ${element.type}:`, {
+                    originalPath: element.image,
+                    fullUrl: getImageUrl(element.image),
+                    element: element
+                  });
+                }}
+                onLoad={() => {
+                  console.log(`✅ Successfully loaded image for ${element.type}:`, {
+                    originalPath: element.image,
+                    fullUrl: getImageUrl(element.image)
+                  });
+                }}
               />
             ) : (
               <div className="text-white text-center text-sm font-bold">
@@ -1114,6 +1213,19 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 src={getImageUrl(element.image)}
                 alt="Flag"
                 className="max-w-full max-h-full object-cover"
+                onError={(e) => {
+                  console.error(`❌ Failed to load flag image:`, {
+                    originalPath: element.image,
+                    fullUrl: getImageUrl(element.image),
+                    element: element
+                  });
+                }}
+                onLoad={() => {
+                  console.log(`✅ Successfully loaded flag image:`, {
+                    originalPath: element.image,
+                    fullUrl: getImageUrl(element.image)
+                  });
+                }}
               />
             ) : (
               <div className="text-white text-center text-sm font-bold">BANDIERA</div>
