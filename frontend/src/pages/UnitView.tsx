@@ -19,11 +19,20 @@ export default function UnitView() {
       if (!id) return;
       
       try {
-        const unitData = await navalUnitsApi.getById(parseInt(id));
+        // First try the public endpoint (no authentication required)
+        const unitData = await navalUnitsApi.getByIdPublic(parseInt(id));
         setUnit(unitData);
-      } catch (err) {
-        setError('Errore nel caricamento della scheda');
-        console.error(err);
+        console.log('✅ Unit loaded via public endpoint:', unitData.name);
+      } catch (err: any) {
+        // If public endpoint fails, try the authenticated endpoint as fallback
+        try {
+          const unitData = await navalUnitsApi.getById(parseInt(id));
+          setUnit(unitData);
+          console.log('✅ Unit loaded via authenticated endpoint:', unitData.name);
+        } catch (authErr) {
+          setError('Errore nel caricamento della scheda. La scheda potrebbe non esistere o non essere disponibile pubblicamente.');
+          console.error('❌ Both endpoints failed:', { publicError: err, authError: authErr });
+        }
       } finally {
         setLoading(false);
       }
@@ -86,13 +95,27 @@ export default function UnitView() {
         apiUrl: `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`
       });
       
-      const response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}), // Empty template config for default export
-      });
+      // Try public endpoint first, then authenticated endpoint as fallback
+      let response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/public/units/${unit.id}/export/powerpoint`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}), // Empty template config for default export
+        });
+      } catch (publicError) {
+        console.log('Public export failed, trying authenticated endpoint...');
+        response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+          body: JSON.stringify({}), // Empty template config for default export
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();

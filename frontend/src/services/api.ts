@@ -70,6 +70,14 @@ export const authApi = {
     const response = await api.get('/api/auth/me');
     return response.data;
   },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    const response = await api.post('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    });
+    return response.data;
+  },
 };
 
 // Naval Units API
@@ -133,6 +141,27 @@ export const navalUnitsApi = {
   exportPng: async (id: number, groupId?: number): Promise<Blob> => {
     const url = groupId ? `/api/units/${id}/export/png?group_id=${groupId}` : `/api/units/${id}/export/png`;
     const response = await api.get(url, { responseType: 'blob' });
+    return response.data;
+  },
+
+  // Template state management
+  saveTemplateState: async (unitId: number, templateId: string, stateData: any): Promise<void> => {
+    await api.post(`/api/units/${unitId}/template-states/${templateId}`, stateData);
+  },
+
+  getTemplateState: async (unitId: number, templateId: string): Promise<any> => {
+    const response = await api.get(`/api/units/${unitId}/template-states/${templateId}`);
+    return response.data;
+  },
+
+  getAllTemplateStates: async (unitId: number): Promise<any> => {
+    const response = await api.get(`/api/units/${unitId}/template-states`);
+    return response.data;
+  },
+
+  // Public endpoint for viewing units (no authentication required)
+  getByIdPublic: async (id: number): Promise<NavalUnit> => {
+    const response = await axios.get(`${API_BASE_URL}/api/public/units/${id}`);
     return response.data;
   },
 };
@@ -214,6 +243,50 @@ export const adminApi = {
 
   removeAdmin: async (userId: number): Promise<{ message: string }> => {
     const response = await api.post(`/api/admin/users/${userId}/remove-admin`);
+    return response.data;
+  },
+
+  // Password management
+  changeUserPassword: async (userId: number, newPassword: string): Promise<{ message: string }> => {
+    const response = await api.post(`/api/admin/users/${userId}/change-password`, {
+      new_password: newPassword
+    });
+    return response.data;
+  },
+
+  changeOwnPassword: async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    const response = await api.post('/api/admin/change-own-password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    });
+    return response.data;
+  },
+};
+
+// Templates API
+export const templatesApi = {
+  getAll: async (): Promise<any[]> => {
+    const response = await api.get('/api/templates');
+    return response.data;
+  },
+
+  getById: async (id: string): Promise<any> => {
+    const response = await api.get(`/api/templates/${id}`);
+    return response.data;
+  },
+
+  create: async (templateData: any): Promise<{ message: string; template_id: string }> => {
+    const response = await api.post('/api/templates', templateData);
+    return response.data;
+  },
+
+  update: async (id: string, templateData: any): Promise<{ message: string }> => {
+    const response = await api.put(`/api/templates/${id}`, templateData);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/templates/${id}`);
     return response.data;
   },
 };

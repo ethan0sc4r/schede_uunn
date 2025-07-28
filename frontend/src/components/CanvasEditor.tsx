@@ -2,7 +2,222 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Palette, Save } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template, CANVAS_SIZES } from './TemplateManager';
+
+// Default templates for multi-template system
+const DEFAULT_TEMPLATES: Template[] = [
+  {
+    id: 'naval-card-standard',
+    name: 'Scheda Navale Standard',
+    description: 'Layout classico con logo, bandiera, silhouette e tabella caratteristiche',
+    isDefault: true,
+    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
+    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
+    canvasBackground: '#ffffff',
+    canvasBorderWidth: 2,
+    canvasBorderColor: '#000000',
+    createdAt: new Date().toISOString(),
+    elements: [
+      {
+        id: 'unit_class',
+        type: 'unit_class',
+        x: 160,
+        y: 30,
+        width: 400,
+        height: 40,
+        content: '[Inserire classe]',
+        isFixed: true,
+        style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
+      },
+      {
+        id: 'unit_name',
+        type: 'unit_name',
+        x: 160,
+        y: 80,
+        width: 400,
+        height: 40,
+        content: '[Inserire nome]',
+        isFixed: true,
+        style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
+      },
+      {
+        id: 'logo',
+        type: 'logo',
+        x: 20,
+        y: 20,
+        width: 120,
+        height: 120,
+        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
+      },
+      {
+        id: 'flag',
+        type: 'flag',
+        x: 983,
+        y: 20,
+        width: 120,
+        height: 80,
+        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
+      },
+      {
+        id: 'silhouette',
+        type: 'silhouette',
+        x: 20,
+        y: 180,
+        width: 1083,
+        height: 300,
+        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
+      },
+      {
+        id: 'characteristics-table',
+        type: 'table',
+        x: 20,
+        y: 500,
+        width: 1083,
+        height: 200,
+        style: { backgroundColor: '#f3f4f6' },
+        tableData: [
+          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
+          ['MOTORI', 'XXX', 'RADAR', 'XXX'],
+          ['ARMA', 'XXX', 'MITRAGLIERA', 'XXX']
+        ]
+      }
+    ]
+  },
+  {
+    id: 'naval-card-minimal',
+    name: 'Scheda Navale Minimalista',
+    description: 'Layout semplificato con solo silhouette e informazioni essenziali',
+    isDefault: true,
+    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
+    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
+    canvasBackground: '#f8fafc',
+    canvasBorderWidth: 1,
+    canvasBorderColor: '#e2e8f0',
+    createdAt: new Date().toISOString(),
+    elements: [
+      {
+        id: 'unit_name',
+        type: 'unit_name',
+        x: 50,
+        y: 50,
+        width: 1000,
+        height: 80,
+        content: '[Inserire nome]',
+        isFixed: true,
+        style: { fontSize: 32, fontWeight: 'bold', color: '#000', textAlign: 'center' }
+      },
+      {
+        id: 'silhouette',
+        type: 'silhouette',
+        x: 150,
+        y: 200,
+        width: 823,
+        height: 400,
+        style: { backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 2, borderColor: '#1e40af', borderStyle: 'solid' }
+      },
+      {
+        id: 'unit_class',
+        type: 'unit_class',
+        x: 50,
+        y: 650,
+        width: 1000,
+        height: 50,
+        content: 'Classe: [Inserire classe]',
+        isFixed: true,
+        style: { fontSize: 18, fontWeight: 'normal', color: '#374151' }
+      }
+    ]
+  },
+  {
+    id: 'naval-card-detailed',
+    name: 'Scheda Navale Dettagliata',
+    description: 'Layout completo con sezioni multiple per informazioni estese',
+    isDefault: true,
+    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
+    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
+    canvasBackground: '#ffffff',
+    canvasBorderWidth: 3,
+    canvasBorderColor: '#1f2937',
+    createdAt: new Date().toISOString(),
+    elements: [
+      {
+        id: 'header-bg',
+        type: 'text',
+        x: 0,
+        y: 0,
+        width: 1123,
+        height: 100,
+        content: '',
+        style: { backgroundColor: '#1f2937', borderRadius: 0 }
+      },
+      {
+        id: 'logo',
+        type: 'logo',
+        x: 20,
+        y: 20,
+        width: 60,
+        height: 60,
+        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#ffffff', borderStyle: 'solid' }
+      },
+      {
+        id: 'unit_name',
+        type: 'unit_name',
+        x: 100,
+        y: 25,
+        width: 800,
+        height: 25,
+        content: '[Inserire nome]',
+        isFixed: true,
+        style: { fontSize: 20, fontWeight: 'bold', color: '#ffffff' }
+      },
+      {
+        id: 'unit_class',
+        type: 'unit_class',
+        x: 100,
+        y: 55,
+        width: 800,
+        height: 25,
+        content: '[Inserire classe]',
+        isFixed: true,
+        style: { fontSize: 16, fontWeight: 'normal', color: '#d1d5db' }
+      },
+      {
+        id: 'flag',
+        type: 'flag',
+        x: 1043,
+        y: 20,
+        width: 60,
+        height: 40,
+        style: { backgroundColor: '#ffffff', borderRadius: 4, borderWidth: 1, borderColor: '#ffffff', borderStyle: 'solid' }
+      },
+      {
+        id: 'silhouette',
+        type: 'silhouette',
+        x: 50,
+        y: 120,
+        width: 1023,
+        height: 300,
+        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#374151', borderStyle: 'solid' }
+      },
+      {
+        id: 'characteristics-table',
+        type: 'table',
+        x: 50,
+        y: 450,
+        width: 1023,
+        height: 250,
+        style: { backgroundColor: '#f9fafb' },
+        tableData: [
+          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
+          ['LUNGHEZZA', 'XXX m', 'LARGHEZZA', 'XXX m'],
+          ['DISLOCAMENTO', 'XXX t', 'VELOCITÀ', 'XXX kn'],
+          ['EQUIPAGGIO', 'XXX', 'ANNO', 'XXXX']
+        ]
+      }
+    ]
+  }
+];
 import { getImageUrl } from '../utils/imageUtils';
+import { navalUnitsApi } from '../services/api';
 
 interface CanvasElement {
   id: string;
@@ -112,6 +327,61 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   // Initialize elements state - start with empty and let useEffect handle the initialization
   const [elements, setElements] = useState<CanvasElement[]>([]);
 
+  // Initialize canvas properties from unit's layout_config
+  const [canvasWidth, setCanvasWidth] = useState(
+    unit?.layout_config?.canvasWidth || DEFAULT_CANVAS_WIDTH
+  );
+  const [canvasHeight, setCanvasHeight] = useState(
+    unit?.layout_config?.canvasHeight || DEFAULT_CANVAS_HEIGHT
+  );
+  const [canvasBackground, setCanvasBackground] = useState(
+    unit?.layout_config?.canvasBackground || '#ffffff'
+  );
+  const [canvasBorderWidth, setCanvasBorderWidth] = useState(
+    unit?.layout_config?.canvasBorderWidth || 4
+  );
+  const [canvasBorderColor, setCanvasBorderColor] = useState(
+    unit?.layout_config?.canvasBorderColor || '#000000'
+  );
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [nationUpdateKey, setNationUpdateKey] = useState(0);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Initialize other state variables
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [showFlagSelector, setShowFlagSelector] = useState(false);
+  const [editingTableCell, setEditingTableCell] = useState<{elementId: string, row: number, col: number} | null>(null);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [flagSearchTerm, setFlagSearchTerm] = useState('');
+  const [customFlags, setCustomFlags] = useState<Array<{name: string, url: string}>>([]);
+  
+  // Multi-template support
+  const [currentTemplateId, setCurrentTemplateId] = useState('naval-card-standard');
+  const [allElementStates, setAllElementStates] = useState<{[templateId: string]: CanvasElement[]}>({});
+  const [templateStatesLoaded, setTemplateStatesLoaded] = useState(false);
+  const [allTemplates, setAllTemplates] = useState<Template[]>(DEFAULT_TEMPLATES);
+
+  // Load user templates from localStorage
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem('naval-templates');
+    const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
+    setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+  }, []);
+
+  // Auto-save current template state when elements change (debounced)
+  useEffect(() => {
+    if (!templateStatesLoaded || !unit?.id) return;
+    
+    const timer = setTimeout(() => {
+      saveCurrentTemplateState();
+    }, 1000); // Debounce by 1 second
+    
+    return () => clearTimeout(timer);
+  }, [elements, canvasWidth, canvasHeight, canvasBackground, canvasBorderWidth, canvasBorderColor, templateStatesLoaded, unit?.id]);
+
   // Update elements when unit changes (e.g., when opening a different unit)
   useEffect(() => {
     if (!unit) {
@@ -217,35 +487,70 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     }
   }, [unit?.id]);
 
-  const [selectedElement, setSelectedElement] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [showFlagSelector, setShowFlagSelector] = useState(false);
-  const [editingTableCell, setEditingTableCell] = useState<{elementId: string, row: number, col: number} | null>(null);
-  const [showTemplateManager, setShowTemplateManager] = useState(false);
-  const [flagSearchTerm, setFlagSearchTerm] = useState('');
-  const [customFlags, setCustomFlags] = useState<Array<{name: string, url: string}>>([]);
-  
-  // Initialize canvas properties from unit's layout_config
-  const [canvasWidth, setCanvasWidth] = useState(
-    unit?.layout_config?.canvasWidth || DEFAULT_CANVAS_WIDTH
-  );
-  const [canvasHeight, setCanvasHeight] = useState(
-    unit?.layout_config?.canvasHeight || DEFAULT_CANVAS_HEIGHT
-  );
-  const [canvasBackground, setCanvasBackground] = useState(
-    unit?.layout_config?.canvasBackground || '#ffffff'
-  );
-  const [canvasBorderWidth, setCanvasBorderWidth] = useState(
-    unit?.layout_config?.canvasBorderWidth || 4
-  );
-  const [canvasBorderColor, setCanvasBorderColor] = useState(
-    unit?.layout_config?.canvasBorderColor || '#000000'
-  );
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [nationUpdateKey, setNationUpdateKey] = useState(0);
-  const canvasRef = useRef<HTMLDivElement>(null);
+  // Load all template states for the unit
+  useEffect(() => {
+    const loadTemplateStates = async () => {
+      if (!unit?.id) {
+        setTemplateStatesLoaded(true);
+        return;
+      }
+      
+      try {
+        const response = await navalUnitsApi.getAllTemplateStates(unit.id);
+        const templateStates = response.template_states || {};
+        
+        // Convert template states to element states
+        const elementStates: {[templateId: string]: CanvasElement[]} = {};
+        
+        Object.keys(templateStates).forEach(templateId => {
+          const state = templateStates[templateId];
+          if (state.element_states && Array.isArray(state.element_states)) {
+            elementStates[templateId] = state.element_states;
+          }
+        });
+        
+        setAllElementStates(elementStates);
+        
+        // Set current template from unit data or use default
+        const currentTemplate = unit.current_template_id || 'naval-card-standard';
+        setCurrentTemplateId(currentTemplate);
+        
+        // Load elements for current template
+        if (elementStates[currentTemplate]) {
+          setElements(elementStates[currentTemplate]);
+        } else {
+          // Use elements from unit.layout_config if no saved state
+          if (unit.layout_config?.elements) {
+            setElements(unit.layout_config.elements);
+          }
+        }
+        
+        setTemplateStatesLoaded(true);
+      } catch (error) {
+        console.error('Error loading template states:', error);
+        
+        // Fallback: just use the current unit layout_config
+        if (unit.layout_config?.elements) {
+          setElements(unit.layout_config.elements);
+        }
+        
+        // Set current template from unit data or use default
+        const currentTemplate = unit.current_template_id || 'naval-card-standard';
+        setCurrentTemplateId(currentTemplate);
+        
+        setTemplateStatesLoaded(true);
+      }
+    };
+
+    loadTemplateStates();
+  }, [unit?.id]);
+
+  // Load user templates from localStorage
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem('naval-templates');
+    const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
+    setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+  }, []);
 
   // Function to get nation from flag element
   const getNationFromFlag = (): string => {
@@ -256,6 +561,125 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     const allFlags = [...PREDEFINED_FLAGS, ...customFlags];
     const matchingFlag = allFlags.find(flag => flag.url === flagElement.image);
     return matchingFlag?.name || unit?.nation || '';
+  };
+
+  // Save current template state
+  const saveCurrentTemplateState = async () => {
+    if (!unit?.id || !templateStatesLoaded) return;
+    
+    try {
+      const stateData = {
+        element_states: elements,
+        canvas_config: {
+          canvasWidth,
+          canvasHeight,
+          canvasBackground,
+          canvasBorderWidth,
+          canvasBorderColor
+        }
+      };
+      
+      await navalUnitsApi.saveTemplateState(unit.id, currentTemplateId, stateData);
+      
+      // Update local state
+      setAllElementStates(prev => ({
+        ...prev,
+        [currentTemplateId]: elements
+      }));
+      
+      console.log(`✅ Saved state for template: ${currentTemplateId}`);
+    } catch (error) {
+      console.error('Error saving template state:', error);
+    }
+  };
+
+  // Change template
+  const changeTemplate = async (newTemplateId: string) => {
+    if (!unit?.id || !templateStatesLoaded) return;
+    
+    // Save current state first
+    await saveCurrentTemplateState();
+    
+    // Preserve images from database
+    const preservedImages = {
+      logo: unit?.logo_path,
+      flag: unit?.flag_path,
+      silhouette: unit?.silhouette_path
+    };
+    
+    // Load new template state
+    if (allElementStates[newTemplateId]) {
+      // Load saved state but ensure images from database are preserved
+      const savedElements = allElementStates[newTemplateId].map(el => {
+        const newEl = { ...el };
+        
+        // Always use database images as primary source
+        if (el.type === 'logo' && preservedImages.logo) {
+          newEl.image = preservedImages.logo;
+        } else if (el.type === 'flag' && preservedImages.flag) {
+          newEl.image = preservedImages.flag;
+        } else if (el.type === 'silhouette' && preservedImages.silhouette) {
+          newEl.image = preservedImages.silhouette;
+        }
+        
+        return newEl;
+      });
+      
+      setElements(savedElements);
+    } else {
+      // Create default elements for new template
+      const template = allTemplates.find(t => t.id === newTemplateId);
+      if (template) {
+        // Use template default elements but preserve existing content AND images
+        const newElements = template.elements.map(el => {
+          // Try to find matching element in current elements to preserve content
+          const existingElement = elements.find(existing => existing.type === el.type);
+          
+          const newEl = { ...el };
+          
+          // Preserve content from existing elements
+          if (existingElement) {
+            newEl.content = existingElement.content;
+            newEl.tableData = existingElement.tableData;
+          }
+          
+          // Always use database images as primary source
+          if (el.type === 'logo' && preservedImages.logo) {
+            newEl.image = preservedImages.logo;
+          } else if (el.type === 'flag' && preservedImages.flag) {
+            newEl.image = preservedImages.flag;
+          } else if (el.type === 'silhouette' && preservedImages.silhouette) {
+            newEl.image = preservedImages.silhouette;
+          } else if (existingElement?.image) {
+            // Fallback to existing element image if no database image
+            newEl.image = existingElement.image;
+          }
+          
+          return newEl;
+        });
+        
+        // Preserve any custom elements that don't exist in the new template
+        const customElements = elements.filter(currentEl => {
+          const isCustomElement = !template.elements.some(templateEl => templateEl.type === currentEl.type);
+          const isNotFixed = !currentEl.isFixed && currentEl.type !== 'unit_name' && currentEl.type !== 'unit_class';
+          return isCustomElement && isNotFixed;
+        });
+        
+        setElements([...newElements, ...customElements]);
+        
+        console.log(`✨ Preserved ${customElements.length} custom elements when switching template`);
+        
+        // Set canvas config from template
+        setCanvasWidth(template.canvasWidth || DEFAULT_CANVAS_WIDTH);
+        setCanvasHeight(template.canvasHeight || DEFAULT_CANVAS_HEIGHT);
+        setCanvasBackground(template.canvasBackground || '#ffffff');
+        setCanvasBorderWidth(template.canvasBorderWidth || 4);
+        setCanvasBorderColor(template.canvasBorderColor || '#000000');
+      }
+    }
+    
+    setCurrentTemplateId(newTemplateId);
+    console.log(`🔄 Switched to template: ${newTemplateId} with preserved images`);
   };
 
   const handleElementClick = (elementId: string, e: React.MouseEvent) => {
@@ -434,6 +858,13 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   };
 
   const applyTemplate = (template: Template, preserveContent = false) => {
+    // Preserve images from database
+    const preservedImages = {
+      logo: unit?.logo_path,
+      flag: unit?.flag_path,
+      silhouette: unit?.silhouette_path
+    };
+
     if (preserveContent) {
       // Preserve content from existing elements when applying template format
       const currentContent = new Map();
@@ -443,6 +874,13 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         if (el.tableData) currentContent.set(`${el.type}_table`, el.tableData);
       });
 
+      // Preserve custom elements that don't exist in the new template
+      const customElements = elements.filter(currentEl => {
+        const isCustomElement = !template.elements.some(templateEl => templateEl.type === currentEl.type);
+        const isNotFixed = !currentEl.isFixed && currentEl.type !== 'unit_name' && currentEl.type !== 'unit_class';
+        return isCustomElement && isNotFixed;
+      });
+
       const updatedElements = template.elements.map(templateEl => {
         const preservedElement = { ...templateEl };
         
@@ -450,11 +888,20 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         if (currentContent.has(templateEl.type)) {
           preservedElement.content = currentContent.get(templateEl.type);
         }
-        if (currentContent.has(`${templateEl.type}_image`)) {
-          preservedElement.image = currentContent.get(`${templateEl.type}_image`);
-        }
         if (currentContent.has(`${templateEl.type}_table`)) {
           preservedElement.tableData = currentContent.get(`${templateEl.type}_table`);
+        }
+
+        // Always use database images as primary source
+        if (templateEl.type === 'logo' && preservedImages.logo) {
+          preservedElement.image = preservedImages.logo;
+        } else if (templateEl.type === 'flag' && preservedImages.flag) {
+          preservedElement.image = preservedImages.flag;
+        } else if (templateEl.type === 'silhouette' && preservedImages.silhouette) {
+          preservedElement.image = preservedImages.silhouette;
+        } else if (currentContent.has(`${templateEl.type}_image`)) {
+          // Fallback to existing element image if no database image
+          preservedElement.image = currentContent.get(`${templateEl.type}_image`);
         }
 
         // Always preserve unit name and class content
@@ -468,11 +915,22 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         return preservedElement;
       });
 
-      setElements(updatedElements);
+      setElements([...updatedElements, ...customElements]);
+      console.log(`✨ Applied template with ${customElements.length} preserved custom elements`);
     } else {
-      // Standard template application - replace everything
+      // Standard template application - replace everything but preserve database images
       const newElements = template.elements.map(el => {
         const newEl = { ...el };
+        
+        // Always use database images as primary source
+        if (el.type === 'logo' && preservedImages.logo) {
+          newEl.image = preservedImages.logo;
+        } else if (el.type === 'flag' && preservedImages.flag) {
+          newEl.image = preservedImages.flag;
+        } else if (el.type === 'silhouette' && preservedImages.silhouette) {
+          newEl.image = preservedImages.silhouette;
+        }
+        
         // Still preserve unit name and class from actual unit data
         if (el.type === 'unit_name' && unit?.name) {
           newEl.content = unit.name;
@@ -774,28 +1232,6 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Controlli Canvas</h3>
             <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))}
-                  className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
-                >
-                  -
-                </button>
-                <span className="text-sm font-medium">{Math.round(zoomLevel * 100)}%</span>
-                <button
-                  onClick={() => setZoomLevel(prev => Math.min(2, prev + 0.1))}
-                  className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
-                >
-                  +
-                </button>
-                <button
-                  onClick={() => setZoomLevel(1)}
-                  className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                >
-                  100%
-                </button>
-              </div>
-              
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Sfondo Canvas</label>
                 <input
@@ -831,6 +1267,32 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             </div>
           </div>
 
+          {/* Template Selector */}
+          {templateStatesLoaded && (
+            <div className="mb-4 p-3 bg-purple-50 rounded-lg">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Template Attivo</h3>
+              <div className="space-y-2">
+                <select
+                  value={currentTemplateId}
+                  onChange={(e) => changeTemplate(e.target.value)}
+                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  {allTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name} {!template.isDefault ? '(Personalizzato)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-xs text-gray-500">
+                  {allTemplates.find(t => t.id === currentTemplateId)?.description}
+                </div>
+                <div className="text-xs text-green-600 font-medium">
+                  ✨ Gli elementi vengono nascosti/mostrati, non eliminati
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Auto-detected Nation */}
           <div key={nationUpdateKey} className="mb-4 p-3 bg-blue-50 rounded-lg">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Nazione Rilevata</h3>
@@ -855,7 +1317,10 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 Annulla
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
+                  // Save current template state first
+                  await saveCurrentTemplateState();
+                  
                   onSave({ 
                     elements, 
                     canvasWidth, 
@@ -863,7 +1328,8 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                     canvasBackground, 
                     canvasBorderWidth, 
                     canvasBorderColor, 
-                    nation: getNationFromFlag() 
+                    nation: getNationFromFlag(),
+                    current_template_id: currentTemplateId
                   });
                 }}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -1537,6 +2003,12 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <TemplateManager
             onSelectTemplate={applyTemplate}
             onClose={() => setShowTemplateManager(false)}
+            onTemplatesUpdate={() => {
+              // Reload templates when they're updated
+              const savedTemplates = localStorage.getItem('naval-templates');
+              const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
+              setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+            }}
             currentElements={elements}
             currentCanvasWidth={canvasWidth}
             currentCanvasHeight={canvasHeight}
@@ -1550,6 +2022,35 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       {/* Canvas Area */}
       <div className="flex-1 p-8 overflow-auto">
         <div className="bg-white shadow-xl rounded-lg overflow-auto max-h-screen">
+          {/* Zoom Controls */}
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-gray-700">Zoom:</span>
+              <button
+                onClick={() => setZoomLevel(prev => Math.max(0.25, prev - 0.25))}
+                className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+              >
+                -
+              </button>
+              <span className="text-sm font-medium min-w-[60px] text-center">{Math.round(zoomLevel * 100)}%</span>
+              <button
+                onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.25))}
+                className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+              >
+                +
+              </button>
+              <button
+                onClick={() => setZoomLevel(1)}
+                className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+              >
+                100%
+              </button>
+            </div>
+            
+            <div className="text-sm text-gray-500">
+              Canvas: {canvasWidth} × {canvasHeight}px
+            </div>
+          </div>
           <div 
             style={{ 
               width: canvasWidth * zoomLevel, 

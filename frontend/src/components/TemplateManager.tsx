@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Download, Trash2, Copy } from 'lucide-react';
+import { templatesApi } from '../services/api';
 
 export interface Template {
   id: string;
@@ -19,6 +20,7 @@ export interface Template {
 interface TemplateManagerProps {
   onSelectTemplate: (template: Template, preserveContent?: boolean) => void;
   onClose: () => void;
+  onTemplatesUpdate?: () => void;
   currentElements: any[];
   currentCanvasWidth?: number;
   currentCanvasHeight?: number;
@@ -314,6 +316,7 @@ const DEFAULT_TEMPLATES: Template[] = [
 export default function TemplateManager({ 
   onSelectTemplate, 
   onClose, 
+  onTemplatesUpdate,
   currentElements,
   currentCanvasWidth,
   currentCanvasHeight,
@@ -321,17 +324,48 @@ export default function TemplateManager({
   currentCanvasBorderWidth,
   currentCanvasBorderColor
 }: TemplateManagerProps) {
-  const [templates, setTemplates] = useState<Template[]>(() => {
-    const saved = localStorage.getItem('naval-templates');
-    const userTemplates = saved ? JSON.parse(saved) : [];
-    return [...DEFAULT_TEMPLATES, ...userTemplates];
-  });
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
+  const [customCanvasWidth, setCustomCanvasWidth] = useState(currentCanvasWidth || CANVAS_SIZES.A4_LANDSCAPE.width);
+  const [customCanvasHeight, setCustomCanvasHeight] = useState(currentCanvasHeight || CANVAS_SIZES.A4_LANDSCAPE.height);
+  const [customCanvasBackground, setCustomCanvasBackground] = useState(currentCanvasBackground || '#ffffff');
+  const [customCanvasBorderWidth, setCustomCanvasBorderWidth] = useState(currentCanvasBorderWidth || 2);
+  const [customCanvasBorderColor, setCustomCanvasBorderColor] = useState(currentCanvasBorderColor || '#000000');
+  const [selectedCanvasSize, setSelectedCanvasSize] = useState('A4_LANDSCAPE');
 
-  const saveCurrentAsTemplate = () => {
+  // Carica i template all'avvio
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setIsLoading(true);
+      const apiTemplates = await templatesApi.getAll();
+      const allTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+      setTemplates(allTemplates);
+    } catch (error) {
+      console.error('❌ Errore caricamento template:', error);
+      setTemplates(DEFAULT_TEMPLATES);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCanvasSizeChange = (sizeKey: string) => {
+    setSelectedCanvasSize(sizeKey);
+    if (sizeKey !== 'CUSTOM') {
+      const size = CANVAS_SIZES[sizeKey as keyof typeof CANVAS_SIZES];
+      setCustomCanvasWidth(size.width);
+      setCustomCanvasHeight(size.height);
+    }
+  };
+
+  const saveCurrentAsTemplate = async () => {
     if (!templateName.trim()) return;
 
     const newTemplate: Template = {
@@ -339,35 +373,55 @@ export default function TemplateManager({
       name: templateName,
       description: templateDescription,
       elements: currentElements,
-      canvasWidth: currentCanvasWidth || CANVAS_SIZES.A4_LANDSCAPE.width,
-      canvasHeight: currentCanvasHeight || CANVAS_SIZES.A4_LANDSCAPE.height,
-      canvasBackground: currentCanvasBackground || '#ffffff',
-      canvasBorderWidth: currentCanvasBorderWidth || 2,
-      canvasBorderColor: currentCanvasBorderColor || '#000000',
+      canvasWidth: customCanvasWidth,
+      canvasHeight: customCanvasHeight,
+      canvasBackground: customCanvasBackground,
+      canvasBorderWidth: customCanvasBorderWidth,
+      canvasBorderColor: customCanvasBorderColor,
       createdAt: new Date().toISOString(),
       isDefault: false
     };
 
-    const userTemplates = templates.filter(t => !t.isDefault);
-    userTemplates.push(newTemplate);
-    
-    localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-    setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
-    
-    setShowSaveDialog(false);
-    setTemplateName('');
-    setTemplateDescription('');
+    try {
+      await templatesApi.create(newTemplate);
+      await loadTemplates(); // Ricarica i template
+      
+      // Notify parent component about template update
+      if (onTemplatesUpdate) {
+        onTemplatesUpdate();
+      }
+      
+      setShowSaveDialog(false);
+      setTemplateName('');
+      setTemplateDescription('');
+    } catch (error) {
+      console.error('❌ Errore salvataggio template:', error);
+      alert('Errore nel salvare il template');
+    }
   };
 
-  const deleteTemplate = (templateId: string) => {
+  const deleteTemplate = async (templateId: string) => {
     if (templates.find(t => t.id === templateId)?.isDefault) return;
     
-    const userTemplates = templates.filter(t => !t.isDefault && t.id !== templateId);
-    localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-    setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+    if (!confirm('Sei sicuro di voler eliminare questo template?')) {
+      return;
+    }
+    
+    try {
+      await templatesApi.delete(templateId);
+      await loadTemplates(); // Ricarica i template
+      
+      // Notify parent component about template update
+      if (onTemplatesUpdate) {
+        onTemplatesUpdate();
+      }
+    } catch (error) {
+      console.error('❌ Errore eliminazione template:', error);
+      alert('Errore nell\'eliminare il template');
+    }
   };
 
-  const duplicateTemplate = (template: Template) => {
+  const duplicateTemplate = async (template: Template) => {
     const duplicated: Template = {
       ...template,
       id: `template-${Date.now()}`,
@@ -376,11 +430,18 @@ export default function TemplateManager({
       createdAt: new Date().toISOString()
     };
 
-    const userTemplates = templates.filter(t => !t.isDefault);
-    userTemplates.push(duplicated);
-    
-    localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-    setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+    try {
+      await templatesApi.create(duplicated);
+      await loadTemplates(); // Ricarica i template
+      
+      // Notify parent component about template update
+      if (onTemplatesUpdate) {
+        onTemplatesUpdate();
+      }
+    } catch (error) {
+      console.error('❌ Errore duplicazione template:', error);
+      alert('Errore nel duplicare il template');
+    }
   };
 
   const exportTemplate = (template: Template) => {
@@ -398,7 +459,7 @@ export default function TemplateManager({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Gestione Template</h2>
@@ -422,8 +483,14 @@ export default function TemplateManager({
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((template) => (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <span className="ml-3 text-gray-600">Caricamento template...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {templates.map((template) => (
               <div key={template.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="h-40 bg-gradient-to-br from-blue-50 to-blue-100 relative">
                   {template.thumbnail ? (
@@ -497,13 +564,14 @@ export default function TemplateManager({
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Save Template Dialog */}
         {showSaveDialog && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <div className="bg-white p-6 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Salva Template Corrente</h3>
               
               <div className="space-y-4">
@@ -527,6 +595,95 @@ export default function TemplateManager({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Breve descrizione del template..."
                   />
+                </div>
+                
+                {/* Canvas Size Controls */}
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Dimensioni Canvas</h4>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Formato Predefinito</label>
+                    <select
+                      value={selectedCanvasSize}
+                      onChange={(e) => handleCanvasSizeChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
+                    >
+                      {Object.entries(CANVAS_SIZES).map(([key, size]) => (
+                        <option key={key} value={key}>
+                          {size.name} ({size.width} x {size.height})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Larghezza (px)</label>
+                      <input
+                        type="number"
+                        min="400"
+                        max="3000"
+                        value={customCanvasWidth}
+                        onChange={(e) => {
+                          setCustomCanvasWidth(parseInt(e.target.value) || 800);
+                          setSelectedCanvasSize('CUSTOM');
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Altezza (px)</label>
+                      <input
+                        type="number"
+                        min="300"
+                        max="3000"
+                        value={customCanvasHeight}
+                        onChange={(e) => {
+                          setCustomCanvasHeight(parseInt(e.target.value) || 600);
+                          setSelectedCanvasSize('CUSTOM');
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Canvas Style Controls */}
+                <div className="border-t border-gray-200 pt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Stile Canvas</h4>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Colore Sfondo</label>
+                      <input
+                        type="color"
+                        value={customCanvasBackground}
+                        onChange={(e) => setCustomCanvasBackground(e.target.value)}
+                        className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Colore Bordo</label>
+                      <input
+                        type="color"
+                        value={customCanvasBorderColor}
+                        onChange={(e) => setCustomCanvasBorderColor(e.target.value)}
+                        className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Spessore Bordo (px)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={customCanvasBorderWidth}
+                      onChange={(e) => setCustomCanvasBorderWidth(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
               </div>
               

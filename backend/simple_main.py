@@ -91,6 +91,13 @@ class GroupUpdate(BaseModel):
     description: Optional[str] = None
     naval_unit_ids: Optional[List[int]] = None
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+class AdminPasswordChange(BaseModel):
+    new_password: str
+
 # Auth functions
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -235,6 +242,15 @@ async def get_naval_unit(unit_id: int, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Naval unit not found")
     return unit
 
+# Public endpoint for viewing units (no authentication required)
+@app.get("/api/public/units/{unit_id}")
+async def get_naval_unit_public(unit_id: int):
+    """Get naval unit for public viewing (no authentication required)"""
+    unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+    if not unit:
+        raise HTTPException(status_code=404, detail="Naval unit not found")
+    return unit
+
 @app.post("/api/units")
 async def create_naval_unit(unit: NavalUnitCreate, user: dict = Depends(get_current_user)):
     unit_id = SimpleDatabase.create_naval_unit(
@@ -312,6 +328,15 @@ async def upload_flag(unit_id: int, file: UploadFile = File(...), user: dict = D
 
 @app.post("/api/units/{unit_id}/export/powerpoint")
 async def export_unit_powerpoint(unit_id: int, template_config: dict = None):
+    """Export a single naval unit to PowerPoint presentation (authenticated)"""
+    return await _export_unit_powerpoint_internal(unit_id, template_config)
+
+@app.post("/api/public/units/{unit_id}/export/powerpoint")
+async def export_unit_powerpoint_public(unit_id: int, template_config: dict = None):
+    """Export a single naval unit to PowerPoint presentation (public, no auth required)"""
+    return await _export_unit_powerpoint_internal(unit_id, template_config)
+
+async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict = None):
     """Export a single naval unit to PowerPoint presentation"""
     
     try:
@@ -418,6 +443,37 @@ async def remove_admin(user_id: int, admin: dict = Depends(get_admin_user)):
     if SimpleDatabase.remove_admin(user_id):
         return {"message": "Admin privileges removed successfully"}
     raise HTTPException(status_code=404, detail="User not found")
+
+@app.post("/api/auth/change-password")
+async def change_password(password_data: PasswordChange, user: dict = Depends(get_current_user)):
+    """Allow users to change their own password"""
+    # Verify current password
+    if not SimpleDatabase.verify_password(password_data.current_password, user["hashed_password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    if SimpleDatabase.update_user_password(user["id"], password_data.new_password):
+        return {"message": "Password changed successfully"}
+    raise HTTPException(status_code=500, detail="Error updating password")
+
+@app.post("/api/admin/users/{user_id}/change-password")
+async def admin_change_user_password(user_id: int, password_data: AdminPasswordChange, admin: dict = Depends(get_admin_user)):
+    """Allow admin to change any user's password"""
+    if SimpleDatabase.update_user_password(user_id, password_data.new_password):
+        return {"message": "Password changed successfully"}
+    raise HTTPException(status_code=404, detail="User not found")
+
+@app.post("/api/admin/change-own-password")
+async def admin_change_own_password(password_data: PasswordChange, admin: dict = Depends(get_admin_user)):
+    """Allow admin to change their own password"""
+    # Verify current password
+    if not SimpleDatabase.verify_password(password_data.current_password, admin["hashed_password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    if SimpleDatabase.update_user_password(admin["id"], password_data.new_password):
+        return {"message": "Admin password changed successfully"}
+    raise HTTPException(status_code=500, detail="Error updating password")
 
 # Groups routes
 @app.get("/api/groups")
@@ -566,6 +622,89 @@ async def export_group_powerpoint(group_id: int, user: dict = Depends(get_curren
             status_code=500, 
             detail=f"Error creating PowerPoint presentation: {str(e)}"
         )
+
+# Template state endpoints
+@app.post("/api/units/{unit_id}/template-states/{template_id}")
+async def save_template_state(unit_id: int, template_id: str, state_data: dict, user: dict = Depends(get_current_user)):
+    """Save the state of elements for a specific template"""
+    try:
+        element_states = state_data.get('element_states', {})
+        canvas_config = state_data.get('canvas_config', {})
+        
+        success = SimpleDatabase.save_unit_template_state(unit_id, template_id, element_states, canvas_config)
+        if success:
+            return {"message": "Template state saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Error saving template state")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/units/{unit_id}/template-states/{template_id}")
+async def get_template_state(unit_id: int, template_id: str, user: dict = Depends(get_current_user)):
+    """Get the saved state for a specific template"""
+    state = SimpleDatabase.get_unit_template_state(unit_id, template_id)
+    if state:
+        return state
+    else:
+        return {"element_states": {}, "canvas_config": {}}
+
+@app.get("/api/units/{unit_id}/template-states")
+async def get_all_template_states(unit_id: int, user: dict = Depends(get_current_user)):
+    """Get all template states for a unit"""
+    states = SimpleDatabase.get_all_template_states_for_unit(unit_id)
+    return {"template_states": states}
+
+# Template Management Endpoints
+@app.post("/api/templates")
+async def create_template(template_data: dict, user: dict = Depends(get_current_user)):
+    """Create a new template"""
+    try:
+        template_id = SimpleDatabase.save_template(template_data, user['id'])
+        return {"message": "Template created successfully", "template_id": template_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating template: {str(e)}")
+
+@app.get("/api/templates")
+async def get_templates(user: dict = Depends(get_current_user)):
+    """Get all templates for the current user"""
+    try:
+        templates = SimpleDatabase.get_templates(user['id'])
+        return templates
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching templates: {str(e)}")
+
+@app.get("/api/templates/{template_id}")
+async def get_template(template_id: str, user: dict = Depends(get_current_user)):
+    """Get a specific template"""
+    try:
+        template = SimpleDatabase.get_template(template_id, user['id'])
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        return template
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching template: {str(e)}")
+
+@app.put("/api/templates/{template_id}")
+async def update_template(template_id: str, template_data: dict, user: dict = Depends(get_current_user)):
+    """Update a template"""
+    try:
+        success = SimpleDatabase.update_template(template_id, template_data, user['id'])
+        if not success:
+            raise HTTPException(status_code=404, detail="Template not found")
+        return {"message": "Template updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating template: {str(e)}")
+
+@app.delete("/api/templates/{template_id}")
+async def delete_template(template_id: str, user: dict = Depends(get_current_user)):
+    """Delete a template"""
+    try:
+        success = SimpleDatabase.delete_template(template_id, user['id'])
+        if not success:
+            raise HTTPException(status_code=404, detail="Template not found")
+        return {"message": "Template deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting template: {str(e)}")
 
 if __name__ == "__main__":
     # Initialize database

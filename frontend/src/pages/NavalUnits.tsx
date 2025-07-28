@@ -387,6 +387,7 @@ export default function NavalUnits() {
                   unit_class: unitClass,
                   nation: canvasData.nation || selectedUnit?.nation || '',
                   layout_config: migratedLayoutConfig,
+                  current_template_id: canvasData.current_template_id || 'naval-card-standard',
                   characteristics: selectedUnit?.characteristics || []
                 };
 

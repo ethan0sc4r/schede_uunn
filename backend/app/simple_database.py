@@ -49,6 +49,7 @@ def init_database():
                 flag_path TEXT,
                 background_color TEXT DEFAULT '#ffffff',
                 layout_config TEXT,  -- JSON string
+                current_template_id TEXT DEFAULT 'naval-card-standard',
                 silhouette_zoom TEXT DEFAULT '1.0',
                 silhouette_position_x TEXT DEFAULT '0',
                 silhouette_position_y TEXT DEFAULT '0',
@@ -57,6 +58,21 @@ def init_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (created_by) REFERENCES users (id)
+            )
+        ''')
+        
+        # Template states for each unit - stores element states per template
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS unit_template_states (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                unit_id INTEGER NOT NULL,
+                template_id TEXT NOT NULL,
+                element_states TEXT,  -- JSON string with element positions and visibility
+                canvas_config TEXT,   -- JSON string with canvas settings for this template
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (unit_id) REFERENCES naval_units (id) ON DELETE CASCADE,
+                UNIQUE(unit_id, template_id)
             )
         ''')
         
@@ -99,6 +115,26 @@ def init_database():
             )
         ''')
         
+        # Templates table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS templates (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                elements TEXT NOT NULL,
+                canvas_width INTEGER DEFAULT 1123,
+                canvas_height INTEGER DEFAULT 794,
+                canvas_background TEXT DEFAULT '#ffffff',
+                canvas_border_width INTEGER DEFAULT 2,
+                canvas_border_color TEXT DEFAULT '#000000',
+                created_by INTEGER NOT NULL,
+                is_default BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users (id)
+            )
+        ''')
+        
         conn.commit()
 
 class SimpleDatabase:
@@ -113,6 +149,24 @@ class SimpleDatabase:
     def verify_password(password: str, hashed: str) -> bool:
         """Verify a password against its hash"""
         return hashlib.sha256(password.encode()).hexdigest() == hashed
+
+    @staticmethod
+    def update_user_password(user_id: int, new_password: str) -> bool:
+        """Update user password"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                hashed_password = SimpleDatabase.hash_password(new_password)
+                cursor.execute('''
+                    UPDATE users 
+                    SET hashed_password = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (hashed_password, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating user password: {e}")
+            return False
     
     # User operations
     @staticmethod
@@ -458,8 +512,8 @@ class SimpleDatabase:
             params = []
             
             for field, value in kwargs.items():
-                if field in ['name', 'unit_class', 'nation', 'background_color', 'silhouette_zoom', 
-                           'silhouette_position_x', 'silhouette_position_y', 'notes']:
+                if field in ['name', 'unit_class', 'nation', 'background_color', 'current_template_id',
+                           'silhouette_zoom', 'silhouette_position_x', 'silhouette_position_y', 'notes']:
                     update_fields.append(f"{field} = ?")
                     params.append(value)
                 elif field == 'characteristics':
@@ -553,6 +607,208 @@ class SimpleDatabase:
             conn.commit()
             return cursor.rowcount > 0
 
+    # Template state management methods
+    @staticmethod
+    def save_unit_template_state(unit_id: int, template_id: str, element_states: dict, canvas_config: dict) -> bool:
+        """Save the state of elements for a specific template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO unit_template_states 
+                    (unit_id, template_id, element_states, canvas_config, updated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (unit_id, template_id, json.dumps(element_states), json.dumps(canvas_config)))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error saving template state: {e}")
+            return False
+    
+    @staticmethod
+    def get_unit_template_state(unit_id: int, template_id: str) -> Optional[Dict[str, Any]]:
+        """Get the saved state for a specific template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT element_states, canvas_config FROM unit_template_states 
+                    WHERE unit_id = ? AND template_id = ?
+                ''', (unit_id, template_id))
+                result = cursor.fetchone()
+                
+                if result:
+                    return {
+                        'element_states': json.loads(result['element_states']) if result['element_states'] else {},
+                        'canvas_config': json.loads(result['canvas_config']) if result['canvas_config'] else {}
+                    }
+                return None
+        except Exception as e:
+            print(f"Error getting template state: {e}")
+            return None
+    
+    @staticmethod
+    def get_all_template_states_for_unit(unit_id: int) -> Dict[str, Any]:
+        """Get all template states for a unit"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT template_id, element_states, canvas_config FROM unit_template_states 
+                    WHERE unit_id = ?
+                ''', (unit_id,))
+                results = cursor.fetchall()
+                
+                template_states = {}
+                for row in results:
+                    template_states[row['template_id']] = {
+                        'element_states': json.loads(row['element_states']) if row['element_states'] else {},
+                        'canvas_config': json.loads(row['canvas_config']) if row['canvas_config'] else {}
+                    }
+                return template_states
+        except Exception as e:
+            print(f"Error getting all template states: {e}")
+            return {}
+
+    # Template management methods
+    @staticmethod
+    def save_template(template_data: dict, user_id: int) -> str:
+        """Save a new template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                template_id = template_data.get('id', f"template_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO templates 
+                    (id, name, description, elements, canvas_width, canvas_height, 
+                     canvas_background, canvas_border_width, canvas_border_color, created_by, is_default, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (
+                    template_id,
+                    template_data['name'],
+                    template_data.get('description', ''),
+                    json.dumps(template_data['elements']),
+                    template_data.get('canvasWidth', 1123),
+                    template_data.get('canvasHeight', 794),
+                    template_data.get('canvasBackground', '#ffffff'),
+                    template_data.get('canvasBorderWidth', 2),
+                    template_data.get('canvasBorderColor', '#000000'),
+                    user_id,
+                    template_data.get('isDefault', False)
+                ))
+                conn.commit()
+                return template_id
+        except Exception as e:
+            print(f"Error saving template: {e}")
+            raise e
+
+    @staticmethod
+    def get_templates(user_id: int) -> List[Dict]:
+        """Get all templates for a user"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM templates 
+                    WHERE created_by = ? OR is_default = 1
+                    ORDER BY is_default DESC, created_at DESC
+                ''', (user_id,))
+                
+                templates = []
+                for row in cursor.fetchall():
+                    template = dict(row)
+                    template['elements'] = json.loads(template['elements'])
+                    # Map database fields to frontend expected fields
+                    template['canvasWidth'] = template['canvas_width']
+                    template['canvasHeight'] = template['canvas_height']
+                    template['canvasBackground'] = template['canvas_background']
+                    template['canvasBorderWidth'] = template['canvas_border_width']
+                    template['canvasBorderColor'] = template['canvas_border_color']
+                    template['isDefault'] = bool(template['is_default'])
+                    template['createdAt'] = template['created_at']
+                    templates.append(template)
+                
+                return templates
+        except Exception as e:
+            print(f"Error getting templates: {e}")
+            return []
+
+    @staticmethod
+    def get_template(template_id: str, user_id: int) -> Optional[Dict]:
+        """Get a specific template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM templates 
+                    WHERE id = ? AND (created_by = ? OR is_default = 1)
+                ''', (template_id, user_id))
+                
+                row = cursor.fetchone()
+                if row:
+                    template = dict(row)
+                    template['elements'] = json.loads(template['elements'])
+                    # Map database fields to frontend expected fields
+                    template['canvasWidth'] = template['canvas_width']
+                    template['canvasHeight'] = template['canvas_height']
+                    template['canvasBackground'] = template['canvas_background']
+                    template['canvasBorderWidth'] = template['canvas_border_width']
+                    template['canvasBorderColor'] = template['canvas_border_color']
+                    template['isDefault'] = bool(template['is_default'])
+                    template['createdAt'] = template['created_at']
+                    return template
+                return None
+        except Exception as e:
+            print(f"Error getting template: {e}")
+            return None
+
+    @staticmethod
+    def update_template(template_id: str, template_data: dict, user_id: int) -> bool:
+        """Update a template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE templates SET 
+                    name = ?, description = ?, elements = ?, canvas_width = ?, canvas_height = ?,
+                    canvas_background = ?, canvas_border_width = ?, canvas_border_color = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND created_by = ?
+                ''', (
+                    template_data['name'],
+                    template_data.get('description', ''),
+                    json.dumps(template_data['elements']),
+                    template_data.get('canvasWidth', 1123),
+                    template_data.get('canvasHeight', 794),
+                    template_data.get('canvasBackground', '#ffffff'),
+                    template_data.get('canvasBorderWidth', 2),
+                    template_data.get('canvasBorderColor', '#000000'),
+                    template_id,
+                    user_id
+                ))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating template: {e}")
+            return False
+
+    @staticmethod
+    def delete_template(template_id: str, user_id: int) -> bool:
+        """Delete a template"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                # Don't allow deletion of default templates
+                cursor.execute('''
+                    DELETE FROM templates 
+                    WHERE id = ? AND created_by = ? AND is_default = 0
+                ''', (template_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting template: {e}")
+            return False
+
 # Initialize database on import
 init_database()
 
@@ -578,7 +834,30 @@ def migrate_database():
             if 'notes' not in columns:
                 cursor.execute("ALTER TABLE naval_units ADD COLUMN notes TEXT")
                 conn.commit()
-                print("✅ Added notes column to naval_units table")
+                print("Added notes column to naval_units table")
+                
+            # Add current_template_id column if it doesn't exist
+            if 'current_template_id' not in columns:
+                cursor.execute("ALTER TABLE naval_units ADD COLUMN current_template_id TEXT DEFAULT 'naval-card-standard'")
+                conn.commit()
+                print("Added current_template_id column to naval_units table")
+                
+            # Create unit_template_states table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS unit_template_states (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    unit_id INTEGER NOT NULL,
+                    template_id TEXT NOT NULL,
+                    element_states TEXT,  -- JSON string with element positions and visibility
+                    canvas_config TEXT,   -- JSON string with canvas settings for this template
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (unit_id) REFERENCES naval_units (id) ON DELETE CASCADE,
+                    UNIQUE(unit_id, template_id)
+                )
+            ''')
+            conn.commit()
+            print("Created unit_template_states table")
     except Exception as e:
         print(f"Migration error: {e}")
 

@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi } from '../services/api';
+import { adminApi, authApi } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import type { User } from '../types/index.ts';
+import { Key, Shield, UserCheck, UserX, UserPlus, Settings } from 'lucide-react';
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'all' | 'pending'>('pending');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'settings'>('pending');
+  const [showPasswordModal, setShowPasswordModal] = useState<{user?: User; isOwnPassword?: boolean} | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
 
   const { data: allUsers, isLoading: allUsersLoading } = useQuery({
     queryKey: ['admin', 'users'],
@@ -45,6 +54,32 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: ({ userId, newPassword }: { userId: number; newPassword: string }) => 
+      adminApi.changeUserPassword(userId, newPassword),
+    onSuccess: () => {
+      setShowPasswordModal(null);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      alert('Password cambiata con successo!');
+    },
+    onError: (error: any) => {
+      alert(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
+    }
+  });
+
+  const changeOwnPasswordMutation = useMutation({
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => 
+      adminApi.changeOwnPassword(currentPassword, newPassword),
+    onSuccess: () => {
+      setShowPasswordModal(null);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      alert('Password amministratore cambiata con successo!');
+    },
+    onError: (error: any) => {
+      alert(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
+    }
   });
 
   const handleActivate = async (userId: number) => {
@@ -93,6 +128,40 @@ export default function Admin() {
     }
   };
 
+  const handleChangePassword = (user: User) => {
+    setShowPasswordModal({ user });
+  };
+
+  const handleChangeOwnPassword = () => {
+    setShowPasswordModal({ isOwnPassword: true });
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert('Le password non coincidono!');
+      return;
+    }
+    
+    if (passwordForm.newPassword.length < 6) {
+      alert('La password deve essere di almeno 6 caratteri!');
+      return;
+    }
+    
+    if (showPasswordModal?.isOwnPassword) {
+      changeOwnPasswordMutation.mutate({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+    } else if (showPasswordModal?.user) {
+      changePasswordMutation.mutate({
+        userId: showPasswordModal.user.id,
+        newPassword: passwordForm.newPassword
+      });
+    }
+  };
+
   const currentUsers = activeTab === 'all' ? allUsers : pendingUsers;
   const isLoading = activeTab === 'all' ? allUsersLoading : pendingUsersLoading;
 
@@ -123,11 +192,68 @@ export default function Admin() {
             >
               Tutti gli Utenti
             </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 flex items-center ${
+                activeTab === 'settings'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Impostazioni
+            </button>
           </nav>
         </div>
 
         <div className="p-6">
-          {isLoading ? (
+          {activeTab === 'settings' ? (
+            <div className="space-y-6">
+              <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                  <Shield className="h-5 w-5 mr-2" />
+                  Impostazioni Amministratore
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-gray-900">Cambia Password Amministratore</h4>
+                      <p className="text-sm text-gray-600">Modifica la tua password di amministratore</p>
+                    </div>
+                    <button
+                      onClick={handleChangeOwnPassword}
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Cambia Password
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informazioni Sistema</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Utenti totali:</span>
+                    <span className="ml-2 text-gray-900">{allUsers?.length || 0}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Utenti attivi:</span>
+                    <span className="ml-2 text-gray-900">{allUsers?.filter(u => u.is_active).length || 0}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Utenti in attesa:</span>
+                    <span className="ml-2 text-gray-900">{pendingUsers?.length || 0}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Amministratori:</span>
+                    <span className="ml-2 text-gray-900">{allUsers?.filter(u => u.is_admin).length || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
@@ -148,12 +274,90 @@ export default function Admin() {
                   onDeactivate={() => handleDeactivate(user.id)}
                   onMakeAdmin={() => handleMakeAdmin(user.id)}
                   onRemoveAdmin={() => handleRemoveAdmin(user.id)}
+                  onChangePassword={() => handleChangePassword(user)}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <Key className="h-5 w-5 mr-2" />
+              {showPasswordModal.isOwnPassword ? 'Cambia Password Amministratore' : `Cambia Password - ${showPasswordModal.user?.first_name} ${showPasswordModal.user?.last_name}`}
+            </h2>
+            
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              {showPasswordModal.isOwnPassword && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Password Attuale
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nuova Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  minLength={6}
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Minimo 6 caratteri</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Conferma Nuova Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(null);
+                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  disabled={changePasswordMutation.isPending || changeOwnPasswordMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {(changePasswordMutation.isPending || changeOwnPasswordMutation.isPending) ? 'Aggiornamento...' : 'Cambia Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -164,9 +368,10 @@ interface UserCardProps {
   onDeactivate: () => void;
   onMakeAdmin: () => void;
   onRemoveAdmin: () => void;
+  onChangePassword: () => void;
 }
 
-function UserCard({ user, onActivate, onDeactivate, onMakeAdmin, onRemoveAdmin }: UserCardProps) {
+function UserCard({ user, onActivate, onDeactivate, onMakeAdmin, onRemoveAdmin, onChangePassword }: UserCardProps) {
   return (
     <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
       <div className="flex items-center justify-between">
@@ -217,6 +422,15 @@ function UserCard({ user, onActivate, onDeactivate, onMakeAdmin, onRemoveAdmin }
 
           {user.is_active && (
             <>
+              <button
+                onClick={onChangePassword}
+                className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center"
+                title="Cambia password"
+              >
+                <Key className="h-3 w-3 mr-1" />
+                Password
+              </button>
+              
               {!user.is_admin ? (
                 <button
                   onClick={onMakeAdmin}
