@@ -378,9 +378,31 @@ export default function NavalUnits() {
                 const unitNameElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'unit_name');
                 const unitClassElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'unit_class');
                 
-                // Extract values from content
-                const unitName = unitNameElement?.content || 'Nuova Unità';
-                const unitClass = unitClassElement?.content || 'Nuova Classe';
+                console.log('💾 Saving unit data:');
+                console.log('   unitNameElement:', unitNameElement);
+                console.log('   unitClassElement:', unitClassElement);
+                console.log('   selectedUnit:', selectedUnit ? { id: selectedUnit.id, name: selectedUnit.name, unit_class: selectedUnit.unit_class } : 'NEW UNIT');
+                
+                // Extract values from content - preserve user input even if it looks like template defaults
+                const unitName = unitNameElement?.content && 
+                                unitNameElement.content !== '' &&
+                                unitNameElement.content !== '[Nome Unità]' &&
+                                unitNameElement.content !== '[Inserire nome]' &&
+                                unitNameElement.content !== 'NOME UNITA\' NAVALE' &&
+                                unitNameElement.content !== '[NOME UNITÀ]'
+                                ? unitNameElement.content 
+                                : (selectedUnit?.name || 'Nuova Unità');
+                
+                const unitClass = unitClassElement?.content && 
+                                 unitClassElement.content !== '' &&
+                                 unitClassElement.content !== '[Classe Unità]' &&
+                                 unitClassElement.content !== '[Inserire classe]' &&
+                                 unitClassElement.content !== 'CLASSE UNITA\'' &&
+                                 unitClassElement.content !== '[CLASSE]'
+                                 ? unitClassElement.content 
+                                 : (selectedUnit?.unit_class || 'Nuova Classe');
+                
+                console.log('💾 Final values to save:', { unitName, unitClass });
                 
                 const unitData = {
                   name: unitName,
@@ -391,24 +413,36 @@ export default function NavalUnits() {
                   characteristics: selectedUnit?.characteristics || []
                 };
 
+                let savedUnit;
                 if (selectedUnit) {
                   // Update existing unit
                   await updateMutation.mutateAsync({ 
                     id: selectedUnit.id, 
                     data: unitData 
                   });
+                  savedUnit = selectedUnit;
                 } else {
                   // Create new unit
-                  await createMutation.mutateAsync(unitData);
+                  console.log('🆕 Creating new unit with data:', unitData);
+                  const newUnit = await createMutation.mutateAsync(unitData);
+                  console.log('✅ New unit created:', newUnit);
+                  savedUnit = newUnit;
                 }
                 
-                // Force refresh the query cache to show updated images
+                // Force refresh the query cache to show updated data
                 await queryClient.invalidateQueries({ queryKey: ['navalUnits'] });
                 
-                // If we're editing an existing unit, fetch the updated unit data for the editor
-                if (selectedUnit) {
+                // Fetch the updated unit data from database to ensure we have the latest
+                if (savedUnit?.id) {
                   try {
-                    const updatedUnit = await navalUnitsApi.getById(selectedUnit.id);
+                    console.log('🔄 Fetching updated unit data for:', savedUnit.id);
+                    const updatedUnit = await navalUnitsApi.getById(savedUnit.id);
+                    console.log('📋 Updated unit data:', { 
+                      id: updatedUnit.id, 
+                      name: updatedUnit.name, 
+                      unit_class: updatedUnit.unit_class,
+                      hasLayoutConfig: !!updatedUnit.layout_config 
+                    });
                     setSelectedUnit(updatedUnit);
                   } catch (error) {
                     console.error('Error fetching updated unit data:', error);

@@ -40,7 +40,7 @@ export const CANVAS_SIZES = {
 };
 
 // Template predefiniti
-const DEFAULT_TEMPLATES: Template[] = [
+export const DEFAULT_TEMPLATES: Template[] = [
   {
     id: 'naval-card-standard',
     name: 'Scheda Navale Standard',

@@ -1,221 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Palette, Save } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
-import TemplateManager, { type Template, CANVAS_SIZES } from './TemplateManager';
+import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from './TemplateManager';
 
-// Default templates for multi-template system
-const DEFAULT_TEMPLATES: Template[] = [
-  {
-    id: 'naval-card-standard',
-    name: 'Scheda Navale Standard',
-    description: 'Layout classico con logo, bandiera, silhouette e tabella caratteristiche',
-    isDefault: true,
-    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
-    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
-    canvasBackground: '#ffffff',
-    canvasBorderWidth: 2,
-    canvasBorderColor: '#000000',
-    createdAt: new Date().toISOString(),
-    elements: [
-      {
-        id: 'unit_class',
-        type: 'unit_class',
-        x: 160,
-        y: 30,
-        width: 400,
-        height: 40,
-        content: '[Inserire classe]',
-        isFixed: true,
-        style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-      },
-      {
-        id: 'unit_name',
-        type: 'unit_name',
-        x: 160,
-        y: 80,
-        width: 400,
-        height: 40,
-        content: '[Inserire nome]',
-        isFixed: true,
-        style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-      },
-      {
-        id: 'logo',
-        type: 'logo',
-        x: 20,
-        y: 20,
-        width: 120,
-        height: 120,
-        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-      },
-      {
-        id: 'flag',
-        type: 'flag',
-        x: 983,
-        y: 20,
-        width: 120,
-        height: 80,
-        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-      },
-      {
-        id: 'silhouette',
-        type: 'silhouette',
-        x: 20,
-        y: 180,
-        width: 1083,
-        height: 300,
-        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-      },
-      {
-        id: 'characteristics-table',
-        type: 'table',
-        x: 20,
-        y: 500,
-        width: 1083,
-        height: 200,
-        style: { backgroundColor: '#f3f4f6' },
-        tableData: [
-          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
-          ['MOTORI', 'XXX', 'RADAR', 'XXX'],
-          ['ARMA', 'XXX', 'MITRAGLIERA', 'XXX']
-        ]
-      }
-    ]
-  },
-  {
-    id: 'naval-card-minimal',
-    name: 'Scheda Navale Minimalista',
-    description: 'Layout semplificato con solo silhouette e informazioni essenziali',
-    isDefault: true,
-    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
-    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
-    canvasBackground: '#f8fafc',
-    canvasBorderWidth: 1,
-    canvasBorderColor: '#e2e8f0',
-    createdAt: new Date().toISOString(),
-    elements: [
-      {
-        id: 'unit_name',
-        type: 'unit_name',
-        x: 50,
-        y: 50,
-        width: 1000,
-        height: 80,
-        content: '[Inserire nome]',
-        isFixed: true,
-        style: { fontSize: 32, fontWeight: 'bold', color: '#000', textAlign: 'center' }
-      },
-      {
-        id: 'silhouette',
-        type: 'silhouette',
-        x: 150,
-        y: 200,
-        width: 823,
-        height: 400,
-        style: { backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 2, borderColor: '#1e40af', borderStyle: 'solid' }
-      },
-      {
-        id: 'unit_class',
-        type: 'unit_class',
-        x: 50,
-        y: 650,
-        width: 1000,
-        height: 50,
-        content: 'Classe: [Inserire classe]',
-        isFixed: true,
-        style: { fontSize: 18, fontWeight: 'normal', color: '#374151' }
-      }
-    ]
-  },
-  {
-    id: 'naval-card-detailed',
-    name: 'Scheda Navale Dettagliata',
-    description: 'Layout completo con sezioni multiple per informazioni estese',
-    isDefault: true,
-    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
-    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
-    canvasBackground: '#ffffff',
-    canvasBorderWidth: 3,
-    canvasBorderColor: '#1f2937',
-    createdAt: new Date().toISOString(),
-    elements: [
-      {
-        id: 'header-bg',
-        type: 'text',
-        x: 0,
-        y: 0,
-        width: 1123,
-        height: 100,
-        content: '',
-        style: { backgroundColor: '#1f2937', borderRadius: 0 }
-      },
-      {
-        id: 'logo',
-        type: 'logo',
-        x: 20,
-        y: 20,
-        width: 60,
-        height: 60,
-        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#ffffff', borderStyle: 'solid' }
-      },
-      {
-        id: 'unit_name',
-        type: 'unit_name',
-        x: 100,
-        y: 25,
-        width: 800,
-        height: 25,
-        content: '[Inserire nome]',
-        isFixed: true,
-        style: { fontSize: 20, fontWeight: 'bold', color: '#ffffff' }
-      },
-      {
-        id: 'unit_class',
-        type: 'unit_class',
-        x: 100,
-        y: 55,
-        width: 800,
-        height: 25,
-        content: '[Inserire classe]',
-        isFixed: true,
-        style: { fontSize: 16, fontWeight: 'normal', color: '#d1d5db' }
-      },
-      {
-        id: 'flag',
-        type: 'flag',
-        x: 1043,
-        y: 20,
-        width: 60,
-        height: 40,
-        style: { backgroundColor: '#ffffff', borderRadius: 4, borderWidth: 1, borderColor: '#ffffff', borderStyle: 'solid' }
-      },
-      {
-        id: 'silhouette',
-        type: 'silhouette',
-        x: 50,
-        y: 120,
-        width: 1023,
-        height: 300,
-        style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#374151', borderStyle: 'solid' }
-      },
-      {
-        id: 'characteristics-table',
-        type: 'table',
-        x: 50,
-        y: 450,
-        width: 1023,
-        height: 250,
-        style: { backgroundColor: '#f9fafb' },
-        tableData: [
-          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
-          ['LUNGHEZZA', 'XXX m', 'LARGHEZZA', 'XXX m'],
-          ['DISLOCAMENTO', 'XXX t', 'VELOCITÀ', 'XXX kn'],
-          ['EQUIPAGGIO', 'XXX', 'ANNO', 'XXXX']
-        ]
-      }
-    ]
-  }
-];
 import { getImageUrl } from '../utils/imageUtils';
 import { navalUnitsApi } from '../services/api';
 
@@ -369,16 +156,35 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   useEffect(() => {
     const savedTemplates = localStorage.getItem('naval-templates');
     const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
-    setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+    const combinedTemplates = [...DEFAULT_TEMPLATES, ...userTemplates];
+    
+    console.log('🔄 Loading templates in CanvasEditor:');
+    console.log('   DEFAULT_TEMPLATES count:', DEFAULT_TEMPLATES.length);
+    console.log('   DEFAULT_TEMPLATES IDs:', DEFAULT_TEMPLATES.map(t => t.id));
+    console.log('   User templates count:', userTemplates.length);
+    console.log('   Combined templates count:', combinedTemplates.length);
+    console.log('   Combined template IDs:', combinedTemplates.map(t => t.id));
+    console.log('   naval-card-powerpoint found:', combinedTemplates.some(t => t.id === 'naval-card-powerpoint') ? '✅' : '❌');
+    
+    setAllTemplates(combinedTemplates);
   }, []);
 
   // Auto-save current template state when elements change (debounced)
+  // ⚠️ DISABLED: This could be causing conflicts with main data saving
   useEffect(() => {
     if (!templateStatesLoaded || !unit?.id) return;
     
+    // Don't auto-save template states for newly created units
+    // Let the main save process handle everything
+    if (unit?.name === 'Nuova Unità' || unit?.unit_class === 'Nuova Classe') {
+      console.log('⏸️ Skipping auto-save for new unit to prevent conflicts');
+      return;
+    }
+    
     const timer = setTimeout(() => {
+      console.log('💾 Auto-saving template state...');
       saveCurrentTemplateState();
-    }, 1000); // Debounce by 1 second
+    }, 2000); // Increased debounce to reduce conflicts
     
     return () => clearTimeout(timer);
   }, [elements, canvasWidth, canvasHeight, canvasBackground, canvasBorderWidth, canvasBorderColor, templateStatesLoaded, unit?.id]);
@@ -386,97 +192,128 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   // Update elements when unit changes (e.g., when opening a different unit)
   useEffect(() => {
     if (!unit) {
-      return;
-    }
-    
-    if (unit?.layout_config?.elements && unit.layout_config.elements.length > 0) {
-      // Force a completely new array with new objects to ensure React sees the change
-      const newElements = unit.layout_config.elements.map(el => ({ ...el }));
-      setElements(newElements);
+      // NEW UNIT: Apply default template automatically
+      console.log('🆕 New unit - applying default template');
+      const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-standard') || DEFAULT_TEMPLATES[0];
+      const defaultElements = defaultTemplate.elements.map(el => ({
+        ...el,
+        // Ensure no images for new units
+        image: undefined
+      }));
       
-      // Initialize visibility - all elements visible by default
-      const initialVisibility: {[key: string]: boolean} = {};
-      newElements.forEach(el => { initialVisibility[el.id] = true; });
-      setVisibleElements(initialVisibility);
-      
-    } else {
-      // Create default template with existing image paths if available
-      const defaultElements = [
-        // Fixed fields that always remain
-        {
-          id: 'unit_class',
-          type: 'unit_class',
-          x: 160,
-          y: 30,
-          width: 400,
-          height: 40,
-          content: unit?.unit_class || '[Inserire classe]',
-          isFixed: true,
-          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-        },
-        {
-          id: 'unit_name',
-          type: 'unit_name',
-          x: 160,
-          y: 80,
-          width: 400,
-          height: 40,
-          content: unit?.name || '[Inserire nome]',
-          isFixed: true,
-          style: { fontSize: 20, fontWeight: 'bold', color: '#000' }
-        },
-        // Default template elements
-        {
-          id: 'logo',
-          type: 'logo',
-          x: 20,
-          y: 20,
-          width: 120,
-          height: 120,
-          image: unit?.logo_path || undefined,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'flag',
-          type: 'flag', 
-          x: DEFAULT_CANVAS_WIDTH - 140,
-          y: 20,
-          width: 120,
-          height: 80,
-          image: unit?.flag_path || undefined,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'silhouette',
-          type: 'silhouette',
-          x: 20,
-          y: 180,
-          width: DEFAULT_CANVAS_WIDTH - 40,
-          height: 300,
-          image: unit?.silhouette_path || undefined,
-          style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' }
-        },
-        {
-          id: 'characteristics-table',
-          type: 'table',
-          x: 20,
-          y: 500,
-          width: DEFAULT_CANVAS_WIDTH - 40,
-          height: 200,
-          style: { backgroundColor: '#f3f4f6' },
-          tableData: [
-            ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
-            ['MOTORI', 'XXX', 'RADAR', 'XXX'],
-            ['ARMA', 'XXX', 'MITRAGLIERA', 'XXX']
-          ]
-        }
-      ];
       setElements(defaultElements);
+      setCurrentTemplateId(defaultTemplate.id);
+      
+      // Set canvas config from default template
+      setCanvasWidth(defaultTemplate.canvasWidth || DEFAULT_CANVAS_WIDTH);
+      setCanvasHeight(defaultTemplate.canvasHeight || DEFAULT_CANVAS_HEIGHT);
+      setCanvasBackground(defaultTemplate.canvasBackground || '#ffffff');
+      setCanvasBorderWidth(defaultTemplate.canvasBorderWidth || 4);
+      setCanvasBorderColor(defaultTemplate.canvasBorderColor || '#000000');
       
       // Initialize visibility - all elements visible by default
       const initialVisibility: {[key: string]: boolean} = {};
       defaultElements.forEach(el => { initialVisibility[el.id] = true; });
       setVisibleElements(initialVisibility);
+      
+      return;
+    }
+    
+    console.log('🔍 Loading unit:', { 
+      id: unit.id, 
+      name: unit.name, 
+      unit_class: unit.unit_class,
+      hasLayoutConfig: !!unit.layout_config?.elements?.length,
+      layoutElements: unit.layout_config?.elements?.length || 0
+    });
+    
+    if (unit?.layout_config?.elements && unit.layout_config.elements.length > 0) {
+      // EXISTING UNIT WITH SAVED LAYOUT: Load exactly as saved
+      console.log('📋 Loading existing unit with saved layout:', unit.name);
+      
+      // Force consistency: always use database images as primary source
+      const savedElements = unit.layout_config.elements.map((el: any) => ({
+        ...el,
+        // ALWAYS use database images for image elements to prevent mixing
+        image: el.type === 'logo' ? unit.logo_path :
+               el.type === 'flag' ? unit.flag_path :
+               el.type === 'silhouette' ? unit.silhouette_path :
+               el.image, // Keep other images as they are
+        // ALWAYS use database values for unit name and class to preserve user input
+        content: el.type === 'unit_name' ? unit.name :
+                 el.type === 'unit_class' ? unit.unit_class :
+                 el.content
+      }));
+      
+      setElements(savedElements);
+      setCurrentTemplateId(unit.current_template_id || 'naval-card-standard');
+      
+      // Initialize visibility based on saved state
+      const initialVisibility: {[key: string]: boolean} = {};
+      savedElements.forEach((el: any) => { 
+        initialVisibility[el.id] = el.visible !== false; 
+      });
+      setVisibleElements(initialVisibility);
+      
+    } else {
+      // EXISTING UNIT WITH NO LAYOUT: Could be newly created with some data or intentionally empty
+      console.log('🔄 Loading existing unit without layout_config:', unit.name);
+      
+      // Check if this unit has been saved with actual data (not defaults or empty)
+      const hasRealName = unit.name && 
+                         unit.name !== 'Nuova Unità' && 
+                         unit.name !== '' &&
+                         unit.name !== '[Nome Unità]' &&
+                         unit.name !== '[Inserire nome]';
+      
+      const hasRealClass = unit.unit_class && 
+                          unit.unit_class !== 'Nuova Classe' && 
+                          unit.unit_class !== '' &&
+                          unit.unit_class !== '[Classe Unità]' &&
+                          unit.unit_class !== '[Inserire classe]';
+      
+      const hasImages = unit.logo_path || unit.flag_path || unit.silhouette_path;
+      
+      if (hasRealName || hasRealClass || hasImages) {
+        // Unit has some real data - apply default template but use the real data
+        console.log('📄 Unit has data, applying template with existing values');
+        const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-standard') || DEFAULT_TEMPLATES[0];
+        const defaultElements = defaultTemplate.elements.map(el => {
+          const newEl = { ...el };
+          
+          // Use ACTUAL database values, not template defaults
+          if (el.type === 'unit_name') {
+            newEl.content = unit.name || el.content;
+          } else if (el.type === 'unit_class') {  
+            newEl.content = unit.unit_class || el.content;
+          }
+          
+          // Use database images if available
+          if (el.type === 'logo') {
+            newEl.image = unit.logo_path;
+          } else if (el.type === 'flag') {
+            newEl.image = unit.flag_path;
+          } else if (el.type === 'silhouette') {
+            newEl.image = unit.silhouette_path;
+          }
+          
+          return newEl;
+        });
+        
+        setElements(defaultElements);
+        setCurrentTemplateId(unit.current_template_id || defaultTemplate.id);
+        
+        // Initialize visibility - all elements visible by default
+        const initialVisibility: {[key: string]: boolean} = {};
+        defaultElements.forEach(el => { initialVisibility[el.id] = true; });
+        setVisibleElements(initialVisibility);
+      } else {
+        // Unit is truly empty (intentionally saved empty)
+        console.log('📭 Unit is intentionally empty');
+        setElements([]);
+        setVisibleElements({});
+        setCurrentTemplateId('naval-card-standard');
+      }
     }
   }, [unit?.id]);
 
@@ -498,7 +335,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     }
   }, [unit?.id]);
 
-  // Load all template states for the unit
+  // Load all template states for the unit - BUT DON'T OVERRIDE MAIN INITIALIZATION
   useEffect(() => {
     const loadTemplateStates = async () => {
       if (!unit?.id) {
@@ -507,6 +344,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       }
       
       try {
+        console.log('🔄 Loading template states for unit:', unit.id);
         const response = await navalUnitsApi.getAllTemplateStates(unit.id);
         const templateStates = response.template_states || {};
         
@@ -520,30 +358,26 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           }
         });
         
+        console.log('📊 Loaded template states:', Object.keys(elementStates));
         setAllElementStates(elementStates);
         
         // Set current template from unit data or use default
         const currentTemplate = unit.current_template_id || 'naval-card-standard';
         setCurrentTemplateId(currentTemplate);
         
-        // Load elements for current template
+        // ⚠️ CRITICAL: DO NOT override elements here! 
+        // Let the main initialization useEffect handle element loading
+        // This useEffect should ONLY load template states into memory for later use
+        
+        // However, for debugging, let's log what we would have loaded
         if (elementStates[currentTemplate]) {
-          setElements(elementStates[currentTemplate]);
-        } else {
-          // Use elements from unit.layout_config if no saved state
-          if (unit.layout_config?.elements) {
-            setElements(unit.layout_config.elements);
-          }
+          console.log('🔍 Template states exist for current template, but NOT overriding main initialization');
+          console.log('   Template state elements:', elementStates[currentTemplate].length);
         }
         
         setTemplateStatesLoaded(true);
       } catch (error) {
         console.error('Error loading template states:', error);
-        
-        // Fallback: just use the current unit layout_config
-        if (unit.layout_config?.elements) {
-          setElements(unit.layout_config.elements);
-        }
         
         // Set current template from unit data or use default
         const currentTemplate = unit.current_template_id || 'naval-card-standard';
@@ -578,6 +412,13 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   const saveCurrentTemplateState = async () => {
     if (!unit?.id || !templateStatesLoaded) return;
     
+    // Don't save template states for newly created units with default names
+    // This prevents overriding user data with template defaults
+    if (unit?.name === 'Nuova Unità' || unit?.unit_class === 'Nuova Classe') {
+      console.log('⏸️ Skipping template state save for new unit to prevent data conflicts');
+      return;
+    }
+    
     try {
       const stateData = {
         element_states: elements,
@@ -590,6 +431,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         }
       };
       
+      console.log(`💾 Saving template state for ${currentTemplateId}:`, stateData);
       await navalUnitsApi.saveTemplateState(unit.id, currentTemplateId, stateData);
       
       // Update local state
@@ -606,64 +448,156 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
   // Change template
   const changeTemplate = async (newTemplateId: string) => {
-    if (!unit?.id || !templateStatesLoaded) return;
+    console.log(`🔄 Starting template change to: ${newTemplateId}`);
+    console.log(`📊 Current state:`, {
+      unitId: unit?.id,
+      unitName: unit?.name,
+      currentTemplate: currentTemplateId,
+      elementsCount: elements.length,
+      templateStatesLoaded,
+      availableTemplateStates: Object.keys(allElementStates)
+    });
     
-    // Save current state first
-    await saveCurrentTemplateState();
-    
-    // Preserve images from database
-    const preservedImages = {
-      logo: unit?.logo_path,
-      flag: unit?.flag_path,
-      silhouette: unit?.silhouette_path
-    };
-    
-    // Load new template state
-    if (allElementStates[newTemplateId]) {
-      // Load saved state but ensure images from database are preserved
-      const savedElements = allElementStates[newTemplateId].map(el => {
-        const newEl = { ...el };
-        
-        // Always use database images as primary source
-        if (el.type === 'logo' && preservedImages.logo) {
-          newEl.image = preservedImages.logo;
-        } else if (el.type === 'flag' && preservedImages.flag) {
-          newEl.image = preservedImages.flag;
-        } else if (el.type === 'silhouette' && preservedImages.silhouette) {
-          newEl.image = preservedImages.silhouette;
-        }
-        
-        return newEl;
-      });
+    try {
+      // Save current state first if this is an existing unit
+      if (unit?.id && templateStatesLoaded) {
+        console.log('💾 Saving current state before template change...');
+        await saveCurrentTemplateState();
+      }
       
-      setElements(savedElements);
-    } else {
-      // Create default elements for new template
+      // Find the target template
       const template = allTemplates.find(t => t.id === newTemplateId);
-      if (template) {
-        // Use template default elements but preserve existing content AND images
-        const newElements = template.elements.map(el => {
+      if (!template) {
+        console.error(`❌ CRITICAL: Template ID not found: ${newTemplateId}`);
+        console.log('🔍 DEBUG: Complete template analysis:');
+        console.log('   Requested template ID:', newTemplateId);
+        console.log('   Total available templates:', allTemplates.length);
+        console.log('   Available template IDs:', allTemplates.map(t => t.id));
+        console.log('   Available template names:', allTemplates.map(t => t.name));
+        console.log('   DEFAULT_TEMPLATES loaded:', DEFAULT_TEMPLATES.length);
+        console.log('   DEFAULT_TEMPLATES IDs:', DEFAULT_TEMPLATES.map(t => t.id));
+        console.log('   Is naval-card-powerpoint in DEFAULT_TEMPLATES?', DEFAULT_TEMPLATES.some(t => t.id === 'naval-card-powerpoint'));
+        console.log('   Is naval-card-powerpoint in allTemplates?', allTemplates.some(t => t.id === 'naval-card-powerpoint'));
+        throw new Error(`Template "${newTemplateId}" not found in available templates`);
+      }
+      
+      // Validate template structure
+      if (!template.elements || !Array.isArray(template.elements)) {
+        console.error(`❌ Template has invalid elements:`, template.elements);
+        throw new Error(`Template "${template.name}" has invalid or missing elements array`);
+      }
+      
+      if (template.elements.length === 0) {
+        console.warn(`⚠️ Template "${template.name}" has no elements`);
+      }
+      
+      console.log(`✅ Found template: ${template.name} with ${template.elements.length} elements`);
+      
+      // For NEW units (no unit.id), preserve images from database (which should be empty)
+      // For EXISTING units, always use database images to prevent mixing
+      const preservedImages = {
+        logo: unit?.logo_path || undefined,
+        flag: unit?.flag_path || undefined,
+        silhouette: unit?.silhouette_path || undefined
+      };
+      
+      console.log('🖼️ Preserved images from database:', preservedImages);
+      
+      // Check if we have saved state for this template
+      const hasSavedState = unit?.id && allElementStates[newTemplateId];
+      console.log(`📋 Saved state available for ${newTemplateId}:`, hasSavedState);
+      
+      if (hasSavedState) {
+        // Load saved state but NEVER use saved images - always use database images
+        console.log('📋 Loading saved template state elements:', allElementStates[newTemplateId].length);
+        const savedElements = allElementStates[newTemplateId].map((el, index) => {
+          const newEl = { ...el };
+          
+          console.log(`   Element ${index}: ${el.type} (${el.id})`);
+          
+          // FORCE database images - NEVER use template or saved images
+          if (el.type === 'logo') {
+            newEl.image = preservedImages.logo;
+            console.log(`     → Logo image: ${newEl.image || 'none'}`);
+          } else if (el.type === 'flag') {
+            newEl.image = preservedImages.flag;
+            console.log(`     → Flag image: ${newEl.image || 'none'}`);
+          } else if (el.type === 'silhouette') {
+            newEl.image = preservedImages.silhouette;
+            console.log(`     → Silhouette image: ${newEl.image || 'none'}`);
+          }
+          // For other elements, clear any images to prevent cross-contamination
+          else if (el.type !== 'text' && el.type !== 'table' && el.type !== 'unit_name' && el.type !== 'unit_class') {
+            newEl.image = undefined;
+            console.log(`     → Other element image cleared`);
+          }
+          
+          // Ensure unit name and class use database values
+          if (el.type === 'unit_name' && unit?.name) {
+            newEl.content = unit.name;
+            console.log(`     → Unit name updated: ${newEl.content}`);
+          } else if (el.type === 'unit_class' && unit?.unit_class) {
+            newEl.content = unit.unit_class;
+            console.log(`     → Unit class updated: ${newEl.content}`);
+          }
+          
+          return newEl;
+        });
+        
+        setElements(savedElements);
+        
+        // Update visibility for all elements (make them visible by default)
+        const newVisibility: {[key: string]: boolean} = {};
+        savedElements.forEach(el => { 
+          newVisibility[el.id] = el.visible !== false; 
+        });
+        setVisibleElements(newVisibility);
+        
+        console.log(`✅ Applied saved template state with ${savedElements.length} elements`);
+      } else {
+        // Create default elements for new template
+        console.log('🎨 Creating new template elements from:', template.name);
+        console.log('📊 Current elements to preserve content from:', elements.length);
+        
+        const newElements = template.elements.map((el, index) => {
           // Try to find matching element in current elements to preserve content
           const existingElement = elements.find(existing => existing.type === el.type);
           
           const newEl = { ...el };
+          console.log(`   Creating element ${index}: ${el.type} (${el.id})`);
           
-          // Preserve content from existing elements
+          // Preserve content from existing elements (but NOT images)
           if (existingElement) {
             newEl.content = existingElement.content;
             newEl.tableData = existingElement.tableData;
+            console.log(`     → Preserved content: ${newEl.content || 'table data'}`);
           }
           
-          // Always use database images as primary source
-          if (el.type === 'logo' && preservedImages.logo) {
+          // Update unit name and class if we have unit data
+          if (el.type === 'unit_name' && unit?.name) {
+            newEl.content = unit.name;
+            console.log(`     → Unit name from database: ${newEl.content}`);
+          } else if (el.type === 'unit_class' && unit?.unit_class) {
+            newEl.content = unit.unit_class;
+            console.log(`     → Unit class from database: ${newEl.content}`);
+          }
+          
+          // FORCE database images ONLY - NEVER use template images
+          if (el.type === 'logo') {
             newEl.image = preservedImages.logo;
-          } else if (el.type === 'flag' && preservedImages.flag) {
+            console.log(`     → Logo image: ${newEl.image || 'none'}`);
+          } else if (el.type === 'flag') {
             newEl.image = preservedImages.flag;
-          } else if (el.type === 'silhouette' && preservedImages.silhouette) {
+            console.log(`     → Flag image: ${newEl.image || 'none'}`);
+          } else if (el.type === 'silhouette') {
             newEl.image = preservedImages.silhouette;
-          } else if (existingElement?.image) {
-            // Fallback to existing element image if no database image
-            newEl.image = existingElement.image;
+            console.log(`     → Silhouette image: ${newEl.image || 'none'}`);
+          }
+          // Clear any other images from template to prevent contamination
+          else if (el.image) {
+            const originalImage = el.image;
+            newEl.image = undefined;
+            console.log(`     → Template image cleared (was: ${originalImage})`);
           }
           
           return newEl;
@@ -676,9 +610,20 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           return isCustomElement && isNotFixed;
         });
         
-        setElements([...newElements, ...customElements]);
+        console.log(`🔍 Found ${customElements.length} custom elements to preserve:`, 
+          customElements.map(el => `${el.type} (${el.id})`));
         
-        console.log(`✨ Preserved ${customElements.length} custom elements when switching template`);
+        const finalElements = [...newElements, ...customElements];
+        setElements(finalElements);
+        
+        // Update visibility for all elements (make them visible by default)
+        const newVisibility: {[key: string]: boolean} = {};
+        finalElements.forEach(el => { 
+          newVisibility[el.id] = true; // All elements visible when applying new template
+        });
+        setVisibleElements(newVisibility);
+        
+        console.log(`✨ Applied template with ${finalElements.length} total elements (${newElements.length} template + ${customElements.length} custom)`);
         
         // Set canvas config from template
         setCanvasWidth(template.canvasWidth || DEFAULT_CANVAS_WIDTH);
@@ -686,11 +631,45 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         setCanvasBackground(template.canvasBackground || '#ffffff');
         setCanvasBorderWidth(template.canvasBorderWidth || 4);
         setCanvasBorderColor(template.canvasBorderColor || '#000000');
+        
+        console.log(`🎨 Applied canvas config: ${template.canvasWidth}x${template.canvasHeight}, bg: ${template.canvasBackground}`);
       }
+      
+      setCurrentTemplateId(newTemplateId);
+      
+      // Verify that the template change was successful
+      setTimeout(() => {
+        console.log('🔍 Verifying template application after state updates:');
+        console.log(`   Template ID: ${currentTemplateId} (should be ${newTemplateId})`);
+        console.log(`   Elements count: ${elements.length}`);
+        console.log(`   Canvas size: ${canvasWidth}x${canvasHeight}`);
+        console.log(`   Visible elements:`, Object.keys(visibleElements).length);
+        
+        if (elements.length === 0) {
+          console.error('❌ CRITICAL: No elements after template application!');
+          console.log('   This indicates a problem with setElements() or state management');
+        }
+        
+        if (currentTemplateId !== newTemplateId) {
+          console.error('❌ CRITICAL: Template ID not updated!');
+          console.log(`   Expected: ${newTemplateId}, Got: ${currentTemplateId}`);
+        }
+        
+        // Check if elements are visible
+        const visibleCount = Object.values(visibleElements).filter(v => v).length;
+        if (visibleCount === 0 && elements.length > 0) {
+          console.warn('⚠️ WARNING: Elements exist but none are visible!');
+        }
+        
+        console.log('✅ Template application verification completed');
+      }, 100);
+      
+      console.log(`✅ Template successfully changed to: ${newTemplateId}`);
+      
+    } catch (error) {
+      console.error(`❌ Error changing template to ${newTemplateId}:`, error);
+      throw error;
     }
-    
-    setCurrentTemplateId(newTemplateId);
-    console.log(`🔄 Switched to template: ${newTemplateId} with preserved images`);
   };
 
   const handleElementClick = (elementId: string, e: React.MouseEvent) => {
@@ -868,171 +847,34 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     ));
   };
 
-  const applyTemplate = (template: Template, preserveContent = false) => {
-    console.log('🎨 Applying template:', template.name, 'preserveContent:', preserveContent);
-    console.log('📋 Unit data:', { name: unit?.name, unit_class: unit?.unit_class });
+  const applyTemplate = async (template: Template, preserveContent = false) => {
+    console.log('🎨 Template Manager requesting template:', template.name, 'preserveContent:', preserveContent);
+    console.log('📋 Template details:', {
+      id: template.id,
+      elements: template.elements?.length || 0,
+      canvasWidth: template.canvasWidth,
+      canvasHeight: template.canvasHeight,
+      isDefault: template.isDefault
+    });
     
-    // Preserve images from database
-    const preservedImages = {
-      logo: unit?.logo_path,
-      flag: unit?.flag_path,
-      silhouette: unit?.silhouette_path
-    };
-
-    if (preserveContent) {
-      // Preserve content from existing elements when applying template format
-      const currentContent = new Map();
-      elements.forEach(el => {
-        if (el.content) currentContent.set(el.type, el.content);
-        if (el.image) currentContent.set(`${el.type}_image`, el.image);
-        if (el.tableData) currentContent.set(`${el.type}_table`, el.tableData);
-      });
-
-      // Preserve custom elements that don't exist in the new template
-      const customElements = elements.filter(currentEl => {
-        const isCustomElement = !template.elements.some(templateEl => templateEl.type === currentEl.type);
-        const isNotFixed = !currentEl.isFixed && currentEl.type !== 'unit_name' && currentEl.type !== 'unit_class';
-        return isCustomElement && isNotFixed;
-      });
-
-      const updatedElements = template.elements.map(templateEl => {
-        const preservedElement = { ...templateEl };
-        
-        // Preserve content for same type elements
-        if (currentContent.has(templateEl.type)) {
-          preservedElement.content = currentContent.get(templateEl.type);
-        }
-        if (currentContent.has(`${templateEl.type}_table`)) {
-          preservedElement.tableData = currentContent.get(`${templateEl.type}_table`);
-        }
-
-        // Always use database images as primary source
-        if (templateEl.type === 'logo' && preservedImages.logo) {
-          preservedElement.image = preservedImages.logo;
-        } else if (templateEl.type === 'flag' && preservedImages.flag) {
-          preservedElement.image = preservedImages.flag;
-        } else if (templateEl.type === 'silhouette' && preservedImages.silhouette) {
-          preservedElement.image = preservedImages.silhouette;
-        } else if (currentContent.has(`${templateEl.type}_image`)) {
-          // Fallback to existing element image if no database image
-          preservedElement.image = currentContent.get(`${templateEl.type}_image`);
-        }
-
-        // Always preserve unit name and class content from actual unit data
-        if (templateEl.type === 'unit_name') {
-          preservedElement.content = unit?.name || templateEl.content || '[Nome Unità]';
-        }
-        if (templateEl.type === 'unit_class') {
-          preservedElement.content = unit?.unit_class || templateEl.content || '[Classe Unità]';
-        }
-
-        return preservedElement;
-      });
-
-      setElements([...updatedElements, ...customElements]);
-      console.log(`✨ Applied template with ${customElements.length} preserved custom elements`);
-    } else {
-      // Standard template application - manage element visibility correctly
-      console.log('📋 Current elements before template application:', elements.length);
-      console.log('🎨 Template elements to apply:', template.elements.length);
+    try {
+      // Close the template manager
+      setShowTemplateManager(false);
+      setSelectedElement(null);
       
-      // Create maps for efficient lookups
-      const templateElementsByType = new Map(template.elements.map(el => [el.type, el]));
-      const currentElementsByType = new Map(elements.map(el => [el.type, el]));
+      // Use the unified changeTemplate function
+      await changeTemplate(template.id);
       
-      // Initialize visibility - start with current visibility state
-      const newVisibility: {[key: string]: boolean} = { ...visibleElements };
-      const updatedElements: CanvasElement[] = [];
+      console.log('✅ Template application completed successfully');
+    } catch (error) {
+      console.error('❌ Error applying template:', error);
       
-      // Step 1: Process all current elements
-      elements.forEach(currentEl => {
-        const templateEl = templateElementsByType.get(currentEl.type);
-        
-        if (templateEl) {
-          // Element exists in template - update it and make it visible
-          const updatedEl = {
-            ...templateEl, // Use template properties (position, size, style)
-            id: currentEl.id, // Keep original ID
-            content: currentEl.content, // Preserve existing content
-            image: currentEl.image, // Preserve existing image
-            tableData: currentEl.tableData // Preserve existing table data
-          };
-          
-          // Always use database images as primary source
-          if (templateEl.type === 'logo' && preservedImages.logo) {
-            updatedEl.image = preservedImages.logo;
-          } else if (templateEl.type === 'flag' && preservedImages.flag) {
-            updatedEl.image = preservedImages.flag;
-          } else if (templateEl.type === 'silhouette' && preservedImages.silhouette) {
-            updatedEl.image = preservedImages.silhouette;
-          }
-          
-          // Always populate unit name and class from actual unit data
-          if (templateEl.type === 'unit_name') {
-            updatedEl.content = unit?.name || templateEl.content || '[Nome Unità]';
-          }
-          if (templateEl.type === 'unit_class') {
-            updatedEl.content = unit?.unit_class || templateEl.content || '[Classe Unità]';
-          }
-          
-          updatedElements.push(updatedEl);
-          newVisibility[updatedEl.id] = true; // Make visible
-          console.log(`✅ Updated existing element: ${currentEl.type} (${currentEl.id})`);
-        } else {
-          // Element doesn't exist in template - hide it but keep it
-          updatedElements.push(currentEl);
-          newVisibility[currentEl.id] = false; // Hide element
-          console.log(`🙈 Hiding element not in template: ${currentEl.type} (${currentEl.id})`);
-        }
-      });
+      // Show user-friendly error message
+      alert(`Errore nell'applicazione del template "${template.name}". Controlla la console per i dettagli.`);
       
-      // Step 2: Add new elements from template that don't exist in current elements
-      template.elements.forEach(templateEl => {
-        if (!currentElementsByType.has(templateEl.type)) {
-          const newEl = { ...templateEl };
-          
-          // Always use database images as primary source
-          if (templateEl.type === 'logo' && preservedImages.logo) {
-            newEl.image = preservedImages.logo;
-          } else if (templateEl.type === 'flag' && preservedImages.flag) {
-            newEl.image = preservedImages.flag;
-          } else if (templateEl.type === 'silhouette' && preservedImages.silhouette) {
-            newEl.image = preservedImages.silhouette;
-          }
-          
-          // Always populate unit name and class from actual unit data
-          if (templateEl.type === 'unit_name') {
-            newEl.content = unit?.name || templateEl.content || '[Nome Unità]';
-          }
-          if (templateEl.type === 'unit_class') {
-            newEl.content = unit?.unit_class || templateEl.content || '[Classe Unità]';
-          }
-          
-          updatedElements.push(newEl);
-          newVisibility[newEl.id] = true; // Make visible
-          console.log(`➕ Added new element from template: ${templateEl.type} (${templateEl.id})`);
-        }
-      });
-      
-      // Apply the changes
-      setElements(updatedElements);
-      setVisibleElements(newVisibility);
-      
-      console.log('🎨 Template application complete:');
-      console.log(`   📊 Total elements: ${updatedElements.length}`);
-      console.log(`   👁️ Visible elements: ${Object.values(newVisibility).filter(v => v).length}`);
-      console.log(`   🙈 Hidden elements: ${Object.values(newVisibility).filter(v => !v).length}`);
+      // Reopen template manager if there was an error
+      setShowTemplateManager(true);
     }
-
-    // Apply canvas settings from template
-    if (template.canvasWidth) setCanvasWidth(template.canvasWidth);
-    if (template.canvasHeight) setCanvasHeight(template.canvasHeight);
-    if (template.canvasBackground) setCanvasBackground(template.canvasBackground);
-    if (template.canvasBorderWidth !== undefined) setCanvasBorderWidth(template.canvasBorderWidth);
-    if (template.canvasBorderColor) setCanvasBorderColor(template.canvasBorderColor);
-
-    setSelectedElement(null);
-    setShowTemplateManager(false);
   };
 
   const deleteElement = (elementId: string) => {
