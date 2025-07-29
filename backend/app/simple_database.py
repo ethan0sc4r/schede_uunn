@@ -293,13 +293,18 @@ class SimpleDatabase:
             
             cursor.execute('''
                 INSERT INTO naval_units (
-                    name, unit_class, nation, background_color, layout_config,
+                    name, unit_class, nation, background_color, layout_config, current_template_id,
+                    logo_path, flag_path, silhouette_path,
                     silhouette_zoom, silhouette_position_x, silhouette_position_y, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 name, unit_class, kwargs.get('nation'),
                 kwargs.get('background_color', '#ffffff'),
-                json.dumps(kwargs.get('layout_config', {})),
+                json.dumps(kwargs.get('layout_config')) if kwargs.get('layout_config') else None,
+                kwargs.get('current_template_id'),
+                kwargs.get('logo_path'),
+                kwargs.get('flag_path'),
+                kwargs.get('silhouette_path'),
                 kwargs.get('silhouette_zoom', '1.0'),
                 kwargs.get('silhouette_position_x', '0'),
                 kwargs.get('silhouette_position_y', '0'),

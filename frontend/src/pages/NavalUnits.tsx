@@ -382,6 +382,20 @@ export default function NavalUnits() {
                 console.log('   unitNameElement:', unitNameElement);
                 console.log('   unitClassElement:', unitClassElement);
                 console.log('   selectedUnit:', selectedUnit ? { id: selectedUnit.id, name: selectedUnit.name, unit_class: selectedUnit.unit_class } : 'NEW UNIT');
+                console.log('   migratedLayoutConfig:', migratedLayoutConfig);
+                console.log('   canvasData received:', canvasData);
+                console.log('🔍 DEBUG: Elements before migration:', canvasData.elements.map((el: any) => ({ 
+                  id: el.id, 
+                  type: el.type, 
+                  hasImage: !!el.image,
+                  imageStart: el.image ? el.image.substring(0, 50) + '...' : 'NO IMAGE'
+                })));
+                console.log('🔍 DEBUG: Elements after migration:', migratedLayoutConfig.elements.map((el: any) => ({ 
+                  id: el.id, 
+                  type: el.type, 
+                  hasImage: !!el.image,
+                  imageStart: el.image ? el.image.substring(0, 50) + '...' : 'NO IMAGE'
+                })));
                 
                 // Extract values from content - preserve user input even if it looks like template defaults
                 const unitName = unitNameElement?.content && 
@@ -403,14 +417,30 @@ export default function NavalUnits() {
                                  : (selectedUnit?.unit_class || 'Nuova Classe');
                 
                 console.log('💾 Final values to save:', { unitName, unitClass });
+                console.log('💾 IsNewUnit?', !selectedUnit, 'selectedUnit:', selectedUnit?.id);
+                console.log('🚨 DEBUG: layout_config content:', JSON.stringify(migratedLayoutConfig, null, 2));
+                
+                // Extract images from migrated elements to save in dedicated fields
+                const logoElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'logo');
+                const flagElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'flag');
+                const silhouetteElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'silhouette');
+                
+                console.log('🖼️ Extracting images from elements:');
+                console.log('   logoElement:', logoElement ? { id: logoElement.id, hasImage: !!logoElement.image } : 'NOT FOUND');
+                console.log('   flagElement:', flagElement ? { id: flagElement.id, hasImage: !!flagElement.image } : 'NOT FOUND');
+                console.log('   silhouetteElement:', silhouetteElement ? { id: silhouetteElement.id, hasImage: !!silhouetteElement.image } : 'NOT FOUND');
                 
                 const unitData = {
                   name: unitName,
                   unit_class: unitClass,
                   nation: canvasData.nation || selectedUnit?.nation || '',
                   layout_config: migratedLayoutConfig,
-                  current_template_id: canvasData.current_template_id || 'naval-card-standard',
-                  characteristics: selectedUnit?.characteristics || []
+                  current_template_id: canvasData.current_template_id || 'naval-card-powerpoint',
+                  characteristics: selectedUnit?.characteristics || [],
+                  // Extract and save images in dedicated database fields
+                  logo_path: logoElement?.image || selectedUnit?.logo_path || null,
+                  flag_path: flagElement?.image || selectedUnit?.flag_path || null,
+                  silhouette_path: silhouetteElement?.image || selectedUnit?.silhouette_path || null
                 };
 
                 let savedUnit;
@@ -424,8 +454,11 @@ export default function NavalUnits() {
                 } else {
                   // Create new unit
                   console.log('🆕 Creating new unit with data:', unitData);
+                  console.log('🚨 DEBUG: Sending to API - layout_config size:', JSON.stringify(unitData.layout_config).length, 'characters');
+                  console.log('🚨 DEBUG: Sending to API - elements count:', unitData.layout_config?.elements?.length || 0);
                   const newUnit = await createMutation.mutateAsync(unitData);
                   console.log('✅ New unit created:', newUnit);
+                  console.log('🔍 New unit layout_config saved?', !!newUnit.layout_config, 'elements:', newUnit.layout_config?.elements?.length || 0);
                   savedUnit = newUnit;
                 }
                 

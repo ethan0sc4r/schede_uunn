@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Download, Share2, FileImage, Printer, Presentation, X } from 'lucide-react';
+import { Share2, FileImage, Printer, Presentation, X } from 'lucide-react';
 import { navalUnitsApi, templatesApi } from '../services/api';
 import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
-import { CANVAS_SIZES } from '../components/TemplateManager';
 
 export default function UnitView() {
   const { id } = useParams<{ id: string }>();
@@ -233,7 +232,14 @@ export default function UnitView() {
         });
       }
       
-      if (unit.silhouette_path) {
+      // Check for silhouette in unit.silhouette_path or layout_config.elements
+      let silhouetteImage = unit.silhouette_path;
+      if (!silhouetteImage) {
+        const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
+        silhouetteImage = silhouetteElement?.image;
+      }
+      
+      if (silhouetteImage) {
         basicElements.push({
           id: 'silhouette',
           type: 'silhouette',
@@ -241,7 +247,7 @@ export default function UnitView() {
           y: 180,
           width: 1083,
           height: 300,
-          image: unit.silhouette_path,
+          image: silhouetteImage,
           style: { backgroundColor: '#ffffff', borderRadius: 8 }
         });
       }
@@ -331,7 +337,10 @@ export default function UnitView() {
                       src={getImageUrl(element.image)}
                       alt={element.type}
                       className="max-w-full max-h-full object-contain"
-                      style={{ display: 'block' }}
+                      style={{ 
+                        display: 'block',
+                        borderRadius: element.style?.borderRadius || 0
+                      }}
                       onError={(e) => {
                         console.error('Error loading image:', element.image);
                         e.currentTarget.style.display = 'none';
@@ -356,7 +365,10 @@ export default function UnitView() {
                       src={getImageUrl(element.image)}
                       alt="Flag"
                       className="max-w-full max-h-full object-cover"
-                      style={{ display: 'block' }}
+                      style={{ 
+                        display: 'block',
+                        borderRadius: element.style?.borderRadius || 0
+                      }}
                       onError={(e) => {
                         console.error('Error loading flag image:', element.image);
                         e.currentTarget.style.display = 'none';
@@ -379,13 +391,21 @@ export default function UnitView() {
                       {element.tableData?.map((row: string[], rowIndex: number) => (
                         <div key={rowIndex} className="flex border-b border-gray-300">
                           {row.map((cell: string, colIndex: number) => {
+                            const columnWidths = element.style?.columnWidths || [];
+                            const width = columnWidths[colIndex] ? `${columnWidths[colIndex]}%` : 'auto';
+                            const headerBgColor = element.style?.headerBackgroundColor || '#f3f4f6';
                             const isHeader = rowIndex === 0;
-                            const bgColor = colIndex % 2 === 0 ? 'bg-gray-100' : 'bg-white';
                             
                             return (
                               <div
                                 key={colIndex}
-                                className={`flex-1 p-2 border-r border-gray-300 ${bgColor} ${isHeader ? 'font-medium' : ''}`}
+                                className="p-2 border-r border-gray-300"
+                                style={{
+                                  width: width,
+                                  flexBasis: width,
+                                  backgroundColor: isHeader ? headerBgColor : (colIndex % 2 === 0 ? '#f9fafb' : '#ffffff'),
+                                  fontWeight: isHeader ? 'bold' : 'normal'
+                                }}
                               >
                                 <span>{cell}</span>
                               </div>

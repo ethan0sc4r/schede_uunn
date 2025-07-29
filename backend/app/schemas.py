@@ -55,12 +55,17 @@ class NavalUnitBase(BaseModel):
     nation: Optional[str] = None
     background_color: str = "#ffffff"
     layout_config: Optional[Dict[str, Any]] = None
+    current_template_id: Optional[str] = None
     silhouette_zoom: str = "1.0"
     silhouette_position_x: str = "0"
     silhouette_position_y: str = "0"
 
 class NavalUnitCreate(NavalUnitBase):
     characteristics: List[CharacteristicCreate] = []
+    # Image paths (sent from frontend)
+    logo_path: Optional[str] = None
+    flag_path: Optional[str] = None
+    silhouette_path: Optional[str] = None
 
 class NavalUnitUpdate(BaseModel):
     name: Optional[str] = None
@@ -68,10 +73,14 @@ class NavalUnitUpdate(BaseModel):
     nation: Optional[str] = None
     background_color: Optional[str] = None
     layout_config: Optional[Dict[str, Any]] = None
+    current_template_id: Optional[str] = None
     silhouette_zoom: Optional[str] = None
     silhouette_position_x: Optional[str] = None
     silhouette_position_y: Optional[str] = None
     notes: Optional[str] = None
+    logo_path: Optional[str] = None
+    flag_path: Optional[str] = None
+    silhouette_path: Optional[str] = None
     characteristics: Optional[List[CharacteristicCreate]] = None
 
 class NavalUnitResponse(NavalUnitBase):

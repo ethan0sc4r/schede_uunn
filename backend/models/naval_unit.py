@@ -19,6 +19,7 @@ class NavalUnit(Base):
     # Layout customization
     background_color = Column(String, default="#ffffff")
     layout_config = Column(JSON, nullable=True)
+    current_template_id = Column(String, nullable=True)
     
     # Silhouette zoom and positioning
     silhouette_zoom = Column(String, default="1.0")

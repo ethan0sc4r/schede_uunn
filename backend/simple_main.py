@@ -78,6 +78,11 @@ class NavalUnitCreate(BaseModel):
     unit_class: str
     nation: Optional[str] = None
     background_color: str = "#ffffff"
+    layout_config: Optional[Dict[str, Any]] = None
+    current_template_id: Optional[str] = None
+    logo_path: Optional[str] = None
+    flag_path: Optional[str] = None
+    silhouette_path: Optional[str] = None
     characteristics: List[Dict[str, Any]] = []
 
 class CharacteristicCreate(BaseModel):
@@ -262,6 +267,11 @@ async def create_naval_unit(unit: NavalUnitCreate, user: dict = Depends(get_curr
         unit_class=unit.unit_class,
         nation=unit.nation,
         background_color=unit.background_color,
+        layout_config=unit.layout_config,
+        current_template_id=unit.current_template_id,
+        logo_path=unit.logo_path,
+        flag_path=unit.flag_path,
+        silhouette_path=unit.silhouette_path,
         created_by=user["id"]
     )
     

@@ -27,6 +27,9 @@ interface TemplateElement {
   style?: {
     fontSize?: number;
     fontWeight?: string;
+    fontStyle?: string;
+    fontFamily?: string;
+    textDecoration?: string;
     color?: string;
     backgroundColor?: string;
     borderRadius?: number;
@@ -35,6 +38,8 @@ interface TemplateElement {
     borderWidth?: number;
     borderColor?: string;
     borderStyle?: string;
+    headerBackgroundColor?: string;
+    columnWidths?: number[];
   };
 }
 
@@ -61,8 +66,8 @@ const FIXED_CHARACTERISTICS_TABLE = {
   ]
 };
 
-const DEFAULT_CANVAS_WIDTH = CANVAS_PRESETS.A4_LANDSCAPE.width;
-const DEFAULT_CANVAS_HEIGHT = CANVAS_PRESETS.A4_LANDSCAPE.height;
+const DEFAULT_CANVAS_WIDTH = CANVAS_PRESETS.PRESENTATION.width;
+const DEFAULT_CANVAS_HEIGHT = CANVAS_PRESETS.PRESENTATION.height;
 
 // Dummy getImageUrl for frontend display - replace with actual backend URL if needed
 const getImageUrl = (path: string) => {
@@ -76,8 +81,8 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
   const [canvasHeight, setCanvasHeight] = useState(DEFAULT_CANVAS_HEIGHT);
   const [canvasBackground, setCanvasBackground] = useState('#ffffff');
   const [canvasBorderWidth, setCanvasBorderWidth] = useState(2);
-  const [canvasBorderColor, setCanvasBorderColor] = useState('#000000');
-  const [selectedPreset, setSelectedPreset] = useState('A4_LANDSCAPE');
+  const [canvasBorderColor, setCanvasBorderColor] = useState('#1e40af');
+  const [selectedPreset, setSelectedPreset] = useState('PRESENTATION');
   const [zoomLevel, setZoomLevel] = useState(100);
 
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
@@ -93,13 +98,14 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const initializeDefaultTemplate = useCallback(() => {
+    // Coordinate ottimizzate per formato PowerPoint 1280x720 (16:9)
     const defaultElements: TemplateElement[] = [
-      { id: 'unit_name', type: 'unit_name', x: 160, y: 30, width: 400, height: 40, content: '[NOME UNITÀ]', isFixed: true, style: { fontSize: 20, fontWeight: 'bold', color: '#000' } },
-      { id: 'unit_class', type: 'unit_class', x: 160, y: 80, width: 400, height: 40, content: '[CLASSE UNITÀ]', isFixed: true, style: { fontSize: 20, fontWeight: 'bold', color: '#000' } },
-      { id: 'logo', type: 'logo', x: 20, y: 20, width: 120, height: 120, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' } },
-      { id: 'flag', type: 'flag', x: canvasWidth - 140, y: 20, width: 120, height: 80, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' } },
-      { id: 'silhouette', type: 'silhouette', x: 20, y: 180, width: canvasWidth - 40, height: 300, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#000000', borderStyle: 'solid' } },
-      { ...FIXED_CHARACTERISTICS_TABLE, width: canvasWidth - 40 }
+      { id: 'unit_name', type: 'unit_name', x: 150, y: 30, width: 400, height: 40, content: '[NOME UNITÀ]', isFixed: true, style: { fontSize: 22, fontWeight: 'bold', color: '#000' } },
+      { id: 'unit_class', type: 'unit_class', x: 150, y: 80, width: 400, height: 35, content: '[CLASSE UNITÀ]', isFixed: true, style: { fontSize: 18, fontWeight: 'normal', color: '#000' } },
+      { id: 'logo', type: 'logo', x: 50, y: 30, width: 80, height: 80, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#1e40af', borderStyle: 'solid' } },
+      { id: 'flag', type: 'flag', x: canvasWidth - 130, y: 30, width: 80, height: 50, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#1e40af', borderStyle: 'solid' } },
+      { id: 'silhouette', type: 'silhouette', x: 50, y: 130, width: canvasWidth - 100, height: 200, isFixed: true, style: { backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 2, borderColor: '#1e40af', borderStyle: 'solid' } },
+      { ...FIXED_CHARACTERISTICS_TABLE, x: 50, y: 350, width: canvasWidth - 100, height: 180 }
     ];
     setElements(defaultElements);
     const initialVisibility: { [key: string]: boolean } = {};
@@ -422,6 +428,11 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
               fontWeight: element.style?.fontWeight,
               color: element.style?.color,
               whiteSpace: element.style?.whiteSpace as any,
+              backgroundColor: element.style?.backgroundColor,
+              borderRadius: element.style?.borderRadius,
+              borderWidth: element.style?.borderWidth,
+              borderColor: element.style?.borderColor,
+              borderStyle: element.style?.borderStyle,
             }}
           >
             {isSelected ? (
@@ -446,7 +457,12 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
         {(element.type === 'logo' || element.type === 'silhouette' || element.type === 'flag') && (
           <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300" style={element.style}>
             {element.image ? (
-              <img src={getImageUrl(element.image)} alt={element.type} className="max-w-full max-h-full object-contain" />
+              <img 
+                src={getImageUrl(element.image)} 
+                alt={element.type} 
+                className="max-w-full max-h-full object-contain" 
+                style={{ borderRadius: element.style?.borderRadius || 0 }}
+              />
             ) : (
               <span className="text-gray-500 text-sm select-none">{element.type.replace('_', ' ').toUpperCase()}</span>
             )}
@@ -460,14 +476,26 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
               <div className="text-xs">
                 {element.tableData?.map((row, rowIndex) => (
                   <div key={rowIndex} className="flex border-b border-gray-300">
-                    {row.map((cell, colIndex) => (
-                      <div
-                        key={colIndex}
-                        className={`flex-1 p-2 border-r border-gray-300 ${rowIndex === 0 ? 'font-medium bg-gray-100' : ''}`}
-                      >
-                        <span>{cell}</span>
-                      </div>
-                    ))}
+                    {row.map((cell, colIndex) => {
+                      const columnWidths = element.style?.columnWidths || [];
+                      const width = columnWidths[colIndex] ? `${columnWidths[colIndex]}%` : 'auto';
+                      const headerBgColor = element.style?.headerBackgroundColor || '#f3f4f6';
+                      
+                      return (
+                        <div
+                          key={colIndex}
+                          className="p-2 border-r border-gray-300"
+                          style={{
+                            width: width,
+                            flexBasis: width,
+                            backgroundColor: rowIndex === 0 ? headerBgColor : (colIndex % 2 === 0 ? '#f9fafb' : '#ffffff'),
+                            fontWeight: rowIndex === 0 ? 'bold' : 'normal'
+                          }}
+                        >
+                          <span>{cell}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -519,6 +547,43 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                 <Settings className="h-5 w-5 mr-2" />
                 Modifica Layout
             </button>
+        </div>
+
+        {/* Add Elements Section */}
+        <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Aggiungi Elementi</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addElement('text')}
+              className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+            >
+              + Testo
+            </button>
+            <button
+              onClick={() => addElement('logo')}
+              className="w-full px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
+            >
+              + Logo
+            </button>
+            <button
+              onClick={() => addElement('flag')}
+              className="w-full px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+            >
+              + Bandiera
+            </button>
+            <button
+              onClick={() => addElement('silhouette')}
+              className="w-full px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+            >
+              + Silhouette
+            </button>
+            <button
+              onClick={() => addElement('table')}
+              className="w-full px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm"
+            >
+              + Tabella
+            </button>
+          </div>
         </div>
 
         {selectedElement && (
@@ -764,6 +829,26 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                           </button>
                         </div>
                       </div>
+
+                      {/* Border Radius for Text */}
+                      <div className="pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Arrotondamento</h4>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Bordo Arrotondato (px)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={element.style?.borderRadius || 0}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, borderRadius: parseInt(e.target.value) || 0 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+                      </div>
                     </>
                   )}
 
@@ -785,6 +870,26 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                         onChange={(e) => e.target.files?.[0] && handleImageUpload(element.id, e.target.files[0])}
                         className="w-full text-xs mt-2 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
+                      
+                      {/* Border Radius for Images */}
+                      <div className="pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Arrotondamento</h4>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Bordo Arrotondato (px)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={element.style?.borderRadius || 0}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, borderRadius: parseInt(e.target.value) || 0 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -805,6 +910,46 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                         rows={5}
                       />
+                      
+                      {/* Table Customization */}
+                      <div className="pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Personalizzazione Tabella</h4>
+                        
+                        {/* Header Background Color */}
+                        <div className="mb-3">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore Intestazioni</label>
+                          <input
+                            type="color"
+                            value={element.style?.headerBackgroundColor || '#f3f4f6'}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, headerBackgroundColor: e.target.value } }
+                                : el
+                            ))}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                        
+                        {/* Column Widths */}
+                        <div className="mb-3">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Larghezze Colonne (%)</label>
+                          <input
+                            type="text"
+                            value={element.style?.columnWidths ? element.style.columnWidths.join(',') : '25,25,25,25'}
+                            onChange={(e) => {
+                              const widths = e.target.value.split(',').map(w => parseInt(w.trim()) || 25);
+                              setElements(prev => prev.map(el => 
+                                el.id === selectedElement 
+                                  ? { ...el, style: { ...el.style, columnWidths: widths } }
+                                  : el
+                              ));
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                            placeholder="25,25,25,25"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Separare con virgole (es: 30,20,30,20)</p>
+                        </div>
+                      </div>
                     </div>
                   )}
 

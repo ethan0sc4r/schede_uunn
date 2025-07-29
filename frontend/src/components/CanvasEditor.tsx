@@ -17,17 +17,23 @@ interface CanvasElement {
   image?: string;
   tableData?: string[][];
   isFixed?: boolean; // For unit_name and unit_class fields
+  visible?: boolean; // For element visibility
   style?: {
     fontSize?: number;
     fontWeight?: string;
+    fontStyle?: string;
+    fontFamily?: string;
+    textDecoration?: string;
     color?: string;
     backgroundColor?: string;
     borderRadius?: number;
     whiteSpace?: string;
-    textAlign?: string;
+    textAlign?: 'left' | 'center' | 'right' | 'justify';
     borderWidth?: number;
     borderColor?: string;
     borderStyle?: string;
+    headerBackgroundColor?: string;
+    columnWidths?: number[];
   };
 }
 
@@ -37,9 +43,9 @@ interface CanvasEditorProps {
   onCancel: () => void;
 }
 
-// Default canvas dimensions (can be changed by templates)
-const DEFAULT_CANVAS_WIDTH = CANVAS_SIZES.A4_LANDSCAPE.width;
-const DEFAULT_CANVAS_HEIGHT = CANVAS_SIZES.A4_LANDSCAPE.height;
+// Default canvas dimensions (PowerPoint format)
+const DEFAULT_CANVAS_WIDTH = CANVAS_SIZES.PRESENTATION.width;
+const DEFAULT_CANVAS_HEIGHT = CANVAS_SIZES.PRESENTATION.height;
 
 // Predefined flags
 const PREDEFINED_FLAGS = [
@@ -147,7 +153,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   const [customFlags, setCustomFlags] = useState<Array<{name: string, url: string}>>([]);
   
   // Multi-template support
-  const [currentTemplateId, setCurrentTemplateId] = useState('naval-card-standard');
+  const [currentTemplateId, setCurrentTemplateId] = useState('naval-card-powerpoint');
   const [allElementStates, setAllElementStates] = useState<{[templateId: string]: CanvasElement[]}>({});
   const [templateStatesLoaded, setTemplateStatesLoaded] = useState(false);
   const [allTemplates, setAllTemplates] = useState<Template[]>(DEFAULT_TEMPLATES);
@@ -194,7 +200,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     if (!unit) {
       // NEW UNIT: Apply default template automatically
       console.log('🆕 New unit - applying default template');
-      const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-standard') || DEFAULT_TEMPLATES[0];
+      const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-powerpoint') || DEFAULT_TEMPLATES[0];
       const defaultElements = defaultTemplate.elements.map(el => ({
         ...el,
         // Ensure no images for new units
@@ -277,7 +283,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       if (hasRealName || hasRealClass || hasImages) {
         // Unit has some real data - apply default template but use the real data
         console.log('📄 Unit has data, applying template with existing values');
-        const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-standard') || DEFAULT_TEMPLATES[0];
+        const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-powerpoint') || DEFAULT_TEMPLATES[0];
         const defaultElements = defaultTemplate.elements.map(el => {
           const newEl = { ...el };
           
@@ -900,14 +906,38 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   };
 
   const addTableRow = (elementId: string) => {
-    setElements(prev => prev.map(el => {
-      if (el.id === elementId && el.tableData) {
-        const cols = el.tableData[0]?.length || 4;
-        const newRow = Array(cols).fill('');
-        return { ...el, tableData: [...el.tableData, newRow] };
-      }
-      return el;
-    }));
+    console.log('🔧 addTableRow called for elementId:', elementId);
+    setElements(prev => {
+      console.log('📋 Current elements:', prev.map(el => ({ id: el.id, type: el.type, hasTableData: !!el.tableData })));
+      return prev.map(el => {
+        console.log(`🔍 Checking element ${el.id} (type: ${el.type}) - matches: ${el.id === elementId}, hasTableData: ${!!el.tableData}`);
+        if (el.id === elementId) {
+          // Se è una tabella ma non ha tableData, inizializzala con dati di default
+          if (el.type === 'table' && !el.tableData) {
+            console.log('🔧 Initializing table data for element:', el.id);
+            el.tableData = [
+              ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
+              ['LUNGHEZZA', 'XXX m', 'LARGHEZZA', 'XXX m'],
+              ['DISLOCAMENTO', 'XXX t', 'VELOCITÀ', 'XXX kn'],
+              ['EQUIPAGGIO', 'XXX', 'ARMA', 'XXX']
+            ];
+          }
+          
+          if (el.tableData) {
+          console.log('📊 Adding row to table:', { currentRows: el.tableData.length, currentCols: el.tableData[0]?.length });
+          const cols = el.tableData[0]?.length || 4;
+          const newRow = Array(cols).fill('');
+          const newTableData = [...el.tableData, newRow];
+          console.log('✅ New table data:', newTableData);
+          return { ...el, tableData: newTableData };
+          } else {
+            console.log('⚠️ Element found but no tableData after initialization');
+            return el;
+          }
+        }
+        return el;
+      });
+    });
   };
 
   const removeTableRow = (elementId: string, rowIndex: number) => {
@@ -1013,6 +1043,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 src={getImageUrl(element.image)}
                 alt={element.type}
                 className="max-w-full max-h-full object-contain"
+                style={{ borderRadius: element.style?.borderRadius || 0 }}
                 onError={(e) => {
                   console.error(`❌ Failed to load image for ${element.type}:`, {
                     originalPath: element.image,
@@ -1055,6 +1086,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 src={getImageUrl(element.image)}
                 alt="Flag"
                 className="max-w-full max-h-full object-cover"
+                style={{ borderRadius: element.style?.borderRadius || 0 }}
                 onError={(e) => {
                   console.error(`❌ Failed to load flag image:`, {
                     originalPath: element.image,
@@ -1088,11 +1120,11 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
         {element.type === 'table' && (
           <div 
-            className="w-full h-full bg-white border border-gray-400 cursor-move overflow-auto"
+            className="w-full h-full bg-white border-2 border-gray-400 cursor-move overflow-auto"
             onMouseDown={(e) => handleMouseDown(element.id, e)}
           >
-            <div className="p-2">
-              <div className="flex items-center justify-between mb-2">
+            <div className="p-1">
+              <div className="flex items-center justify-between mb-1">
                 <div className="text-xs font-bold">CARATTERISTICHE</div>
                 {isSelected && (
                   <div className="flex space-x-1">
@@ -1110,16 +1142,25 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               </div>
               
               <div className="text-xs">
-                {element.tableData?.map((row, rowIndex) => (
-                  <div key={rowIndex} className="flex border-b border-gray-300">
-                    {row.map((cell, colIndex) => {
-                      const isHeader = rowIndex === 0;
-                      const bgColor = colIndex % 2 === 0 ? 'bg-gray-100' : 'bg-white';
-                      
-                      return (
-                        <div
-                          key={colIndex}
-                          className={`flex-1 p-2 border-r border-gray-300 ${bgColor} ${isHeader ? 'font-medium' : ''}`}
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {element.tableData?.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="border-b border-gray-300">
+                        {row.map((cell, colIndex) => {
+                          const columnWidths = element.style?.columnWidths || [];
+                          const width = columnWidths[colIndex] ? `${columnWidths[colIndex]}%` : 'auto';
+                          const headerBgColor = element.style?.headerBackgroundColor || '#f3f4f6';
+                          const isHeader = rowIndex === 0;
+                          
+                          return (
+                            <td
+                              key={colIndex}
+                              className="p-2 border-r border-gray-300 text-center"
+                              style={{
+                                width: width,
+                                backgroundColor: isHeader ? headerBgColor : (colIndex % 2 === 0 ? '#f9fafb' : '#ffffff'),
+                                fontWeight: isHeader ? 'bold' : 'normal'
+                              }}
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingTableCell({ elementId: element.id, row: rowIndex, col: colIndex });
@@ -1144,22 +1185,13 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                           ) : (
                             <span>{cell}</span>
                           )}
-                        </div>
+                        </td>
                       );
                     })}
-                    {isSelected && rowIndex > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeTableRow(element.id, rowIndex);
-                        }}
-                        className="text-xs bg-red-500 text-white px-1 py-1 ml-1"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -1251,9 +1283,25 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               <button
                 onClick={async () => {
                   // Save current template state first
+                  console.log('💾 Saving canvas data:', { 
+                    elementsCount: elements.length, 
+                    templateId: currentTemplateId,
+                    unitId: unit?.id,
+                    isNewUnit: !unit
+                  });
+                  
+                  // For new units, ensure we have elements from template
+                  if (!unit && elements.length === 0) {
+                    console.log('⚠️ WARNING: New unit has no elements! Applying default template now...');
+                    const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-powerpoint') || DEFAULT_TEMPLATES[0];
+                    setElements(defaultTemplate.elements);
+                    setCurrentTemplateId(defaultTemplate.id);
+                    console.log('✅ Applied default template with', defaultTemplate.elements.length, 'elements');
+                  }
+                  
                   await saveCurrentTemplateState();
                   
-                  onSave({ 
+                  const saveData = { 
                     elements, 
                     canvasWidth, 
                     canvasHeight, 
@@ -1262,7 +1310,12 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                     canvasBorderColor, 
                     nation: getNationFromFlag(),
                     current_template_id: currentTemplateId
+                  };
+                  console.log('💾 Final save data being sent to onSave:', {
+                    ...saveData,
+                    elementDetails: elements.map(el => ({ id: el.id, type: el.type, content: el.content }))
                   });
+                  onSave(saveData);
                 }}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
@@ -1673,6 +1726,47 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                     </div>
                   )}
 
+                  {element.type === 'table' && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Personalizzazione Tabella</h4>
+                      
+                      {/* Header Background Color */}
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Colore Intestazioni</label>
+                        <input
+                          type="color"
+                          value={element.style?.headerBackgroundColor || '#f3f4f6'}
+                          onChange={(e) => setElements(prev => prev.map(el => 
+                            el.id === selectedElement 
+                              ? { ...el, style: { ...el.style, headerBackgroundColor: e.target.value } }
+                              : el
+                          ))}
+                          className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                        />
+                      </div>
+                      
+                      {/* Column Widths */}
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Larghezze Colonne (%)</label>
+                        <input
+                          type="text"
+                          value={element.style?.columnWidths ? element.style.columnWidths.join(',') : '25,25,25,25'}
+                          onChange={(e) => {
+                            const widths = e.target.value.split(',').map(w => parseInt(w.trim()) || 25);
+                            setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, columnWidths: widths } }
+                                : el
+                            ));
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          placeholder="25,25,25,25"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Separare con virgole (es: 30,20,30,20)</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Border Controls - Available for all elements */}
                   <div className="pt-3 border-t border-gray-200">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Bordo</h4>
@@ -1723,6 +1817,23 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                         <option value="dotted">Punteggiato</option>
                         <option value="double">Doppio</option>
                       </select>
+                    </div>
+                    
+                    {/* Border Radius Control */}
+                    <div className="mt-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Arrotondamento (px)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        value={element.style?.borderRadius || 0}
+                        onChange={(e) => setElements(prev => prev.map(el => 
+                          el.id === selectedElement 
+                            ? { ...el, style: { ...el.style, borderRadius: parseInt(e.target.value) || 0 } }
+                            : el
+                        ))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
                     </div>
                   </div>
 

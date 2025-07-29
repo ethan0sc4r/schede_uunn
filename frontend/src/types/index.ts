@@ -23,6 +23,7 @@ export interface NavalUnit {
   silhouette_position_y: string;
   template_name?: string;
   template_id?: string;
+  current_template_id?: string;
   notes?: string; // Rich text notes field
   created_by: number;
   creator?: User; // User who created this unit
