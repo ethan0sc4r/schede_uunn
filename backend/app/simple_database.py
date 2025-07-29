@@ -152,6 +152,45 @@ def init_database():
         except sqlite3.OperationalError:
             pass  # Column already exists
         
+        # Quiz sessions table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS quiz_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                participant_name TEXT NOT NULL,
+                participant_surname TEXT NOT NULL,
+                quiz_type TEXT NOT NULL,  -- 'name_to_class', 'nation_to_class', 'class_to_flag'
+                total_questions INTEGER NOT NULL,
+                time_per_question INTEGER NOT NULL,  -- in seconds
+                correct_answers INTEGER DEFAULT 0,
+                score INTEGER DEFAULT 0,  -- 1-30 scale
+                status TEXT DEFAULT 'active',  -- 'active', 'completed', 'abandoned'
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Quiz questions table (stores individual questions for each session)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS quiz_questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                question_number INTEGER NOT NULL,
+                question_type TEXT NOT NULL,  -- 'name_to_class', 'nation_to_class', 'class_to_flag'
+                naval_unit_id INTEGER NOT NULL,
+                correct_answer TEXT NOT NULL,
+                option_a TEXT NOT NULL,
+                option_b TEXT NOT NULL,
+                option_c TEXT NOT NULL,
+                option_d TEXT NOT NULL,
+                user_answer TEXT NULL,
+                is_correct BOOLEAN NULL,
+                answered_at TIMESTAMP NULL,
+                FOREIGN KEY (session_id) REFERENCES quiz_sessions (id) ON DELETE CASCADE,
+                FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id)
+            )
+        ''')
+        
         conn.commit()
 
 class SimpleDatabase:
@@ -865,6 +904,306 @@ class SimpleDatabase:
                 return units
         except Exception as e:
             print(f"Error getting units using template: {e}")
+            return []
+
+    # Quiz management methods
+    @staticmethod
+    def create_quiz_session(participant_name: str, participant_surname: str, quiz_type: str, 
+                           total_questions: int, time_per_question: int) -> Optional[int]:
+        """Create a new quiz session"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO quiz_sessions 
+                    (participant_name, participant_surname, quiz_type, total_questions, time_per_question)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (participant_name, participant_surname, quiz_type, total_questions, time_per_question))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"Error creating quiz session: {e}")
+            return None
+
+    @staticmethod
+    def get_available_naval_units_for_quiz(quiz_type: str) -> List[Dict]:
+        """Get naval units that can be used for quiz questions based on quiz type"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                if quiz_type == 'name_to_class':
+                    # Need units with name and class
+                    cursor.execute('''
+                        SELECT * FROM naval_units 
+                        WHERE name IS NOT NULL AND name != '' 
+                        AND unit_class IS NOT NULL AND unit_class != ''
+                        AND silhouette_path IS NOT NULL
+                    ''')
+                elif quiz_type == 'nation_to_class':
+                    # Need units with nation and class
+                    cursor.execute('''
+                        SELECT * FROM naval_units 
+                        WHERE nation IS NOT NULL AND nation != '' 
+                        AND unit_class IS NOT NULL AND unit_class != ''
+                        AND silhouette_path IS NOT NULL
+                    ''')
+                elif quiz_type == 'class_to_flag':
+                    # Need units with class and flag
+                    cursor.execute('''
+                        SELECT * FROM naval_units 
+                        WHERE unit_class IS NOT NULL AND unit_class != ''
+                        AND (flag_path IS NOT NULL OR 
+                             (layout_config IS NOT NULL AND layout_config LIKE '%flag%'))
+                        AND silhouette_path IS NOT NULL
+                    ''')
+                else:
+                    return []
+                
+                units = []
+                for row in cursor.fetchall():
+                    unit = dict(row)
+                    if unit['layout_config']:
+                        try:
+                            unit['layout_config'] = json.loads(unit['layout_config'])
+                        except:
+                            unit['layout_config'] = {}
+                    units.append(unit)
+                
+                return units
+        except Exception as e:
+            print(f"Error getting available units for quiz: {e}")
+            return []
+
+    @staticmethod
+    def generate_quiz_questions(session_id: int, quiz_type: str, total_questions: int) -> bool:
+        """Generate questions for a quiz session"""
+        import random
+        
+        try:
+            # Get available units for this quiz type
+            available_units = SimpleDatabase.get_available_naval_units_for_quiz(quiz_type)
+            
+            if len(available_units) < 4:
+                print(f"Not enough units available for quiz type {quiz_type} (need at least 4, have {len(available_units)})")
+                return False
+            
+            # Select random units for questions
+            selected_units = random.sample(available_units, min(total_questions, len(available_units)))
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                for i, unit in enumerate(selected_units, 1):
+                    # Generate answer options based on quiz type
+                    if quiz_type == 'name_to_class':
+                        correct_answer = unit['unit_class']
+                        # Get other classes as wrong options
+                        cursor.execute('''
+                            SELECT DISTINCT unit_class FROM naval_units 
+                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+                        
+                    elif quiz_type == 'nation_to_class':
+                        correct_answer = unit['unit_class']
+                        # Get other classes from same or different nations
+                        cursor.execute('''
+                            SELECT DISTINCT unit_class FROM naval_units 
+                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+                        
+                    elif quiz_type == 'class_to_flag':
+                        # For flag quiz, the correct answer is the nation
+                        correct_answer = unit['nation'] or 'Unknown'
+                        # Get other nations as wrong options
+                        cursor.execute('''
+                            SELECT DISTINCT nation FROM naval_units 
+                            WHERE nation != ? AND nation IS NOT NULL AND nation != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+                    
+                    # Ensure we have exactly 3 wrong options
+                    while len(wrong_options) < 3:
+                        wrong_options.append(f"Option {len(wrong_options) + 1}")
+                    
+                    wrong_options = wrong_options[:3]
+                    
+                    # Create all 4 options and shuffle them
+                    all_options = [correct_answer] + wrong_options
+                    random.shuffle(all_options)
+                    
+                    # Insert question
+                    cursor.execute('''
+                        INSERT INTO quiz_questions 
+                        (session_id, question_number, question_type, naval_unit_id, correct_answer,
+                         option_a, option_b, option_c, option_d)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (session_id, i, quiz_type, unit['id'], correct_answer,
+                          all_options[0], all_options[1], all_options[2], all_options[3]))
+                
+                conn.commit()
+                return True
+                
+        except Exception as e:
+            print(f"Error generating quiz questions: {e}")
+            return False
+
+    @staticmethod
+    def get_quiz_session(session_id: int) -> Optional[Dict]:
+        """Get quiz session details"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM quiz_sessions WHERE id = ?', (session_id,))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except Exception as e:
+            print(f"Error getting quiz session: {e}")
+            return None
+
+    @staticmethod
+    def get_quiz_question(session_id: int, question_number: int) -> Optional[Dict]:
+        """Get a specific question from a quiz session"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT qq.*, nu.name, nu.unit_class, nu.nation, nu.silhouette_path, nu.flag_path, nu.layout_config
+                    FROM quiz_questions qq
+                    JOIN naval_units nu ON qq.naval_unit_id = nu.id
+                    WHERE qq.session_id = ? AND qq.question_number = ?
+                ''', (session_id, question_number))
+                
+                row = cursor.fetchone()
+                if row:
+                    question = dict(row)
+                    if question['layout_config']:
+                        try:
+                            question['layout_config'] = json.loads(question['layout_config'])
+                        except:
+                            question['layout_config'] = {}
+                    return question
+                return None
+        except Exception as e:
+            print(f"Error getting quiz question: {e}")
+            return None
+
+    @staticmethod
+    def submit_quiz_answer(session_id: int, question_number: int, user_answer: str) -> bool:
+        """Submit answer for a quiz question"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get the correct answer
+                cursor.execute('''
+                    SELECT correct_answer FROM quiz_questions 
+                    WHERE session_id = ? AND question_number = ?
+                ''', (session_id, question_number))
+                
+                result = cursor.fetchone()
+                if not result:
+                    return False
+                
+                correct_answer = result[0]
+                is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+                
+                # Update the question with user's answer
+                cursor.execute('''
+                    UPDATE quiz_questions 
+                    SET user_answer = ?, is_correct = ?, answered_at = CURRENT_TIMESTAMP
+                    WHERE session_id = ? AND question_number = ?
+                ''', (user_answer, is_correct, session_id, question_number))
+                
+                # Update session stats if this is correct
+                if is_correct:
+                    cursor.execute('''
+                        UPDATE quiz_sessions 
+                        SET correct_answers = correct_answers + 1
+                        WHERE id = ?
+                    ''', (session_id,))
+                
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error submitting quiz answer: {e}")
+            return False
+
+    @staticmethod
+    def complete_quiz_session(session_id: int) -> bool:
+        """Mark quiz session as completed and calculate final score"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get session details
+                cursor.execute('''
+                    SELECT total_questions, correct_answers FROM quiz_sessions WHERE id = ?
+                ''', (session_id,))
+                
+                result = cursor.fetchone()
+                if not result:
+                    return False
+                
+                total_questions, correct_answers = result
+                
+                # Calculate score on 1-30 scale
+                if total_questions > 0:
+                    percentage = (correct_answers / total_questions) * 100
+                    # Convert to 1-30 scale (18 is passing grade)
+                    score = max(1, min(30, round(1 + (percentage / 100) * 29)))
+                else:
+                    score = 1
+                
+                # Update session
+                cursor.execute('''
+                    UPDATE quiz_sessions 
+                    SET status = 'completed', score = ?, completed_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (score, session_id))
+                
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error completing quiz session: {e}")
+            return False
+
+    @staticmethod
+    def get_quiz_history(limit: int = 50) -> List[Dict]:
+        """Get quiz session history"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM quiz_sessions 
+                    WHERE status = 'completed'
+                    ORDER BY completed_at DESC 
+                    LIMIT ?
+                ''', (limit,))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error getting quiz history: {e}")
+            return []
+
+    @staticmethod
+    def get_nations_with_units() -> List[str]:
+        """Get list of nations that have naval units"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT DISTINCT nation FROM naval_units 
+                    WHERE nation IS NOT NULL AND nation != ''
+                    ORDER BY nation
+                ''')
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error getting nations with units: {e}")
             return []
 
 # Initialize database on import

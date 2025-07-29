@@ -10,7 +10,8 @@ import {
   Shield,
   Menu,
   X,
-  Palette
+  Palette,
+  Brain
 } from 'lucide-react';
 
 const Layout: React.FC = () => {
@@ -59,6 +60,24 @@ const Layout: React.FC = () => {
                 </Link>
               );
             })}
+          </div>
+          
+          {/* Quiz Section */}
+          <div className="mt-8 pt-4 border-t border-gray-200">
+            <div className="px-4 pb-2">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Quiz & Training
+              </h3>
+            </div>
+            <div className="space-y-2">
+              <a
+                href="/quiz"
+                className="group flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-green-50 hover:text-green-600 transition-all duration-200"
+              >
+                <Brain className="mr-3 h-5 w-5" />
+                Quiz Navali
+              </a>
+            </div>
           </div>
         </nav>
 

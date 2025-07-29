@@ -16,12 +16,16 @@ import tempfile
 
 from app.simple_database import SimpleDatabase, init_database
 from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint
+from api.quiz import router as quiz_router
 
 app = FastAPI(
     title="Naval Units Management System",
     description="API for managing naval unit information sheets",
     version="1.0.0"
 )
+
+# Include quiz router
+app.include_router(quiz_router, prefix="/api", tags=["quiz"])
 
 # CORS middleware
 app.add_middleware(

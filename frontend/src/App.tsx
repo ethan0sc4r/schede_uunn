@@ -12,6 +12,8 @@ import Templates from './pages/Templates';
 import Search from './pages/Search';
 import Admin from './pages/Admin';
 import UnitView from './pages/UnitView';
+import Quiz from './pages/Quiz';
+import QuizHistory from './pages/QuizHistory';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +34,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/units/:id/view" element={<UnitView />} />
+            <Route path="/quiz" element={<Quiz />} />
+            <Route path="/quiz/history" element={<QuizHistory />} />
             
             {/* Protected routes */}
             <Route
