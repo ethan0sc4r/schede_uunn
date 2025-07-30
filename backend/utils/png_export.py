@@ -166,47 +166,130 @@ def _add_element_to_image(draw: ImageDraw.Draw, image: Image.Image, element: Dic
             elif element_type == 'unit_class':
                 content = unit_data.get('unit_class', '')
         
-        print(f"    Text content: {content}")
+        print(f"    Text content: '{content}'")
+        print(f"    Raw style properties: {style}")
         
-        # Text styling
-        font_size = style.get('fontSize', 16)
+        # Complete text styling from CSS properties
+        font_family = style.get('fontFamily', 'Arial')
+        
+        # Font size - può essere numero o stringa con unità
+        font_size_raw = style.get('fontSize', 16)
+        if isinstance(font_size_raw, str):
+            font_size = int(font_size_raw.replace('px', '').replace('pt', '').replace('em', '').replace('rem', ''))
+        else:
+            font_size = int(font_size_raw)
+        
         font_weight = style.get('fontWeight', 'normal')
+        font_style = style.get('fontStyle', 'normal')  # italic, oblique
         text_color = style.get('color', '#000000')
-        bg_color = style.get('backgroundColor')
+        text_align = style.get('textAlign', 'left')
+        text_decoration = style.get('textDecoration', 'none')  # underline, line-through
+        text_transform = style.get('textTransform', 'none')  # uppercase, lowercase, capitalize
         
-        # Try to load font (fallback to default if not available)
-        try:
-            if font_weight == 'bold':
-                font = ImageFont.truetype("arial.ttf", font_size)
+        # Letter spacing - può essere numero o stringa
+        letter_spacing_raw = style.get('letterSpacing', 0)
+        if isinstance(letter_spacing_raw, str):
+            letter_spacing = float(letter_spacing_raw.replace('px', '').replace('em', '').replace('rem', ''))
+        else:
+            letter_spacing = float(letter_spacing_raw) if letter_spacing_raw else 0
+        
+        # Line height - può essere numero o stringa
+        line_height_raw = style.get('lineHeight', 1.2)
+        if isinstance(line_height_raw, str):
+            if 'px' in line_height_raw:
+                line_height = float(line_height_raw.replace('px', '')) / font_size  # Convert px to multiplier
             else:
-                font = ImageFont.truetype("arial.ttf", font_size)
-        except:
-            font = ImageFont.load_default()
+                line_height = float(line_height_raw.replace('em', '').replace('rem', ''))
+        else:
+            line_height = float(line_height_raw) if line_height_raw else 1.2
+        
+        print(f"    Parsed formatting -> Font: {font_family} {font_size}px {font_weight} {font_style}")
+        print(f"    Parsed formatting -> Color: {text_color}, Align: {text_align}")
+        print(f"    Parsed formatting -> Transform: {text_transform}, Decoration: {text_decoration}")
+        
+        # Background and borders
+        bg_color = style.get('backgroundColor')
+        border_width = int(style.get('borderWidth', 0)) if style.get('borderWidth') else 0
+        border_color = style.get('borderColor', '#000000')
+        border_radius = int(style.get('borderRadius', 0)) if style.get('borderRadius') else 0
+        
+        # Padding - può essere un numero o una stringa come "8px"
+        padding = style.get('padding', 8)
+        if isinstance(padding, str):
+            padding = int(padding.replace('px', '').replace('em', '').replace('rem', ''))
+        elif padding is None:
+            padding = 8
+        
+        print(f"    Parsed styling -> Background: {bg_color}, Border: {border_width}px {border_color}")
+        print(f"    Parsed styling -> Padding: {padding}px, Border radius: {border_radius}px")
+        
+        # Apply text transformations
+        if text_transform == 'uppercase':
+            content = content.upper()
+        elif text_transform == 'lowercase':
+            content = content.lower()
+        elif text_transform == 'capitalize':
+            content = content.title()
         
         # Draw background if specified
         if bg_color:
             draw.rectangle([x, y, x + width, y + height], fill=bg_color)
         
-        # Draw text
-        text_bbox = draw.textbbox((0, 0), content, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
+        # Draw border if specified
+        if border_width > 0:
+            for i in range(border_width):
+                draw.rectangle([x + i, y + i, x + width - 1 - i, y + height - 1 - i], outline=border_color)
         
-        # Get text alignment from style (default to left like HTML)
-        text_align = style.get('textAlign', 'left')
+        # Load appropriate font
+        font = _get_font(font_family, font_size, font_weight, font_style)
         
-        if text_align == 'center':
-            text_x = x + (width - text_width) // 2
-        elif text_align == 'right':
-            text_x = x + width - text_width - 8  # 8px padding
-        else:  # left alignment (default)
-            text_x = x + 8  # 8px left padding like HTML
+        # Handle multi-line text if needed
+        lines = content.split('\n') if '\n' in content else [content]
         
-        # Vertical center
-        text_y = y + (height - text_height) // 2
+        # Calculate text dimensions for all lines
+        total_text_height = 0
+        line_heights = []
+        line_widths = []
         
-        draw.text((text_x, text_y), content, fill=text_color, font=font)
-        print(f"    Drew text: '{content}' at ({text_x}, {text_y}) with alignment: {text_align}")
+        for line in lines:
+            line_bbox = draw.textbbox((0, 0), line, font=font)
+            line_width = line_bbox[2] - line_bbox[0]
+            calculated_line_height = int((line_bbox[3] - line_bbox[1]) * line_height)
+            line_heights.append(calculated_line_height)
+            line_widths.append(line_width)
+            total_text_height += calculated_line_height
+        
+        # Calculate starting Y position (vertical alignment)
+        text_start_y = y + (height - total_text_height) // 2
+        
+        # Draw each line
+        current_y = text_start_y
+        for i, line in enumerate(lines):
+            line_width = line_widths[i]
+            calculated_line_height = line_heights[i]
+            
+            # Calculate X position based on alignment
+            if text_align == 'center':
+                text_x = x + (width - line_width) // 2
+            elif text_align == 'right':
+                text_x = x + width - line_width - padding
+            else:  # left alignment (default)
+                text_x = x + padding
+            
+            # Draw the text line
+            draw.text((text_x, current_y), line, fill=text_color, font=font)
+            
+            # Draw text decorations
+            if text_decoration == 'underline':
+                underline_y = current_y + calculated_line_height - 2
+                draw.line([text_x, underline_y, text_x + line_width, underline_y], fill=text_color, width=1)
+            elif text_decoration == 'line-through':
+                strikethrough_y = current_y + calculated_line_height // 2
+                draw.line([text_x, strikethrough_y, text_x + line_width, strikethrough_y], fill=text_color, width=1)
+            
+            current_y += calculated_line_height
+        
+        print(f"    Drew text: '{content}' with font: {font_family} {font_size}px {font_weight} {font_style}, color: {text_color}, align: {text_align}")
     
     elif element_type in ['logo', 'flag', 'silhouette']:
         # Draw background first if specified
@@ -270,10 +353,7 @@ def _add_element_to_image(draw: ImageDraw.Draw, image: Image.Image, element: Dic
                     print(f"    Image not found, showing placeholder")
                     # Draw placeholder text
                     placeholder_text = f"[{element_type.upper()}]"
-                    try:
-                        font = ImageFont.truetype("arial.ttf", 12)
-                    except:
-                        font = ImageFont.load_default()
+                    font = _get_font('Arial', 12, 'normal', 'normal')
                     
                     text_bbox = draw.textbbox((0, 0), placeholder_text, font=font)
                     text_width = text_bbox[2] - text_bbox[0]
@@ -288,10 +368,7 @@ def _add_element_to_image(draw: ImageDraw.Draw, image: Image.Image, element: Dic
                 print(f"    Error loading image: {img_error}")
                 # Draw error placeholder
                 placeholder_text = f"[ERROR: {element_type.upper()}]"
-                try:
-                    font = ImageFont.truetype("arial.ttf", 10)
-                except:
-                    font = ImageFont.load_default()
+                font = _get_font('Arial', 10, 'normal', 'normal')
                 
                 text_bbox = draw.textbbox((0, 0), placeholder_text, font=font)
                 text_width = text_bbox[2] - text_bbox[0]
@@ -363,12 +440,10 @@ def _add_element_to_image(draw: ImageDraw.Draw, image: Image.Image, element: Dic
                         # Draw cell border
                         draw.rectangle([current_x, current_y, current_x + cell_width, current_y + cell_height], outline='#d1d5db')
                         
-                        # Draw cell text
-                        try:
-                            cell_font_size = 9 if is_header else 8
-                            cell_font = ImageFont.truetype("arial.ttf", cell_font_size)
-                        except:
-                            cell_font = ImageFont.load_default()
+                        # Draw cell text with proper formatting
+                        cell_font_size = 9 if is_header else 8
+                        cell_font_weight = 'bold' if is_header else 'normal'
+                        cell_font = _get_font('Arial', cell_font_size, cell_font_weight, 'normal')
                         
                         cell_text = str(cell_data)
                         text_bbox = draw.textbbox((0, 0), cell_text, font=cell_font)
@@ -539,6 +614,102 @@ def _download_remote_image_png(image_url: str) -> Optional[str]:
     except Exception as e:
         print(f"    Failed to download remote image {image_url}: {e}")
         return None
+
+def _get_font(font_family: str, font_size: int, font_weight: str, font_style: str):
+    """Get the appropriate font based on family, size, weight and style"""
+    
+    # Font mapping - try to find the best available font
+    font_paths = {
+        'Arial': {
+            'normal': {'normal': 'arial.ttf', 'italic': 'ariali.ttf'},
+            'bold': {'normal': 'arialbd.ttf', 'italic': 'arialbi.ttf'}
+        },
+        'Times': {
+            'normal': {'normal': 'times.ttf', 'italic': 'timesi.ttf'},
+            'bold': {'normal': 'timesbd.ttf', 'italic': 'timesbi.ttf'}
+        },
+        'Courier': {
+            'normal': {'normal': 'cour.ttf', 'italic': 'couri.ttf'},
+            'bold': {'normal': 'courbd.ttf', 'italic': 'courbi.ttf'}
+        },
+        'Verdana': {
+            'normal': {'normal': 'verdana.ttf', 'italic': 'verdanai.ttf'},
+            'bold': {'normal': 'verdanab.ttf', 'italic': 'verdanaz.ttf'}
+        },
+        'Calibri': {
+            'normal': {'normal': 'calibri.ttf', 'italic': 'calibrii.ttf'},
+            'bold': {'normal': 'calibrib.ttf', 'italic': 'calibriz.ttf'}
+        },
+        'Tahoma': {
+            'normal': {'normal': 'tahoma.ttf', 'italic': 'tahoma.ttf'},
+            'bold': {'normal': 'tahomabd.ttf', 'italic': 'tahomabd.ttf'}
+        }
+    }
+    
+    # Normalize font family name
+    font_family_normalized = font_family.replace('"', '').replace("'", "").split(',')[0].strip()
+    
+    # Map common generic families
+    if font_family_normalized.lower() in ['sans-serif', 'system-ui']:
+        font_family_normalized = 'Arial'
+    elif font_family_normalized.lower() in ['serif']:
+        font_family_normalized = 'Times'
+    elif font_family_normalized.lower() in ['monospace']:
+        font_family_normalized = 'Courier'
+    
+    # Normalize weight - supporta valori numerici e stringhe
+    if isinstance(font_weight, (int, float)):
+        weight = 'bold' if font_weight >= 600 else 'normal'
+    elif isinstance(font_weight, str):
+        if font_weight.lower() in ['bold', 'bolder']:
+            weight = 'bold'
+        elif font_weight.isdigit() and int(font_weight) >= 600:
+            weight = 'bold'
+        else:
+            weight = 'normal'
+    else:
+        weight = 'normal'
+    
+    # Normalize style
+    style = 'italic' if font_style in ['italic', 'oblique'] else 'normal'
+    
+    # Try to find the exact font
+    font_file = None
+    if font_family_normalized in font_paths:
+        try:
+            font_file = font_paths[font_family_normalized][weight][style]
+        except KeyError:
+            # Fallback to normal weight/style
+            try:
+                font_file = font_paths[font_family_normalized]['normal']['normal']
+            except KeyError:
+                pass
+    
+    # Try to load the font
+    if font_file:
+        try:
+            print(f"    Loading font: {font_file} size {font_size}")
+            return ImageFont.truetype(font_file, font_size)
+        except Exception as e:
+            print(f"    Failed to load {font_file}: {e}")
+    
+    # Fallback fonts in order of preference
+    fallback_fonts = ['arial.ttf', 'calibri.ttf', 'verdana.ttf', 'tahoma.ttf']
+    
+    for fallback in fallback_fonts:
+        try:
+            print(f"    Fallback to: {fallback} size {font_size}")
+            return ImageFont.truetype(fallback, font_size)
+        except:
+            continue
+    
+    # Last resort - default font
+    print(f"    Using default font size {font_size}")
+    try:
+        return ImageFont.load_default()
+    except:
+        # If even default fails, create a basic font
+        return ImageFont.load_default()
 
 def _create_basic_elements_from_unit_data(unit_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Create basic elements when layout_config has no elements"""
