@@ -76,24 +76,61 @@ export default function UnitView() {
   };
 
   const handleExportPNG = async () => {
-    if (!unit || !canvasRef.current) {
-      alert('Errore: Canvas non disponibile per l\'esportazione');
+    if (!unit) {
+      alert('Errore: Unità non disponibile per l\'esportazione');
       return;
     }
     
-    console.log('Starting PNG export for:', unit.name);
-    console.log('Canvas ref element:', canvasRef.current);
-    console.log('Canvas dimensions:', canvasRef.current.offsetWidth, 'x', canvasRef.current.offsetHeight);
+    console.log('Starting server-side PNG export for:', unit.name);
     
     try {
-      const filename = `${unit.name.replace(/\s+/g, '_')}_scheda.png`;
-      await exportCanvasToPNG(canvasRef.current, filename);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      
+      // Try public endpoint first, then authenticated endpoint as fallback
+      let response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/public/units/${unit.id}/export/png`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+      } catch (publicError) {
+        console.log('Public PNG export failed, trying authenticated endpoint...');
+        response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/png`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          }
+        });
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('PNG export error response:', response.status, errorText);
+        throw new Error(`Errore durante l'export PNG: ${response.status} - ${errorText}`);
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${unit.name.replace(/\s+/g, '_')}_scheda.png`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
       console.log('PNG export completed successfully');
+      alert(`PNG di "${unit.name}" esportato con successo!`);
     } catch (error: any) {
       console.error('PNG export error:', error);
       alert(`Errore durante l'esportazione PNG: ${error.message || error}`);
     }
   };
+
 
   const handleExportPowerPointWithTemplate = async (templateConfig: any = null) => {
     if (!unit) {
@@ -398,31 +435,36 @@ export default function UnitView() {
                   <div className="p-2">
                     <div className="text-xs font-bold mb-2">CARATTERISTICHE</div>
                     <div className="text-xs">
-                      {element.tableData?.map((row: string[], rowIndex: number) => (
-                        <div key={rowIndex} className="flex border-b border-gray-300">
-                          {row.map((cell: string, colIndex: number) => {
-                            const columnWidths = element.style?.columnWidths || [];
-                            const width = columnWidths[colIndex] ? `${columnWidths[colIndex]}%` : 'auto';
-                            const headerBgColor = element.style?.headerBackgroundColor || '#f3f4f6';
-                            const isHeader = rowIndex === 0;
-                            
-                            return (
-                              <div
-                                key={colIndex}
-                                className="p-2 border-r border-gray-300"
-                                style={{
-                                  width: width,
-                                  flexBasis: width,
-                                  backgroundColor: isHeader ? headerBgColor : (colIndex % 2 === 0 ? '#f9fafb' : '#ffffff'),
-                                  fontWeight: isHeader ? 'bold' : 'normal'
-                                }}
-                              >
-                                <span>{cell}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          {element.tableData?.map((row: string[], rowIndex: number) => (
+                            <tr key={rowIndex} className="border-b border-gray-300">
+                              {row.map((cell: string, colIndex: number) => {
+                                const columnWidths = element.style?.columnWidths || [];
+                                const width = columnWidths[colIndex] ? `${columnWidths[colIndex]}%` : 'auto';
+                                const headerBgColor = element.style?.headerBackgroundColor || '#f3f4f6';
+                                const isHeader = rowIndex === 0;
+                                
+                                return (
+                                  <td
+                                    key={colIndex}
+                                    className="p-1 border-r border-gray-300 text-left"
+                                    style={{
+                                      width: width,
+                                      backgroundColor: isHeader ? headerBgColor : (rowIndex % 2 === 0 ? '#f9fafb' : '#ffffff'),
+                                      fontWeight: isHeader ? 'bold' : 'normal',
+                                      fontSize: '10px',
+                                      lineHeight: '1.2'
+                                    }}
+                                  >
+                                    {cell}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>

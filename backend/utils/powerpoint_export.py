@@ -10,6 +10,9 @@ import requests
 import tempfile
 from typing import List, Dict, Any, Optional
 
+# Global scale factor for canvas to PowerPoint conversion
+CANVAS_TO_PPT_SCALE = 1.0
+
 def create_unit_powerpoint(unit_data: Dict[str, Any], output_path: str, template_config: Optional[Dict[str, Any]] = None) -> str:
     """
     Create a PowerPoint presentation from a single naval unit
@@ -39,11 +42,24 @@ def create_unit_powerpoint(unit_data: Dict[str, Any], output_path: str, template
             print(f"📏 Canvas dimensions from template: {canvas_width} x {canvas_height}")
             
             # Convert canvas dimensions to PowerPoint slide dimensions
-            # PowerPoint works better with direct pixel to inch conversion
-            # Use a scale that makes the slide match the exact canvas size
-            pixels_per_inch = 72.0  # PowerPoint standard
+            # Use 120 DPI for better scaling instead of 96 DPI
+            pixels_per_inch = 120.0  # Better scaling factor
             slide_width_inches = canvas_width / pixels_per_inch
             slide_height_inches = canvas_height / pixels_per_inch
+            
+            # Ensure minimum reasonable size for PowerPoint
+            min_width_inches = 8.0  # Minimum 8 inches width
+            min_height_inches = 6.0  # Minimum 6 inches height
+            
+            if slide_width_inches < min_width_inches:
+                scale_factor = min_width_inches / slide_width_inches
+                slide_width_inches = min_width_inches
+                slide_height_inches *= scale_factor
+            
+            if slide_height_inches < min_height_inches:
+                scale_factor = min_height_inches / slide_height_inches
+                slide_height_inches = min_height_inches
+                slide_width_inches *= scale_factor
             
             print(f"📏 Calculated slide dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
             
@@ -61,9 +77,13 @@ def create_unit_powerpoint(unit_data: Dict[str, Any], output_path: str, template
                 
                 print(f"📏 Using unit layout dimensions: {canvas_width} x {canvas_height}")
                 
-                pixels_per_inch = 72.0  # PowerPoint standard
+                pixels_per_inch = 120.0  # Better scaling factor
                 slide_width_inches = canvas_width / pixels_per_inch
                 slide_height_inches = canvas_height / pixels_per_inch
+                
+                # Also update element positioning scale
+                global CANVAS_TO_PPT_SCALE
+                CANVAS_TO_PPT_SCALE = 1.0  # 1:1 mapping
                 
                 prs.slide_width = Inches(slide_width_inches)
                 prs.slide_height = Inches(slide_height_inches)
@@ -87,6 +107,99 @@ def create_unit_powerpoint(unit_data: Dict[str, Any], output_path: str, template
         
     except Exception as e:
         print(f"Error in create_unit_powerpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+def create_unit_powerpoint_to_buffer(unit_data: Dict[str, Any], output_buffer, template_config: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Create a PowerPoint presentation from a single naval unit and save to buffer
+    
+    Args:
+        unit_data: Unit data including layout config
+        output_buffer: BytesIO buffer to save the PowerPoint
+        template_config: Optional template configuration for presentation format
+    """
+    
+    try:
+        print(f"Creating PowerPoint for unit: {unit_data.get('name', 'Unknown')}")
+        
+        # Create new presentation
+        prs = Presentation()
+        
+        # Apply template configuration if provided
+        print(f"🔍 Template config received: {template_config}")
+        
+        if template_config:
+            canvas_width = template_config.get('canvasWidth', 1123)
+            canvas_height = template_config.get('canvasHeight', 794)
+            
+            print(f"📏 Canvas dimensions from template: {canvas_width} x {canvas_height}")
+            
+            # Convert canvas dimensions to PowerPoint slide dimensions
+            # Use 120 DPI for better scaling instead of 96 DPI
+            pixels_per_inch = 120.0  # Better scaling factor
+            slide_width_inches = canvas_width / pixels_per_inch
+            slide_height_inches = canvas_height / pixels_per_inch
+            
+            # Ensure minimum reasonable size for PowerPoint
+            min_width_inches = 8.0  # Minimum 8 inches width
+            min_height_inches = 6.0  # Minimum 6 inches height
+            
+            if slide_width_inches < min_width_inches:
+                scale_factor = min_width_inches / slide_width_inches
+                slide_width_inches = min_width_inches
+                slide_height_inches *= scale_factor
+            
+            if slide_height_inches < min_height_inches:
+                scale_factor = min_height_inches / slide_height_inches
+                slide_height_inches = min_height_inches
+                slide_width_inches *= scale_factor
+            
+            print(f"📏 Calculated slide dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
+            
+            prs.slide_width = Inches(slide_width_inches)
+            prs.slide_height = Inches(slide_height_inches)
+            
+            print(f"✅ Applied template dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
+        else:
+            print("⚠️ No template config provided, using default")
+            # Try to get canvas config from unit data
+            unit_layout = unit_data.get('layout_config', {})
+            if unit_layout:
+                canvas_width = unit_layout.get('canvasWidth', 1123)
+                canvas_height = unit_layout.get('canvasHeight', 794)
+                
+                print(f"📏 Using unit layout dimensions: {canvas_width} x {canvas_height}")
+                
+                pixels_per_inch = 120.0  # Better scaling factor
+                slide_width_inches = canvas_width / pixels_per_inch
+                slide_height_inches = canvas_height / pixels_per_inch
+                
+                # Also update element positioning scale
+                global CANVAS_TO_PPT_SCALE
+                CANVAS_TO_PPT_SCALE = 1.0  # 1:1 mapping
+                
+                prs.slide_width = Inches(slide_width_inches)
+                prs.slide_height = Inches(slide_height_inches)
+                
+                print(f"✅ Applied unit layout dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
+            else:
+                # Default to 16:9 widescreen
+                prs.slide_width = Inches(13.33)
+                prs.slide_height = Inches(7.5)
+                print(f"⚠️ Using default widescreen dimensions: 13.33\" x 7.5\"")
+        
+        # Create the unit slide
+        slide = _create_unit_slide(prs, unit_data, {})
+        
+        # Save presentation to buffer
+        print(f"Saving presentation to buffer")
+        prs.save(output_buffer)
+        print(f"PowerPoint saved successfully to buffer")
+        
+    except Exception as e:
+        print(f"Error in create_unit_powerpoint_to_buffer: {e}")
         import traceback
         traceback.print_exc()
         raise
@@ -602,8 +715,10 @@ def _add_element_to_slide(slide: Any, element: Dict[str, Any], unit: Dict[str, A
                 font.size = Pt(10)
 
 def _pixels_to_inches(pixels: float) -> Inches:
-    """Convert pixels to inches (assuming 96 DPI)"""
-    return Inches(pixels / 96.0)
+    """Convert pixels to inches using current scale"""
+    global CANVAS_TO_PPT_SCALE
+    scaled_pixels = pixels * CANVAS_TO_PPT_SCALE
+    return Inches(scaled_pixels / 120.0)  # Updated to match new DPI
 
 def _download_image(image_url: str) -> Optional[str]:
     """Download image from URL and return temporary file path"""

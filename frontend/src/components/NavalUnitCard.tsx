@@ -31,14 +31,39 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
 
   const handleExportPNG = async () => {
     try {
-      // Open unit view in new window and capture it
-      const viewWindow = window.open(`/units/${unit.id}/view`, '_blank');
-      if (viewWindow) {
-        alert('Per esportare PNG: apri la pagina di visualizzazione e usa il pulsante PNG');
+      console.log('Starting server-side PNG export for:', unit.name);
+      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      
+      const response = await fetch(`${API_BASE_URL}/api/public/units/${unit.id}/export/png`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('PNG export error response:', response.status, errorText);
+        throw new Error(`Errore durante l'export PNG: ${response.status} - ${errorText}`);
       }
-    } catch (error) {
+
+      // Get the blob and create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${unit.name.replace(/\s+/g, '_')}_scheda.png`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      console.log('PNG export completed successfully');
+      alert(`PNG di "${unit.name}" esportato con successo!`);
+    } catch (error: any) {
       console.error('Errore esportazione PNG:', error);
-      alert('Errore durante l\'esportazione PNG');
+      alert(`Errore durante l'esportazione PNG: ${error.message || error}`);
     }
   };
 

@@ -89,7 +89,7 @@ export const getImageUrl = (imagePath: string): string => {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
   
   // Convert backend path to full URL
-  return `${API_BASE_URL}/api/static/${imagePath}`;
+  return `${API_BASE_URL}/uploads/${imagePath}`;
 };
 
 // Migrate all base64 images in layout_config to backend files

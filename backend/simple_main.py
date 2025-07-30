@@ -13,9 +13,10 @@ from datetime import datetime, timedelta
 import datetime as dt
 import hashlib
 import tempfile
+import io
 
 from app.simple_database import SimpleDatabase, init_database
-from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint
+from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint, create_unit_powerpoint_to_buffer
 from api.quiz import router as quiz_router
 import threading
 import time
@@ -61,7 +62,6 @@ class StaticFilesCORSMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "*"
             response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-            response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
         
         return response
 
@@ -73,7 +73,7 @@ UPLOAD_DIR = "./data/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Static files for uploaded images
-app.mount("/api/static", StaticFiles(directory=UPLOAD_DIR), name="static")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Additional static file routes for direct access (for compatibility)
 app.mount("/silhouettes", StaticFiles(directory=os.path.join(UPLOAD_DIR, "silhouettes")), name="silhouettes")
@@ -392,45 +392,31 @@ async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict =
         
         print(f"Unit found: {unit['name']}")
         
-        # Create temporary file for PowerPoint in server directory
-        temp_dir = "./data/temp"
-        os.makedirs(temp_dir, exist_ok=True)
+        # Create PowerPoint in memory
+        from io import BytesIO
+        output_buffer = BytesIO()
         
-        # Generate unique filename
-        import uuid
-        temp_filename = f"ppt_{uuid.uuid4().hex}.pptx"
-        output_path = os.path.join(temp_dir, temp_filename)
-        
-        print(f"Temporary file created: {output_path}")
+        print(f"Creating PowerPoint in memory")
         print(f"Template config: {template_config}")
         
         # Generate PowerPoint presentation using single unit function
-        created_path = create_unit_powerpoint(unit, output_path, template_config)
-        print(f"PowerPoint created successfully: {created_path}")
+        create_unit_powerpoint_to_buffer(unit, output_buffer, template_config)
+        print(f"PowerPoint created successfully in memory")
         
-        # Create exports directory if it doesn't exist
-        exports_dir = "./data/exports"
-        os.makedirs(exports_dir, exist_ok=True)
-        print(f"Exports directory ensured: {exports_dir}")
-        
-        # Create final filename with better handling
+        # Create final filename
         safe_name = "".join(c for c in unit['name'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
         if not safe_name:  # Fallback if name becomes empty
             safe_name = f"unit_{unit_id}"
         final_filename = f"{safe_name}_scheda.pptx"
-        final_path = os.path.join(exports_dir, final_filename)
         
-        print(f"Final path: {final_path}")
+        # Return in-memory file as response
+        output_buffer.seek(0)
+        from fastapi.responses import StreamingResponse
         
-        # Move file to exports directory
-        shutil.move(created_path, final_path)
-        print(f"File moved to final location")
-        
-        # Return file response
-        return FileResponse(
-            path=final_path,
-            filename=final_filename,
-            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        return StreamingResponse(
+            io.BytesIO(output_buffer.read()),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f"attachment; filename={final_filename}"}
         )
         
     except Exception as e:
@@ -438,9 +424,7 @@ async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict =
         import traceback
         traceback.print_exc()
         
-        # Clean up temp file on error
-        if 'output_path' in locals() and os.path.exists(output_path):
-            os.unlink(output_path)
+        # No temp file cleanup needed for in-memory processing
         raise HTTPException(
             status_code=500, 
             detail=f"Error creating PowerPoint presentation: {str(e)}"
@@ -451,10 +435,68 @@ async def export_unit_pdf(unit_id: int, group_id: Optional[int] = None, user: di
     # TODO: Implement PDF export
     raise HTTPException(status_code=501, detail="PDF export not implemented")
 
-@app.get("/api/units/{unit_id}/export/png")
-async def export_unit_png(unit_id: int, group_id: Optional[int] = None, user: dict = Depends(get_current_user)):
-    # TODO: Implement PNG export
-    raise HTTPException(status_code=501, detail="PNG export not implemented")
+@app.post("/api/units/{unit_id}/export/png")
+async def export_unit_png(unit_id: int):
+    """Export a single naval unit to PNG image (server-side rendering)"""
+    return await _export_unit_png_internal(unit_id)
+
+@app.post("/api/public/units/{unit_id}/export/png")
+async def export_unit_png_public(unit_id: int):
+    """Export a single naval unit to PNG image (public, no auth required)"""
+    return await _export_unit_png_internal(unit_id)
+
+async def _export_unit_png_internal(unit_id: int):
+    """Export a single naval unit to PNG image"""
+    
+    try:
+        print(f"PNG export requested for unit ID: {unit_id}")
+        
+        # Get the unit with all related data
+        unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+        if not unit:
+            print(f"Unit {unit_id} not found")
+            raise HTTPException(status_code=404, detail="Naval unit not found")
+        
+        print(f"Unit found: {unit['name']}")
+        
+        # Create PNG using server-side rendering in memory
+        from utils.png_export import create_unit_png_to_buffer
+        
+        # Create PNG in memory
+        output_buffer = io.BytesIO()
+        
+        print(f"Creating PNG in memory")
+        
+        # Generate PNG image
+        create_unit_png_to_buffer(unit, output_buffer)
+        print(f"PNG created successfully in memory")
+        
+        # Create final filename
+        safe_name = "".join(c for c in unit['name'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        if not safe_name:
+            safe_name = f"unit_{unit_id}"
+        final_filename = f"{safe_name}_scheda.png"
+        
+        # Return in-memory file as response
+        output_buffer.seek(0)
+        from fastapi.responses import StreamingResponse
+        
+        return StreamingResponse(
+            io.BytesIO(output_buffer.read()),
+            media_type="image/png",
+            headers={"Content-Disposition": f"attachment; filename={final_filename}"}
+        )
+        
+    except Exception as e:
+        print(f"PNG export error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # No temp file cleanup needed for in-memory processing
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error creating PNG image: {str(e)}"
+        )
 
 # Admin routes
 @app.get("/api/admin/users")
@@ -838,7 +880,7 @@ def start_cleanup_scheduler():
     
     cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
     cleanup_thread.start()
-    print("🧹 Started daily temp file cleanup scheduler")
+    print("Started daily temp file cleanup scheduler")
 
 if __name__ == "__main__":
     # Initialize database
