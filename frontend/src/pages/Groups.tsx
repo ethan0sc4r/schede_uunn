@@ -118,8 +118,8 @@ export default function Groups() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Errore durante l\'export PowerPoint:', error);
-      console.error('Error details:', error.response?.data || error.message);
-      alert(`Errore durante l'export PowerPoint: ${error.response?.data?.detail || error.message}`);
+      console.error('Error details:', (error as any).response?.data || (error as any).message);
+      alert(`Errore durante l'export PowerPoint: ${(error as any).response?.data?.detail || (error as any).message}`);
     }
   };
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, GitBranch, Tag, User, Download, Trash2, Eye, RotateCcw, Plus } from 'lucide-react';
+import { Clock, GitBranch, Tag, User, Trash2, RotateCcw, Plus } from 'lucide-react';
 
 interface Version {
   id: number;
@@ -29,8 +29,7 @@ interface VersionManagerProps {
 const VersionManager: React.FC<VersionManagerProps> = ({ 
   unitId, 
   isOpen, 
-  onClose, 
-  onVersionSelected 
+  onClose
 }) => {
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -58,7 +57,6 @@ const VersionManager: React.FC<VersionManagerProps> = ({
   });
 
   const versions = versionsData?.versions || [];
-  const currentVersion = versions.find((v: Version) => v.is_current);
 
   // Create version mutation
   const createVersionMutation = useMutation({
@@ -266,7 +264,7 @@ const VersionManager: React.FC<VersionManagerProps> = ({
                       {!selectedVersion.is_current && (
                         <button
                           onClick={() => handleRestoreVersion(selectedVersion)}
-                          disabled={restoreVersionMutation.isLoading}
+                          disabled={restoreVersionMutation.isPending}
                           className="flex items-center px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50"
                         >
                           <RotateCcw className="h-3 w-3 mr-1" />
@@ -276,7 +274,7 @@ const VersionManager: React.FC<VersionManagerProps> = ({
                       {!selectedVersion.is_current && (
                         <button
                           onClick={() => handleDeleteVersion(selectedVersion)}
-                          disabled={deleteVersionMutation.isLoading}
+                          disabled={deleteVersionMutation.isPending}
                           className="flex items-center px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 disabled:opacity-50"
                         >
                           <Trash2 className="h-3 w-3 mr-1" />
@@ -392,10 +390,10 @@ const VersionManager: React.FC<VersionManagerProps> = ({
                 </button>
                 <button
                   onClick={handleCreateVersion}
-                  disabled={createVersionMutation.isLoading}
+                  disabled={createVersionMutation.isPending}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
                 >
-                  {createVersionMutation.isLoading ? 'Creazione...' : 'Crea Versione'}
+                  {createVersionMutation.isPending ? 'Creazione...' : 'Crea Versione'}
                 </button>
               </div>
             </div>

@@ -36,7 +36,7 @@ const QUIZ_TYPES = [
 export default function QuizConfiguration({ onStartQuiz, onCancel }: QuizConfigurationProps) {
   const [participantName, setParticipantName] = useState('');
   const [participantSurname, setParticipantSurname] = useState('');
-  const [selectedQuizType, setSelectedQuizType] = useState<QuizConfig['quizType']>('name_to_class');
+  const [selectedQuizType, setSelectedQuizType] = useState<QuizConfigType['quizType']>('name_to_class');
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [timePerQuestion, setTimePerQuestion] = useState(30);
   const [availableUnits, setAvailableUnits] = useState<{[key: string]: number}>({});

@@ -14,8 +14,8 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
   const [currentPage, setCurrentPage] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showControls, setShowControls] = useState(true);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Cache per le slide renderizzate

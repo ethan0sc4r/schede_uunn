@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { groupsApi, navalUnitsApi } from '../services/api';
-import type { Group, CreateGroupRequest, NavalUnit } from '../types/index.ts';
+import type { Group, CreateGroupRequest } from '../types/index.ts';
 
 interface GroupModalProps {
   group?: Group | null;

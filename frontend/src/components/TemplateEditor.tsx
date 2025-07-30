@@ -455,7 +455,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
         )}
 
         {(element.type === 'logo' || element.type === 'silhouette' || element.type === 'flag') && (
-          <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300" style={element.style}>
+          <div className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-300" style={element.style as React.CSSProperties}>
             {element.image ? (
               <img 
                 src={getImageUrl(element.image)} 

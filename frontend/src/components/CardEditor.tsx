@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Save, X, Plus, Trash2, Eye, EyeOff, Upload, ZoomIn, ZoomOut, Settings, Move, RotateCcw } from 'lucide-react';
+import { Save, X, Plus, Trash2, Eye, EyeOff, Upload, ZoomIn, ZoomOut, Settings } from 'lucide-react';
 import type { NavalUnit, UnitCharacteristic } from '../types/index.ts';
 import { templatesApi } from '../services/api';
 
@@ -598,7 +598,7 @@ export default function CardEditor({ unit, onSave, onCancel }: CardEditorProps) 
           top: element.y,
           width: element.width,
           height: element.height,
-          ...element.style
+          ...(element.style as React.CSSProperties)
         }}
         onClick={(e) => {
           e.stopPropagation();
@@ -631,12 +631,12 @@ export default function CardEditor({ unit, onSave, onCancel }: CardEditorProps) 
                 value={element.content || ''}
                 onChange={(e) => updateElementContent(element.id, e.target.value)}
                 className="w-full h-full bg-transparent border-none outline-none resize-none"
-                style={element.style}
+                style={element.style as React.CSSProperties}
                 onClick={(e) => e.stopPropagation()}
                 autoFocus
               />
             ) : (
-              <div className="w-full h-full flex items-center" style={element.style}>
+              <div className="w-full h-full flex items-center" style={element.style as React.CSSProperties}>
                 {element.type === 'unit_name' ? cardState.name || '[NOME UNITÀ]' :
                  element.type === 'unit_class' ? cardState.unit_class || '[CLASSE UNITÀ]' :
                  element.content || 'Testo'}
@@ -647,7 +647,7 @@ export default function CardEditor({ unit, onSave, onCancel }: CardEditorProps) 
         
         {element.type === 'table' && (
           <div className="w-full h-full overflow-auto bg-white">
-            <table className="w-full border-collapse" style={element.style}>
+            <table className="w-full border-collapse" style={element.style as React.CSSProperties}>
               <tbody>
                 {(element as MobileElement).tableData?.map((row, rowIndex) => (
                   <tr key={rowIndex}>

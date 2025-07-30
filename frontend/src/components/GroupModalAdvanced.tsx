@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Search, Upload, Save, Plus, Grid, Clock, Settings } from 'lucide-react';
+import { X, Search, Upload, Save, Grid, Clock, Settings } from 'lucide-react';
 import type { Group, NavalUnit, PresentationConfig, CreateGroupRequest } from '../types/index.ts';
 
 interface GroupModalAdvancedProps {

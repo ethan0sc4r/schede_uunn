@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Download, Trash2, Copy } from 'lucide-react';
 import { templatesApi } from '../services/api';
 

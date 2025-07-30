@@ -21,7 +21,7 @@ export const useUndoRedo = <T>(
     { state: initialState, timestamp: Date.now() }
   ]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const debounceTimer = useRef<NodeJS.Timeout>();
+  const debounceTimer = useRef<number | undefined>(undefined);
   const lastSaveTime = useRef(Date.now());
 
   // Get current state
@@ -46,19 +46,19 @@ export const useUndoRedo = <T>(
       }
       
       debounceTimer.current = setTimeout(() => {
-        saveStateImmediate(newState, description, now);
+        saveStateImmediate(newState, now, description);
       }, debounceMs);
       
       return;
     }
     
-    saveStateImmediate(newState, description, now);
+    saveStateImmediate(newState, now, description);
   }, [debounceMs]);
 
   const saveStateImmediate = useCallback((
     newState: T, 
-    description?: string, 
-    timestamp: number
+    timestamp: number,
+    description?: string
   ) => {
     setHistory(prevHistory => {
       // Remove any history after current index (we're creating a new branch)

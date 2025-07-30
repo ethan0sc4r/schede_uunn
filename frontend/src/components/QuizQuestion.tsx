@@ -57,7 +57,7 @@ export default function QuizQuestion({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, imageX: 0, imageY: 0 });
   
   const imageRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   // Timer effect
   useEffect(() => {
