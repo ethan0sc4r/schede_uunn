@@ -907,38 +907,86 @@ async def delete_template(template_id: str, user: dict = Depends(get_current_use
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting template: {str(e)}")
 
+@app.post("/api/admin/cleanup-temp-files")
+async def manual_cleanup_temp_files(user: dict = Depends(get_current_user)):
+    """Manually trigger temp files cleanup (admin only)"""
+    if not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # Count files before cleanup
+        temp_dir = "./data/temp"
+        files_before = len([f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]) if os.path.exists(temp_dir) else 0
+        
+        # Run cleanup
+        cleanup_temp_files(max_age_hours=2)
+        
+        # Count files after cleanup
+        files_after = len([f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]) if os.path.exists(temp_dir) else 0
+        
+        return {
+            "message": "Temp files cleanup completed",
+            "files_before": files_before,
+            "files_after": files_after,
+            "files_removed": files_before - files_after
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during cleanup: {str(e)}")
+
 # Function to clean temporary files
-def cleanup_temp_files():
-    """Clean temporary files older than 1 day"""
+def cleanup_temp_files(max_age_hours=2):
+    """Clean temporary files older than specified hours (default 2 hours)"""
     temp_dir = "./data/temp"
     if not os.path.exists(temp_dir):
+        print(f"Temp directory {temp_dir} does not exist")
         return
     
     try:
         import time
         current_time = time.time()
-        one_day_ago = current_time - (24 * 60 * 60)  # 24 hours
+        max_age_seconds = max_age_hours * 60 * 60
+        cutoff_time = current_time - max_age_seconds
+        
+        total_files = 0
+        cleaned_files = 0
+        total_size = 0
         
         for filename in os.listdir(temp_dir):
             file_path = os.path.join(temp_dir, filename)
             if os.path.isfile(file_path):
+                total_files += 1
                 file_mtime = os.path.getmtime(file_path)
-                if file_mtime < one_day_ago:
+                file_size = os.path.getsize(file_path)
+                total_size += file_size
+                
+                if file_mtime < cutoff_time:
                     os.remove(file_path)
-                    print(f"🗑️ Cleaned up old temp file: {filename}")
+                    cleaned_files += 1
+                    print(f"🗑️ Cleaned up temp file: {filename} ({file_size} bytes)")
+        
+        if cleaned_files > 0:
+            print(f"✅ Cleanup completed: {cleaned_files}/{total_files} files removed")
+        else:
+            print(f"ℹ️ No files to clean. Total: {total_files} files ({total_size/1024:.1f} KB)")
+            
     except Exception as e:
-        print(f"Error cleaning temp files: {e}")
+        print(f"❌ Error cleaning temp files: {e}")
 
 def start_cleanup_scheduler():
-    """Start background thread for daily cleanup"""
+    """Start background thread for periodic cleanup"""
     def cleanup_loop():
+        # Initial cleanup at startup
+        print("🧹 Running initial temp file cleanup...")
+        cleanup_temp_files(max_age_hours=2)
+        
         while True:
-            time.sleep(24 * 60 * 60)  # Wait 24 hours
-            cleanup_temp_files()
+            # Clean every 2 hours
+            time.sleep(2 * 60 * 60)  # Wait 2 hours
+            cleanup_temp_files(max_age_hours=2)
     
     cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
     cleanup_thread.start()
-    print("Started daily temp file cleanup scheduler")
+    print("Started temp file cleanup scheduler (runs every 2 hours)")
 
 if __name__ == "__main__":
     # Initialize database

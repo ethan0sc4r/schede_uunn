@@ -15,6 +15,7 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Cache per le slide renderizzate
@@ -190,6 +191,12 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
 
   // Handle closing
   const handleClose = async () => {
+    // Clear timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    
     if (isFullscreen) {
       await exitFullscreen();
     }
@@ -208,6 +215,10 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
   // Cleanup della cache quando il componente viene smontato
   useEffect(() => {
     return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       slideCache.forEach(url => URL.revokeObjectURL(url));
       currentSlideUrls.forEach(url => URL.revokeObjectURL(url));
     };
@@ -310,42 +321,55 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     };
   }, [isOpen]);
 
-  // Timer logic - più stabile
+  // Timer management
   useEffect(() => {
-    if (!isPlaying || !isOpen) return;
-
-    const interval = setInterval(() => {
-      setTimeRemaining(prev => {
-        const newTime = prev - 1;
-        if (newTime <= 0) {
-          // Auto advance
-          if (config.mode === 'single') {
-            setCurrentIndex(prevIndex => (prevIndex + 1) % units.length);
-          } else {
-            setCurrentPage(prevPage => (prevPage + 1) % totalPages);
-          }
-          // Reset timer for next slide
-          const durationSeconds = config.mode === 'single' 
-            ? (config.interval || 5)
-            : (config.page_duration || 10);
-          return durationSeconds;
-        }
-        return newTime;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, isOpen]);
-
-  // Reset timer when slide changes manually
-  useEffect(() => {
-    if (isPlaying && isOpen) {
-      const durationSeconds = config.mode === 'single' 
-        ? (config.interval || 5)
-        : (config.page_duration || 10);
-      setTimeRemaining(durationSeconds);
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-  }, [currentIndex, currentPage, config.mode, config.interval, config.page_duration, isPlaying, isOpen]);
+
+    if (!isOpen || !isPlaying) {
+      setTimeRemaining(0);
+      return;
+    }
+
+    // Set initial time
+    const durationSeconds = config.mode === 'single' 
+      ? (config.interval || 5)
+      : (config.page_duration || 10);
+    
+    setTimeRemaining(durationSeconds);
+
+    let currentTime = durationSeconds;
+    
+    const countdown = () => {
+      if (currentTime <= 0) {
+        // Auto advance to next slide
+        if (config.mode === 'single') {
+          setCurrentIndex(prev => (prev + 1) % units.length);
+        } else {
+          setCurrentPage(prev => (prev + 1) % totalPages);
+        }
+        return;
+      }
+      
+      setTimeRemaining(currentTime);
+      currentTime--;
+      
+      timerRef.current = setTimeout(countdown, 1000);
+    };
+    
+    countdown();
+
+    // Cleanup function
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isOpen, isPlaying, currentIndex, currentPage, config.mode, config.interval, config.page_duration, units.length, totalPages]);
 
   const handlePlay = () => setIsPlaying(true);
   const handlePause = () => setIsPlaying(false);
@@ -356,9 +380,7 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     } else {
       setCurrentPage(prev => (prev + 1) % totalPages);
     }
-    // Reset timer
-    const duration = config.mode === 'single' ? (config.interval || 5) : (config.page_duration || 10);
-    setTimeRemaining(duration);
+    // Timer will reset automatically via useEffect
   };
 
   const handlePrevious = () => {
@@ -367,9 +389,7 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     } else {
       setCurrentPage(prev => (prev - 1 + totalPages) % totalPages);
     }
-    // Reset timer
-    const duration = config.mode === 'single' ? (config.interval || 5) : (config.page_duration || 10);
-    setTimeRemaining(duration);
+    // Timer will reset automatically via useEffect
   };
 
   // Trigger slide loading when needed

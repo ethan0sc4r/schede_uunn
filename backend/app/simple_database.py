@@ -109,12 +109,20 @@ def init_database():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 group_id INTEGER NOT NULL,
                 naval_unit_id INTEGER NOT NULL,
+                order_index INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (group_id) REFERENCES groups (id) ON DELETE CASCADE,
                 FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE,
                 UNIQUE(group_id, naval_unit_id)
             )
         ''')
+        
+        # Add order_index column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute('ALTER TABLE group_memberships ADD COLUMN order_index INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
         
         # Templates table
         cursor.execute('''
@@ -421,13 +429,13 @@ class SimpleDatabase:
             ''', (name, description, created_by))
             group_id = cursor.lastrowid
             
-            # Add naval unit memberships
-            for unit_id in naval_unit_ids:
+            # Add naval unit memberships with order
+            for order_index, unit_id in enumerate(naval_unit_ids):
                 try:
                     cursor.execute('''
-                        INSERT INTO group_memberships (group_id, naval_unit_id)
-                        VALUES (?, ?)
-                    ''', (group_id, unit_id))
+                        INSERT INTO group_memberships (group_id, naval_unit_id, order_index)
+                        VALUES (?, ?, ?)
+                    ''', (group_id, unit_id, order_index))
                 except Exception as e:
                     if "UNIQUE constraint failed" in str(e):
                         continue  # Skip duplicates
@@ -450,11 +458,12 @@ class SimpleDatabase:
             for group_row in cursor.fetchall():
                 group = dict(group_row)
                 
-                # Get naval units for this group
+                # Get naval units for this group in order
                 cursor.execute('''
                     SELECT nu.* FROM naval_units nu
                     JOIN group_memberships gm ON nu.id = gm.naval_unit_id
                     WHERE gm.group_id = ?
+                    ORDER BY gm.order_index ASC
                 ''', (group['id'],))
                 group['naval_units'] = [dict(row) for row in cursor.fetchall()]
                 
@@ -476,11 +485,12 @@ class SimpleDatabase:
             
             group = dict(group_row)
             
-            # Get naval units for this group
+            # Get naval units for this group in order
             cursor.execute('''
                 SELECT nu.* FROM naval_units nu
                 JOIN group_memberships gm ON nu.id = gm.naval_unit_id
                 WHERE gm.group_id = ?
+                ORDER BY gm.order_index ASC
             ''', (group_id,))
             
             naval_units = []
@@ -524,12 +534,12 @@ class SimpleDatabase:
                 # Remove existing memberships
                 cursor.execute('DELETE FROM group_memberships WHERE group_id = ?', (group_id,))
                 
-                # Add new memberships
-                for unit_id in naval_unit_ids:
+                # Add new memberships with order
+                for order_index, unit_id in enumerate(naval_unit_ids):
                     cursor.execute('''
-                        INSERT INTO group_memberships (group_id, naval_unit_id)
-                        VALUES (?, ?)
-                    ''', (group_id, unit_id))
+                        INSERT INTO group_memberships (group_id, naval_unit_id, order_index)
+                        VALUES (?, ?, ?)
+                    ''', (group_id, unit_id, order_index))
             
             conn.commit()
             return cursor.rowcount > 0 or naval_unit_ids is not None
