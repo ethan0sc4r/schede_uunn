@@ -519,7 +519,17 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         const savedElements = allElementStates[newTemplateId].map((el, index) => {
           const newEl = { ...el };
           
+          // Find corresponding template element to ensure we always have template styles
+          const templateElement = template.elements.find(tEl => tEl.type === el.type);
+          
           console.log(`   Element ${index}: ${el.type} (${el.id})`);
+          
+          // IMPORTANT: Always apply template styles even to saved elements
+          // This ensures that any style changes in the template are reflected
+          if (templateElement?.style) {
+            newEl.style = { ...templateElement.style, ...el.style };
+            console.log(`     → Applied template styles merged with saved:`, newEl.style);
+          }
           
           // FORCE database images - NEVER use template or saved images
           if (el.type === 'logo') {
@@ -579,7 +589,14 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             console.log(`     → Preserved content: ${newEl.content || 'table data'}`);
           }
           
-          // Update unit name and class if we have unit data
+          // IMPORTANT: Always use template styles for all elements including unit_name and unit_class
+          // This ensures that font size, color, family etc. are inherited from template
+          if (el.style) {
+            newEl.style = { ...el.style };
+            console.log(`     → Applied template styles:`, el.style);
+          }
+          
+          // Update unit name and class if we have unit data (but keep template styles)
           if (el.type === 'unit_name' && unit?.name) {
             newEl.content = unit.name;
             console.log(`     → Unit name from database: ${newEl.content}`);

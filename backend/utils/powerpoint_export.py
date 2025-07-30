@@ -30,24 +30,50 @@ def create_unit_powerpoint(unit_data: Dict[str, Any], output_path: str, template
         prs = Presentation()
         
         # Apply template configuration if provided
+        print(f"🔍 Template config received: {template_config}")
+        
         if template_config:
             canvas_width = template_config.get('canvasWidth', 1123)
             canvas_height = template_config.get('canvasHeight', 794)
             
+            print(f"📏 Canvas dimensions from template: {canvas_width} x {canvas_height}")
+            
             # Convert canvas dimensions to PowerPoint slide dimensions
-            # Assuming 96 DPI for canvas and converting to inches
-            slide_width_inches = canvas_width / 96.0
-            slide_height_inches = canvas_height / 96.0
+            # PowerPoint works better with direct pixel to inch conversion
+            # Use a scale that makes the slide match the exact canvas size
+            pixels_per_inch = 72.0  # PowerPoint standard
+            slide_width_inches = canvas_width / pixels_per_inch
+            slide_height_inches = canvas_height / pixels_per_inch
+            
+            print(f"📏 Calculated slide dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
             
             prs.slide_width = Inches(slide_width_inches)
             prs.slide_height = Inches(slide_height_inches)
             
-            print(f"Applied template dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
+            print(f"✅ Applied template dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
         else:
-            # Default to 16:9 widescreen
-            prs.slide_width = Inches(13.33)
-            prs.slide_height = Inches(7.5)
-            print(f"Using default widescreen dimensions")
+            print("⚠️ No template config provided, using default")
+            # Try to get canvas config from unit data
+            unit_layout = unit_data.get('layout_config', {})
+            if unit_layout:
+                canvas_width = unit_layout.get('canvasWidth', 1123)
+                canvas_height = unit_layout.get('canvasHeight', 794)
+                
+                print(f"📏 Using unit layout dimensions: {canvas_width} x {canvas_height}")
+                
+                pixels_per_inch = 72.0  # PowerPoint standard
+                slide_width_inches = canvas_width / pixels_per_inch
+                slide_height_inches = canvas_height / pixels_per_inch
+                
+                prs.slide_width = Inches(slide_width_inches)
+                prs.slide_height = Inches(slide_height_inches)
+                
+                print(f"✅ Applied unit layout dimensions: {slide_width_inches:.2f}\" x {slide_height_inches:.2f}\"")
+            else:
+                # Default to 16:9 widescreen
+                prs.slide_width = Inches(13.33)
+                prs.slide_height = Inches(7.5)
+                print(f"⚠️ Using default widescreen dimensions: 13.33\" x 7.5\"")
         
         # Create the unit slide
         slide = _create_unit_slide(prs, unit_data, {})
@@ -390,8 +416,55 @@ def _add_element_to_slide(slide: Any, element: Dict[str, Any], unit: Dict[str, A
                     
                     try:
                         print(f"Adding {element_type} image to slide: {actual_image_path}")
-                        slide.shapes.add_picture(actual_image_path, x, y, width, height)
-                        print(f"Successfully added {element_type} image")
+                        print(f"Target dimensions: {width} x {height} at position ({x}, {y})")
+                        
+                        # Get image dimensions first using PIL to calculate proper aspect ratio
+                        try:
+                            with PILImage.open(actual_image_path) as img:
+                                img_width, img_height = img.size
+                                print(f"Original image size: {img_width} x {img_height}")
+                                
+                                # Calculate aspect ratios
+                                img_aspect = img_width / img_height
+                                target_aspect = width / height
+                                
+                                print(f"Image aspect: {img_aspect:.3f}, Target aspect: {target_aspect:.3f}")
+                                
+                                # Calculate final dimensions maintaining aspect ratio
+                                if img_aspect > target_aspect:
+                                    # Image is wider than target - fit to width
+                                    final_width = width
+                                    final_height = width / img_aspect
+                                else:
+                                    # Image is taller than target - fit to height
+                                    final_height = height
+                                    final_width = height * img_aspect
+                                
+                                # Center the image
+                                final_x = x + (width - final_width) / 2
+                                final_y = y + (height - final_height) / 2
+                                
+                                print(f"Final dimensions: {final_width} x {final_height} at ({final_x}, {final_y})")
+                                
+                                # Add image with calculated dimensions
+                                picture = slide.shapes.add_picture(actual_image_path, final_x, final_y, final_width, final_height)
+                                print(f"Successfully added {element_type} image with proper aspect ratio")
+                                
+                        except Exception as pil_error:
+                            print(f"PIL processing failed: {pil_error}, using fallback method")
+                            import traceback
+                            traceback.print_exc()
+                            # Fallback: add image at original size and position
+                            try:
+                                picture = slide.shapes.add_picture(actual_image_path, x, y, width, height)
+                                print(f"Added {element_type} image with fallback method")
+                            except Exception as fallback_error:
+                                print(f"Fallback also failed: {fallback_error}")
+                                # Last resort: create placeholder text
+                                text_box = slide.shapes.add_textbox(x, y, width, height)
+                                text_frame = text_box.text_frame
+                                text_frame.text = f"[{element_type.upper()}]"
+                                print(f"Created text placeholder for {element_type}")
                         
                         # Clean up temporary files
                         for temp_file in temp_files_to_cleanup:
@@ -415,10 +488,47 @@ def _add_element_to_slide(slide: Any, element: Dict[str, Any], unit: Dict[str, A
                         text_frame.text = f"[{element_type.upper()}]"
                 else:
                     print(f"Could not get image for {element_type}: {image_path}")
-                    # Add placeholder text if file doesn't exist
+                    
+                    # For silhouettes, try to find in unit data
+                    if element_type == 'silhouette' and unit:
+                        # Try unit.silhouette_path
+                        unit_silhouette = unit.get('silhouette_path')
+                        if unit_silhouette:
+                            print(f"🔍 Trying unit silhouette_path: {unit_silhouette}")
+                            actual_image_path_alt = _get_image_path(unit_silhouette)
+                            if actual_image_path_alt:
+                                try:
+                                    picture = slide.shapes.add_picture(actual_image_path_alt, x, y, width, height)
+                                    print(f"✅ Added silhouette from unit.silhouette_path")
+                                    return  # Success, exit function
+                                except Exception as alt_error:
+                                    print(f"❌ Failed to add unit silhouette: {alt_error}")
+                    
+                    # Add placeholder text if all methods fail
                     text_box = slide.shapes.add_textbox(x, y, width, height)
                     text_frame = text_box.text_frame
                     text_frame.text = f"[{element_type.upper()}]"
+                    
+                    # Style the placeholder better
+                    text_frame.margin_left = Inches(0.1)
+                    text_frame.margin_right = Inches(0.1)
+                    text_frame.margin_top = Inches(0.1)
+                    text_frame.margin_bottom = Inches(0.1)
+                    
+                    paragraph = text_frame.paragraphs[0]
+                    paragraph.alignment = PP_ALIGN.CENTER
+                    font = paragraph.font
+                    font.size = Pt(12)
+                    font.bold = True
+                    font.color.rgb = RGBColor(128, 128, 128)  # Gray color
+                    
+                    # Add border to placeholder
+                    text_box.line.color.rgb = RGBColor(200, 200, 200)
+                    text_box.line.width = Pt(1)
+                    text_box.fill.solid()
+                    text_box.fill.fore_color.rgb = RGBColor(245, 245, 245)  # Light gray background
+                    
+                    print(f"Created styled placeholder for {element_type} - image file missing: {image_path}")
             except Exception as e:
                 print(f"Exception processing {element_type} image: {e}")
                 # Clean up temporary files on error
@@ -513,10 +623,18 @@ def _download_image(image_url: str) -> Optional[str]:
         if '.' in image_url.split('/')[-1]:
             file_ext = '.' + image_url.split('.')[-1].split('?')[0]  # Remove query params
         
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-            tmp_file.write(response.content)
-            temp_path = tmp_file.name
+        # Create temporary file in server directory
+        temp_dir = "./data/temp"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Generate unique filename
+        import uuid
+        temp_filename = f"download_{uuid.uuid4().hex}{file_ext}"
+        temp_path = os.path.join(temp_dir, temp_filename)
+        
+        # Write downloaded content
+        with open(temp_path, 'wb') as f:
+            f.write(response.content)
         
         print(f"Image downloaded successfully to: {temp_path}")
         return temp_path
@@ -527,28 +645,100 @@ def _download_image(image_url: str) -> Optional[str]:
 
 def _get_image_path(image_path: str) -> Optional[str]:
     """Get the correct image path, downloading remote images if needed"""
+    print(f"🔍 _get_image_path called with: {image_path}")
+    
     if not image_path:
+        print("❌ Empty image_path provided")
         return None
+    
+    # If it's base64 data, convert to temporary file
+    if image_path.startswith('data:image/'):
+        print(f"🔄 Converting base64 image to temporary file")
+        return _convert_base64_to_temp_file(image_path)
     
     # If it's an HTTP URL, download it
     if image_path.startswith('http://') or image_path.startswith('https://'):
+        print(f"📥 Downloading remote image: {image_path}")
         return _download_image(image_path)
     
     # Handle local file paths
     if image_path.startswith('/api/static/'):
         local_path = image_path.replace('/api/static/', './data/uploads/')
+        print(f"🔄 Converted /api/static/ path: {image_path} -> {local_path}")
     elif image_path.startswith('../data/uploads/'):
         local_path = image_path.replace('../data/uploads/', './data/uploads/')
+        print(f"🔄 Converted ../ path: {image_path} -> {local_path}")
     elif not image_path.startswith('./data/uploads/'):
         local_path = f"./data/uploads/{image_path}"
+        print(f"🔄 Added data/uploads prefix: {image_path} -> {local_path}")
     else:
         local_path = image_path
+        print(f"✅ Using path as-is: {local_path}")
     
     # Check if local file exists
+    print(f"🔍 Checking if file exists: {local_path}")
     if os.path.exists(local_path):
+        print(f"✅ File found: {local_path}")
         return local_path
     else:
-        print(f"Local image file not found: {local_path}")
+        print(f"❌ Local image file not found: {local_path}")
+        
+        # Try different path variations
+        variations = [
+            image_path,
+            os.path.join('./data/uploads', os.path.basename(image_path)),
+            os.path.join('./data/uploads/silhouettes', os.path.basename(image_path)),
+            os.path.join('./data/uploads/logos', os.path.basename(image_path)),
+            os.path.join('./data/uploads/flags', os.path.basename(image_path))
+        ]
+        
+        for variation in variations:
+            print(f"🔍 Trying variation: {variation}")
+            if os.path.exists(variation):
+                print(f"✅ Found at variation: {variation}")
+                return variation
+        
+        print(f"❌ No variations found for: {image_path}")
+        return None
+
+def _convert_base64_to_temp_file(base64_data: str) -> Optional[str]:
+    """Convert base64 image data to temporary file"""
+    try:
+        print(f"🔄 Converting base64 to temp file")
+        
+        # Extract the base64 data
+        if ',' in base64_data:
+            header, data = base64_data.split(',', 1)
+            # Extract format from header (e.g., data:image/png;base64)
+            if 'image/' in header:
+                image_format = header.split('image/')[1].split(';')[0]
+            else:
+                image_format = 'png'  # default
+        else:
+            data = base64_data
+            image_format = 'png'
+        
+        # Decode base64
+        image_data = base64.b64decode(data)
+        
+        # Create temporary file in server directory
+        temp_dir = "./data/temp"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Generate unique filename
+        import uuid
+        temp_filename = f"img_{uuid.uuid4().hex}.{image_format}"
+        temp_path = os.path.join(temp_dir, temp_filename)
+        
+        # Write image data
+        with open(temp_path, 'wb') as f:
+            f.write(image_data)
+        
+        print(f"✅ Base64 converted to temp file: {temp_path}")
+        return temp_path
+        
+    except Exception as e:
+        print(f"❌ Failed to convert base64 to temp file: {e}")
         return None
 
 def _hex_to_rgb(hex_color: str):

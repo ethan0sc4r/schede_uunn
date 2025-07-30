@@ -650,6 +650,211 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                     </div>
                   </div>
 
+                  {(element.type === 'unit_name' || element.type === 'unit_class') && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {element.type === 'unit_name' ? 'Testo Nome Unità' : 'Testo Classe Unità'}
+                        </label>
+                        <textarea
+                          value={element.content || ''}
+                          onChange={(e) => handleTextEdit(element.id, e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          rows={2}
+                          placeholder={element.type === 'unit_name' ? '[NOME UNITÀ]' : '[CLASSE]'}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Carattere</label>
+                        <select
+                          value={element.style?.fontFamily || 'Arial'}
+                          onChange={(e) => setElements(prev => prev.map(el => 
+                            el.id === selectedElement 
+                              ? { ...el, style: { ...el.style, fontFamily: e.target.value } }
+                              : el
+                          ))}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="Arial">Arial</option>
+                          <option value="Helvetica">Helvetica</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Georgia">Georgia</option>
+                          <option value="Verdana">Verdana</option>
+                          <option value="Courier New">Courier New</option>
+                          <option value="Impact">Impact</option>
+                          <option value="Comic Sans MS">Comic Sans MS</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Dimensione</label>
+                          <input
+                            type="number"
+                            min="8"
+                            max="72"
+                            value={element.style?.fontSize || 16}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, fontSize: parseInt(e.target.value) || 16 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                          <input
+                            type="color"
+                            value={element.style?.color || '#000000'}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, color: e.target.value } }
+                              : el
+                            ))}
+                            className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Formato</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontWeight: el.style?.fontWeight === 'bold' ? 'normal' : 'bold' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm font-bold border rounded transition-colors ${
+                              element.style?.fontWeight === 'bold'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            B
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      fontStyle: el.style?.fontStyle === 'italic' ? 'normal' : 'italic' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm italic border rounded transition-colors ${
+                              element.style?.fontStyle === 'italic'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            I
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { 
+                                    ...el, 
+                                    style: { 
+                                      ...el.style, 
+                                      textDecoration: el.style?.textDecoration === 'underline' ? 'none' : 'underline' 
+                                    } 
+                                  }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm underline border rounded transition-colors ${
+                              element.style?.textDecoration === 'underline'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            U
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Allineamento</label>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'left' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'left' || !element.style?.textAlign
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ⇤
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'center' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'center'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ↔
+                          </button>
+                          <button
+                            onClick={() => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, textAlign: 'right' } }
+                                : el
+                            ))}
+                            className={`px-3 py-1 text-sm border rounded transition-colors ${
+                              element.style?.textAlign === 'right'
+                                ? 'bg-blue-500 text-white border-blue-500'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            ⇥
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Border Radius for Unit Name/Class */}
+                      <div className="pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Arrotondamento</h4>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Bordo Arrotondato (px)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={element.style?.borderRadius || 0}
+                            onChange={(e) => setElements(prev => prev.map(el => 
+                              el.id === selectedElement 
+                                ? { ...el, style: { ...el.style, borderRadius: parseInt(e.target.value) || 0 } }
+                                : el
+                            ))}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {element.type === 'text' && (
                     <>
                       <div>

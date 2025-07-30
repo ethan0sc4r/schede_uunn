@@ -108,7 +108,17 @@ export default function UnitView() {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
       
-      const finalTemplateConfig = templateConfig || unit.layout_config || null;
+      // Extract only canvas properties for template config
+    let finalTemplateConfig = templateConfig;
+    if (!finalTemplateConfig && unit.layout_config) {
+      finalTemplateConfig = {
+        canvasWidth: unit.layout_config.canvasWidth,
+        canvasHeight: unit.layout_config.canvasHeight,
+        canvasBackground: unit.layout_config.canvasBackground,
+        canvasBorderWidth: unit.layout_config.canvasBorderWidth,
+        canvasBorderColor: unit.layout_config.canvasBorderColor
+      };
+    }
       console.log('🔍 PowerPoint export starting from View:', {
         unitId: unit.id,
         apiUrl: `${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`,

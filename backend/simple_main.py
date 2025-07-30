@@ -17,6 +17,8 @@ import tempfile
 from app.simple_database import SimpleDatabase, init_database
 from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint
 from api.quiz import router as quiz_router
+import threading
+import time
 
 app = FastAPI(
     title="Naval Units Management System",
@@ -44,6 +46,27 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Custom middleware to add CORS headers to static files
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+class StaticFilesCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Add CORS headers for static files (images)
+        if request.url.path.startswith("/api/static/"):
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+            response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
+        
+        return response
+
+app.add_middleware(StaticFilesCORSMiddleware)
+
 # Create data and uploads directories if they don't exist
 os.makedirs("./data", exist_ok=True)
 UPLOAD_DIR = "./data/uploads"
@@ -51,6 +74,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Static files for uploaded images
 app.mount("/api/static", StaticFiles(directory=UPLOAD_DIR), name="static")
+
+# Additional static file routes for direct access (for compatibility)
+app.mount("/silhouettes", StaticFiles(directory=os.path.join(UPLOAD_DIR, "silhouettes")), name="silhouettes")
+app.mount("/logos", StaticFiles(directory=os.path.join(UPLOAD_DIR, "logos")), name="logos")
+app.mount("/flags", StaticFiles(directory=os.path.join(UPLOAD_DIR, "flags")), name="flags")
 
 # Security
 security = HTTPBearer()
@@ -364,9 +392,14 @@ async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict =
         
         print(f"Unit found: {unit['name']}")
         
-        # Create temporary file for PowerPoint
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
-            output_path = tmp_file.name
+        # Create temporary file for PowerPoint in server directory
+        temp_dir = "./data/temp"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Generate unique filename
+        import uuid
+        temp_filename = f"ppt_{uuid.uuid4().hex}.pptx"
+        output_path = os.path.join(temp_dir, temp_filename)
         
         print(f"Temporary file created: {output_path}")
         print(f"Template config: {template_config}")
@@ -589,9 +622,14 @@ async def export_group_powerpoint(group_id: int, user: dict = Depends(get_curren
         
         print(f"Group data prepared for export")
         
-        # Create temporary file for PowerPoint
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
-            output_path = tmp_file.name
+        # Create temporary file for PowerPoint in server directory
+        temp_dir = "./data/temp"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Generate unique filename
+        import uuid
+        temp_filename = f"ppt_{uuid.uuid4().hex}.pptx"
+        output_path = os.path.join(temp_dir, temp_filename)
         
         print(f"Temporary file created: {output_path}")
         
@@ -769,8 +807,45 @@ async def delete_template(template_id: str, user: dict = Depends(get_current_use
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting template: {str(e)}")
 
+# Function to clean temporary files
+def cleanup_temp_files():
+    """Clean temporary files older than 1 day"""
+    temp_dir = "./data/temp"
+    if not os.path.exists(temp_dir):
+        return
+    
+    try:
+        import time
+        current_time = time.time()
+        one_day_ago = current_time - (24 * 60 * 60)  # 24 hours
+        
+        for filename in os.listdir(temp_dir):
+            file_path = os.path.join(temp_dir, filename)
+            if os.path.isfile(file_path):
+                file_mtime = os.path.getmtime(file_path)
+                if file_mtime < one_day_ago:
+                    os.remove(file_path)
+                    print(f"🗑️ Cleaned up old temp file: {filename}")
+    except Exception as e:
+        print(f"Error cleaning temp files: {e}")
+
+def start_cleanup_scheduler():
+    """Start background thread for daily cleanup"""
+    def cleanup_loop():
+        while True:
+            time.sleep(24 * 60 * 60)  # Wait 24 hours
+            cleanup_temp_files()
+    
+    cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
+    cleanup_thread.start()
+    print("🧹 Started daily temp file cleanup scheduler")
+
 if __name__ == "__main__":
     # Initialize database
     init_database()
+    
+    # Start cleanup scheduler
+    start_cleanup_scheduler()
+    
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8001)

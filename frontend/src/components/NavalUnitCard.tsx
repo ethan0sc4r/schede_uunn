@@ -64,12 +64,26 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
         templateConfig
       });
       
+      // Extract only canvas properties for template config
+      let finalTemplateConfig = templateConfig;
+      if (!finalTemplateConfig && unit.layout_config) {
+        finalTemplateConfig = {
+          canvasWidth: unit.layout_config.canvasWidth,
+          canvasHeight: unit.layout_config.canvasHeight,
+          canvasBackground: unit.layout_config.canvasBackground,
+          canvasBorderWidth: unit.layout_config.canvasBorderWidth,
+          canvasBorderColor: unit.layout_config.canvasBorderColor
+        };
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/powerpoint`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(templateConfig)
+        body: JSON.stringify({
+          template_config: finalTemplateConfig
+        })
       });
 
       if (!response.ok) {
