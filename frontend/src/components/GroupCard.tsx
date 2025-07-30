@@ -61,8 +61,8 @@ export default function GroupCard({ group, onEdit, onDelete, onPresentation, onE
           
           {group.naval_units && group.naval_units.length > 0 && (
             <div className="space-y-1">
-              {group.naval_units.slice(0, 3).map((unit) => (
-                <div key={unit.id} className="text-xs text-gray-600">
+              {group.naval_units.slice(0, 3).map((unit, index) => (
+                <div key={`${unit.id}-${index}`} className="text-xs text-gray-600">
                   • {unit.name} ({unit.unit_class})
                 </div>
               ))}

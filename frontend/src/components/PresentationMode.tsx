@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Pause, SkipForward, SkipBack, X, Grid, Clock, Settings } from 'lucide-react';
 import type { Group, NavalUnit, PresentationConfig } from '../types/index.ts';
 
@@ -14,8 +14,17 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
   const [currentPage, setCurrentPage] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showControls, setShowControls] = useState(true);
-  const [controlsTimeout, setControlsTimeout] = useState<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Cache per le slide renderizzate
+  const [slideCache, setSlideCache] = useState<Map<number, string>>(new Map());
+  const [renderingQueue, setRenderingQueue] = useState<Set<number>>(new Set());
+  const [isLoadingSlide, setIsLoadingSlide] = useState(false);
+  
+  // Stato per tenere traccia delle slide correnti
+  const [currentSlideUrls, setCurrentSlideUrls] = useState<Map<number, string>>(new Map());
+  const [slideErrors, setSlideErrors] = useState<Set<number>>(new Set());
 
   const config = group.presentation_config || {
     mode: 'single',
@@ -29,6 +38,87 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
   const units = group.naval_units || [];
   const unitsPerPage = config.mode === 'grid' ? (config.grid_rows || 3) * (config.grid_cols || 3) : 1;
   const totalPages = Math.ceil(units.length / unitsPerPage);
+
+
+  // Funzione per renderizzare una slide specifica
+  const renderSlide = async (unitId: number): Promise<string> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+        const response = await fetch(`${API_BASE_URL}/api/groups/${group.id}/presentation/slide/${unitId}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to render slide: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        resolve(imageUrl);
+      } catch (error) {
+        console.error(`Error rendering slide for unit ${unitId}:`, error);
+        reject(error);
+      }
+    });
+  };
+
+  // Funzione per pre-renderizzare la prossima slide in modo asincrono
+  const preRenderNextSlide = async (currentIdx: number) => {
+    const nextIdx = (currentIdx + 1) % units.length;
+    const nextUnitId = units[nextIdx]?.id;
+    
+    if (!nextUnitId || slideCache.has(nextUnitId) || renderingQueue.has(nextUnitId)) {
+      return; // Già in cache o in rendering
+    }
+    
+    // Aggiungi alla coda di rendering
+    setRenderingQueue(prev => new Set(prev).add(nextUnitId));
+    
+    try {
+      const imageUrl = await renderSlide(nextUnitId);
+      
+      // Salva nella cache
+      setSlideCache(prev => {
+        const newCache = new Map(prev);
+        newCache.set(nextUnitId, imageUrl);
+        return newCache;
+      });
+    } catch (error) {
+      console.error(`Failed to pre-render slide for unit ${nextUnitId}:`, error);
+    } finally {
+      // Rimuovi dalla coda di rendering
+      setRenderingQueue(prev => {
+        const newQueue = new Set(prev);
+        newQueue.delete(nextUnitId);
+        return newQueue;
+      });
+    }
+  };
+
+  // Funzione per ottenere la slide corrente (dalla cache o renderizzarla)
+  const getCurrentSlideUrl = async (unitId: number): Promise<string> => {
+    // Controlla se è già in cache
+    if (slideCache.has(unitId)) {
+      return slideCache.get(unitId)!;
+    }
+    
+    // Se non è in cache, renderizzala ora
+    setIsLoadingSlide(true);
+    
+    try {
+      const imageUrl = await renderSlide(unitId);
+      
+      // Salva nella cache
+      setSlideCache(prev => {
+        const newCache = new Map(prev);
+        newCache.set(unitId, imageUrl);
+        return newCache;
+      });
+      
+      return imageUrl;
+    } finally {
+      setIsLoadingSlide(false);
+    }
+  };
 
   // Fullscreen functions
   const enterFullscreen = async () => {
@@ -71,15 +161,70 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     if (isOpen && !isFullscreen) {
       enterFullscreen();
     }
-  }, [isOpen]);
+  }, [isOpen, isFullscreen]);
+
+  // Pre-render next slide when current slide is ready
+  useEffect(() => {
+    if (!isOpen || units.length === 0) return;
+
+    const currentUnit = units[currentIndex];
+    if (!currentUnit) return;
+
+    // Pre-render next slide with delay
+    const timer = setTimeout(() => {
+      preRenderNextSlide(currentIndex);
+    }, 1000); // Wait 1 second before pre-rendering next
+
+    return () => clearTimeout(timer);
+  }, [isOpen, currentIndex, units]);
+
+  // Pre-render next slide when timer is about to expire
+  useEffect(() => {
+    if (!isPlaying || !isOpen || units.length === 0) return;
+
+    // Pre-render next slide when 2 seconds remain
+    if (timeRemaining === 2) {
+      preRenderNextSlide(currentIndex);
+    }
+  }, [timeRemaining, isPlaying, isOpen, currentIndex, units.length]);
 
   // Handle closing
   const handleClose = async () => {
     if (isFullscreen) {
       await exitFullscreen();
     }
+    
+    // Pulisci la cache quando chiudi la presentazione
+    slideCache.forEach(url => URL.revokeObjectURL(url));
+    currentSlideUrls.forEach(url => URL.revokeObjectURL(url));
+    setSlideCache(new Map());
+    setCurrentSlideUrls(new Map());
+    setSlideErrors(new Set());
+    setRenderingQueue(new Set());
+    
     onClose();
   };
+
+  // Cleanup della cache quando il componente viene smontato
+  useEffect(() => {
+    return () => {
+      slideCache.forEach(url => URL.revokeObjectURL(url));
+      currentSlideUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // Cleanup quando la presentazione viene chiusa (non durante il loop)
+  useEffect(() => {
+    if (!isOpen) {
+      // Pulisci la cache solo quando la presentazione viene effettivamente chiusa
+      slideCache.forEach(url => URL.revokeObjectURL(url));
+      currentSlideUrls.forEach(url => URL.revokeObjectURL(url));
+      setSlideCache(new Map());
+      setCurrentSlideUrls(new Map());
+      setSlideErrors(new Set());
+      setRenderingQueue(new Set());
+    }
+  }, [isOpen]);
 
   // Get current units to display
   const getCurrentUnits = useCallback(() => {
@@ -91,30 +236,37 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     }
   }, [config.mode, currentIndex, currentPage, units, unitsPerPage]);
 
-  // Controls auto-hide logic (only when not in fullscreen)
-  const resetControlsTimeout = useCallback(() => {
-    if (controlsTimeout) {
-      clearTimeout(controlsTimeout);
-    }
-    setShowControls(true);
-    
-    // Don't auto-hide in fullscreen
-    if (!isFullscreen) {
-      const timeout = setTimeout(() => {
-        setShowControls(false);
-      }, 3000); // Hide after 3 seconds
-      setControlsTimeout(timeout);
-    }
-  }, [controlsTimeout, isFullscreen]);
 
   // Show controls on mouse movement and keyboard shortcuts
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleMouseMove = () => {
-      resetControlsTimeout();
+      setShowControls(true);
+      
+      // Clear existing timeout
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      
+      // Auto-hide controls after 1 second
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 1000);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      resetControlsTimeout();
+      setShowControls(true);
+      
+      // Clear existing timeout
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+      
+      // Auto-hide controls after 1 second
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 1000);
       
       switch (e.key) {
         case 'ArrowRight':
@@ -129,7 +281,7 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
         case 'p':
         case 'P':
           e.preventDefault();
-          isPlaying ? handlePause() : handlePlay();
+          setIsPlaying(prev => !prev);
           break;
         case 'Escape':
           e.preventDefault();
@@ -138,48 +290,62 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('keydown', handleKeyDown);
-      resetControlsTimeout(); // Initial timeout
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('keydown', handleKeyDown);
-        if (controlsTimeout) {
-          clearTimeout(controlsTimeout);
-        }
-      };
-    }
-  }, [isOpen, resetControlsTimeout, isPlaying]);
+    // Add event listeners to the document
+    document.addEventListener('mousemove', handleMouseMove, { passive: true });
+    document.addEventListener('keydown', handleKeyDown);
+    
+    // Start with controls visible and set initial timeout
+    setShowControls(true);
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 1000);
+    
+    // Cleanup function
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('keydown', handleKeyDown);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isOpen]);
 
-  // Timer logic
+  // Timer logic - più stabile
   useEffect(() => {
     if (!isPlaying || !isOpen) return;
 
-    const duration = config.mode === 'single' 
-      ? (config.interval || 5) * 1000
-      : (config.page_duration || 10) * 1000;
-
-    setTimeRemaining(duration / 1000);
-
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
-        if (prev <= 1) {
+        const newTime = prev - 1;
+        if (newTime <= 0) {
           // Auto advance
           if (config.mode === 'single') {
-            setCurrentIndex(prev => (prev + 1) % units.length);
+            setCurrentIndex(prevIndex => (prevIndex + 1) % units.length);
           } else {
-            setCurrentPage(prev => (prev + 1) % totalPages);
+            setCurrentPage(prevPage => (prevPage + 1) % totalPages);
           }
-          return duration / 1000;
+          // Reset timer for next slide
+          const durationSeconds = config.mode === 'single' 
+            ? (config.interval || 5)
+            : (config.page_duration || 10);
+          return durationSeconds;
         }
-        return prev - 1;
+        return newTime;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, isOpen, config, units.length, totalPages]);
+  }, [isPlaying, isOpen]);
+
+  // Reset timer when slide changes manually
+  useEffect(() => {
+    if (isPlaying && isOpen) {
+      const durationSeconds = config.mode === 'single' 
+        ? (config.interval || 5)
+        : (config.page_duration || 10);
+      setTimeRemaining(durationSeconds);
+    }
+  }, [currentIndex, currentPage, config.mode, config.interval, config.page_duration, isPlaying, isOpen]);
 
   const handlePlay = () => setIsPlaying(true);
   const handlePause = () => setIsPlaying(false);
@@ -190,7 +356,9 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     } else {
       setCurrentPage(prev => (prev + 1) % totalPages);
     }
-    setTimeRemaining(config.mode === 'single' ? (config.interval || 5) : (config.page_duration || 10));
+    // Reset timer
+    const duration = config.mode === 'single' ? (config.interval || 5) : (config.page_duration || 10);
+    setTimeRemaining(duration);
   };
 
   const handlePrevious = () => {
@@ -199,123 +367,105 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
     } else {
       setCurrentPage(prev => (prev - 1 + totalPages) % totalPages);
     }
-    setTimeRemaining(config.mode === 'single' ? (config.interval || 5) : (config.page_duration || 10));
+    // Reset timer
+    const duration = config.mode === 'single' ? (config.interval || 5) : (config.page_duration || 10);
+    setTimeRemaining(duration);
   };
 
-  const renderUnit = (unit: NavalUnit) => {
-    // Create a modified layout with group template overrides
-    const getModifiedElements = () => {
-      if (!unit.layout_config?.elements) return [];
-      
-      return unit.layout_config.elements.map((element: any) => {
-        // Apply group template overrides
-        if (element.type === 'logo' && group.override_logo && group.template_logo_path) {
-          return { ...element, image: group.template_logo_path };
-        }
-        if (element.type === 'flag' && group.override_flag && group.template_flag_path) {
-          return { ...element, image: group.template_flag_path };
-        }
-        return element;
+  // Trigger slide loading when needed
+  useEffect(() => {
+    const currentUnit = units[currentIndex];
+    if (!currentUnit || !isOpen) return;
+
+    const unitId = currentUnit.id;
+    const cachedSlideUrl = slideCache.get(unitId);
+    const currentSlideUrl = currentSlideUrls.get(unitId);
+    const hasError = slideErrors.has(unitId);
+    const inQueue = renderingQueue.has(unitId);
+
+    if (!cachedSlideUrl && !currentSlideUrl && !inQueue && !hasError) {
+      getCurrentSlideUrl(unitId).then((url) => {
+        setCurrentSlideUrls(prev => {
+          const newMap = new Map(prev);
+          newMap.set(unitId, url);
+          return newMap;
+        });
+        setSlideErrors(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(unitId);
+          return newSet;
+        });
+      }).catch((error) => {
+        console.error(`Error loading current slide for unit ${unitId}:`, error);
+        setSlideErrors(prev => new Set(prev).add(unitId));
       });
-    };
+    } else if (cachedSlideUrl && !currentSlideUrl) {
+      setCurrentSlideUrls(prev => {
+        const newMap = new Map(prev);
+        newMap.set(unitId, cachedSlideUrl);
+        return newMap;
+      });
+      setSlideErrors(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(unitId);
+        return newSet;
+      });
+    }
+  }, [currentIndex, isOpen, units]);
 
-    const elements = getModifiedElements();
-    const canvasBackground = unit.layout_config?.canvasBackground || '#ffffff';
-    const canvasBorderWidth = unit.layout_config?.canvasBorderWidth || 4;
-    const canvasBorderColor = unit.layout_config?.canvasBorderColor || '#000000';
+  const renderUnit = (unit: NavalUnit) => {
+    const cachedSlideUrl = slideCache.get(unit.id);
+    const currentSlideUrl = currentSlideUrls.get(unit.id);
+    const hasError = slideErrors.has(unit.id);
+    const displayUrl = currentSlideUrl || cachedSlideUrl;
 
+    // Show loading state while slide is being rendered
+    if (!displayUrl && !hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+          <div className="bg-white bg-opacity-10 p-8 rounded-lg backdrop-blur-sm text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <h1 className="text-2xl font-bold text-white mb-2">{unit.name}</h1>
+            <h2 className="text-lg text-gray-300 mb-4">{unit.unit_class}</h2>
+            <p className="text-gray-400">Rendering slide...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Show error state if slide failed to load
+    if (hasError || !displayUrl) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+          <div className="bg-white p-8 rounded-lg shadow-2xl text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{unit.name}</h1>
+            <h2 className="text-xl text-gray-600 mb-8">{unit.unit_class}</h2>
+            <p className="text-red-500">Errore nel caricamento della slide</p>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-900">
-        <div 
-          className="relative bg-white shadow-2xl"
-          style={{ 
-            width: '1123px', // A4 landscape width
-            height: '794px',  // A4 landscape height
-            backgroundColor: canvasBackground,
-            borderWidth: canvasBorderWidth,
-            borderColor: canvasBorderColor,
-            borderStyle: 'solid',
-            transform: isFullscreen ? 'scale(1)' : 'scale(0.95)', // 5% zoom out when not fullscreen
-            transformOrigin: 'center'
+        <img
+          src={displayUrl}
+          alt={`${unit.name} - ${unit.unit_class}`}
+          className="w-full h-full object-contain"
+          style={{
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+            width: '100%',
+            height: '100%'
           }}
-        >
-          {/* Render all canvas elements */}
-          {elements.map((element: any) => (
-            <div
-              key={element.id}
-              className="absolute"
-              style={{
-                left: element.x,
-                top: element.y,
-                width: element.width,
-                height: element.height,
-                fontSize: element.style?.fontSize || 16,
-                fontWeight: element.style?.fontWeight || 'normal',
-                color: element.style?.color || '#000000',
-                backgroundColor: element.style?.backgroundColor || 'transparent',
-                borderRadius: element.style?.borderRadius || 0,
-                borderWidth: element.style?.borderWidth || 0,
-                borderColor: element.style?.borderColor || 'transparent',
-                borderStyle: element.style?.borderStyle || 'solid',
-                textAlign: element.style?.textAlign || 'left',
-                whiteSpace: element.style?.whiteSpace || 'normal'
-              }}
-            >
-              {/* Text elements */}
-              {(element.type === 'text' || element.type === 'unit_name' || element.type === 'unit_class') && (
-                <div className="w-full h-full flex items-center px-2">
-                  {element.content}
-                </div>
-              )}
-
-              {/* Image elements */}
-              {(element.type === 'logo' || element.type === 'flag' || element.type === 'silhouette') && element.image && (
-                <img
-                  src={element.image}
-                  alt={element.type}
-                  className="w-full h-full object-contain"
-                  style={{
-                    borderRadius: element.style?.borderRadius || 0
-                  }}
-                />
-              )}
-
-              {/* Table elements */}
-              {element.type === 'table' && element.tableData && (
-                <div className="w-full h-full overflow-auto p-1">
-                  <table className="w-full border-collapse">
-                    <tbody>
-                      {element.tableData.map((row: string[], rowIndex: number) => (
-                        <tr key={rowIndex}>
-                          {row.map((cell: string, colIndex: number) => {
-                            const isHeader = rowIndex === 0;
-                            const bgColor = colIndex % 2 === 0 ? '#f3f4f6' : '#ffffff';
-                            
-                            return (
-                              <td
-                                key={colIndex}
-                                className={`border border-gray-400 px-1 py-0.5 text-xs ${
-                                  isHeader ? 'font-bold bg-gray-300' : ''
-                                }`}
-                                style={{
-                                  backgroundColor: isHeader ? '#d1d5db' : bgColor,
-                                  fontSize: '10px',
-                                  lineHeight: '1.2'
-                                }}
-                              >
-                                {cell}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+          onError={(e) => {
+            console.error('Error displaying slide for unit:', unit.name);
+            setSlideErrors(prev => new Set(prev).add(unit.id));
+          }}
+          onLoad={() => {
+            // Slide loaded successfully
+          }}
+        />
       </div>
     );
   };
@@ -327,8 +477,8 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
   return (
     <div className="fixed inset-0 bg-black z-50">
       {/* Floating Header Controls */}
-      <div className={`absolute top-4 left-4 right-4 z-10 flex items-center justify-between transition-opacity duration-300 ${
-        showControls || isFullscreen ? 'opacity-100' : 'opacity-0'
+      <div className={`absolute top-4 left-4 right-4 z-10 flex items-center justify-between transition-all duration-500 ease-in-out ${
+        showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
       }`}>
         <div className="flex items-center space-x-4 bg-black bg-opacity-70 text-white p-3 rounded-lg backdrop-blur-sm">
           <h2 className="text-lg font-bold">{group.name}</h2>
@@ -449,8 +599,8 @@ export default function PresentationMode({ group, isOpen, onClose }: Presentatio
       </div>
 
       {/* Floating Progress Bar */}
-      <div className={`absolute bottom-4 left-4 right-4 z-10 transition-opacity duration-300 ${
-        showControls || isFullscreen ? 'opacity-100' : 'opacity-0'
+      <div className={`absolute bottom-4 left-4 right-4 z-10 transition-all duration-500 ease-in-out ${
+        showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
       }`}>
         <div className="bg-black bg-opacity-70 p-2 rounded-lg backdrop-blur-sm">
           <div className="bg-gray-600 rounded-full h-2">

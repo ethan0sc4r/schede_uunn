@@ -15,7 +15,7 @@ import hashlib
 import tempfile
 import io
 
-from app.simple_database import SimpleDatabase, init_database
+from app.simple_database import SimpleDatabase, init_database, get_db_connection
 from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint, create_unit_powerpoint_to_buffer
 from api.quiz import router as quiz_router
 import threading
@@ -498,6 +498,61 @@ async def _export_unit_png_internal(unit_id: int):
             detail=f"Error creating PNG image: {str(e)}"
         )
 
+@app.get("/api/groups/{group_id}/presentation/slide/{unit_id}")
+async def get_presentation_slide(group_id: int, unit_id: int):
+    """Get a presentation slide as PNG image"""
+    
+    try:
+        print(f"Presentation slide requested for group {group_id}, unit {unit_id}")
+        
+        # Get the group and unit
+        group = SimpleDatabase.get_group_by_id(group_id)
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        
+        # Find the unit in the group
+        unit = None
+        for naval_unit in group.get('naval_units', []):
+            if naval_unit['id'] == unit_id:
+                unit = naval_unit
+                break
+        
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unit not found in group")
+        
+        print(f"Found unit: {unit['name']}")
+        
+        # Create PNG in memory using the same logic as PNG export
+        from utils.png_export import create_unit_png_to_buffer
+        
+        output_buffer = io.BytesIO()
+        
+        print(f"Creating presentation slide in memory")
+        
+        # Generate PNG image
+        create_unit_png_to_buffer(unit, output_buffer)
+        print(f"Presentation slide created successfully")
+        
+        # Return as image response
+        output_buffer.seek(0)
+        from fastapi.responses import StreamingResponse
+        
+        return StreamingResponse(
+            io.BytesIO(output_buffer.read()),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=300"}  # Cache for 5 minutes
+        )
+        
+    except Exception as e:
+        print(f"Presentation slide error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error creating presentation slide: {str(e)}"
+        )
+
 # Admin routes
 @app.get("/api/admin/users")
 async def get_all_users(skip: int = 0, limit: int = 100, admin: dict = Depends(get_admin_user)):
@@ -575,6 +630,7 @@ async def get_group(group_id: int, user: dict = Depends(get_current_user)):
     group = SimpleDatabase.get_group_by_id(group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+    
     return group
 
 @app.post("/api/groups")
@@ -587,7 +643,9 @@ async def create_group(group: GroupCreate, user: dict = Depends(get_current_user
     )
     if not group_id:
         raise HTTPException(status_code=400, detail="Error creating group")
+    
     return {"message": "Group created successfully", "id": group_id}
+
 
 @app.put("/api/groups/{group_id}")
 async def update_group(group_id: int, group_update: GroupUpdate, user: dict = Depends(get_current_user)):
@@ -885,6 +943,7 @@ def start_cleanup_scheduler():
 if __name__ == "__main__":
     # Initialize database
     init_database()
+    
     
     # Start cleanup scheduler
     start_cleanup_scheduler()

@@ -46,7 +46,10 @@ export default function GroupModalAdvanced({
   
   // Search and filtering
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'basic' | 'template' | 'presentation'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'ordering' | 'template' | 'presentation'>('basic');
+  
+  // Drag and drop for ordering
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const filteredUnits = useMemo(() => {
     if (!searchTerm) return availableUnits;
@@ -72,6 +75,39 @@ export default function GroupModalAdvanced({
         ? prev.filter(id => id !== unitId)
         : [...prev, unitId]
     );
+  };
+
+  // Drag and drop handlers for ordering
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null) return;
+
+    const newOrder = [...selectedUnitIds];
+    const [draggedItem] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(dropIndex, 0, draggedItem);
+    
+    setSelectedUnitIds(newOrder);
+    setDraggedIndex(null);
+  };
+
+  const moveUnit = (fromIndex: number, direction: 'up' | 'down') => {
+    const newOrder = [...selectedUnitIds];
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+    
+    if (toIndex < 0 || toIndex >= newOrder.length) return;
+    
+    [newOrder[fromIndex], newOrder[toIndex]] = [newOrder[toIndex], newOrder[fromIndex]];
+    setSelectedUnitIds(newOrder);
   };
 
   const handleSave = () => {
@@ -135,6 +171,19 @@ export default function GroupModalAdvanced({
           >
             <Settings className="h-4 w-4 mr-2 inline" />
             Informazioni Base
+          </button>
+          <button
+            onClick={() => setActiveTab('ordering')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'ordering'
+                ? 'border-b-2 border-blue-500 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <svg className="h-4 w-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 16a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+            </svg>
+            Ordine
           </button>
           <button
             onClick={() => setActiveTab('template')}
@@ -222,6 +271,7 @@ export default function GroupModalAdvanced({
                       }
                     </div>
                   </div>
+
                 </div>
 
                 {/* Right Column - Units Selection */}
@@ -286,6 +336,152 @@ export default function GroupModalAdvanced({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'ordering' && (
+            <div className="p-6">
+              <div className="space-y-6">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h3 className="text-lg font-medium text-blue-900 mb-2">Ordine di Presentazione</h3>
+                  <p className="text-sm text-blue-700">
+                    Definisci l'ordine in cui le unità navali verranno presentate durante la presentazione del gruppo.
+                  </p>
+                </div>
+
+                {selectedUnitIds.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 16a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+                    </svg>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Nessuna unità selezionata</h3>
+                    <p className="text-gray-600">
+                      Vai alla tab "Informazioni Base" per selezionare le unità navali da includere nel gruppo.
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('basic')}
+                      className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      Seleziona Unità
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center text-sm text-green-800">
+                        <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <span>
+                          <strong>{selectedUnitIds.length} unità selezionate</strong> - Le slide verranno mostrate nell'ordine: #{selectedUnitIds.map((_, i) => i + 1).join(' → #')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-start space-x-3">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <div className="text-sm text-blue-800">
+                          <strong>Come riordinare:</strong>
+                          <ul className="mt-2 space-y-1 list-disc list-inside">
+                            <li>Trascina le unità per spostarle</li>
+                            <li>Usa le frecce ↑↓ per spostamenti precisi</li>
+                            <li>Clicca ✕ per rimuovere un'unità dal gruppo</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                      {selectedUnitIds.map((unitId, index) => {
+                        const unit = availableUnits.find(u => u.id === unitId);
+                        if (!unit) return null;
+                        
+                        return (
+                          <div
+                            key={unitId}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, index)}
+                            className={`flex items-center justify-between p-4 bg-white border-2 border-blue-200 rounded-lg cursor-move hover:bg-blue-50 hover:border-blue-300 hover:shadow-md transition-all duration-200 ${
+                              draggedIndex === index ? 'opacity-50 scale-95 bg-blue-100 shadow-lg' : ''
+                            }`}
+                            style={{ userSelect: 'none' }}
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white text-lg font-bold rounded-full shadow-sm">
+                                {index + 1}
+                              </div>
+                              <div className="cursor-move text-gray-400 hover:text-blue-600 transition-colors">
+                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M7 2a2 2 0 110 4 2 2 0 010-4zM7 8a2 2 0 110 4 2 2 0 010-4zM7 14a2 2 0 110 4 2 2 0 010-4zM13 2a2 2 0 110 4 2 2 0 010-4zM13 8a2 2 0 110 4 2 2 0 010-4zM13 14a2 2 0 110 4 2 2 0 010-4z"></path>
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-semibold text-lg text-gray-900">{unit.name}</div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                  <span className="font-medium">{unit.unit_class}</span>
+                                  {unit.nation && (
+                                    <>
+                                      <span className="mx-2 text-gray-400">•</span>
+                                      <span>{unit.nation}</span>
+                                    </>
+                                  )}
+                                  {unit.creator && (
+                                    <>
+                                      <span className="mx-2 text-gray-400">•</span>
+                                      <span className="text-gray-500">
+                                        {unit.creator.first_name} {unit.creator.last_name}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => moveUnit(index, 'up')}
+                                disabled={index === 0}
+                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-100 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg transition-colors"
+                                title="Sposta su"
+                              >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveUnit(index, 'down')}
+                                disabled={index === selectedUnitIds.length - 1}
+                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-100 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg transition-colors"
+                                title="Sposta giù"
+                              >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUnitToggle(unitId)}
+                                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                title="Rimuovi dal gruppo"
+                              >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

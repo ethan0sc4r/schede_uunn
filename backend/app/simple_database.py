@@ -111,7 +111,8 @@ def init_database():
                 naval_unit_id INTEGER NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (group_id) REFERENCES groups (id) ON DELETE CASCADE,
-                FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE
+                FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE,
+                UNIQUE(group_id, naval_unit_id)
             )
         ''')
         
@@ -406,6 +407,7 @@ class SimpleDatabase:
             return [dict(row) for row in cursor.fetchall()]
     
     # Group operations
+
     @staticmethod
     def create_group(name: str, description: str, created_by: int, naval_unit_ids: List[int]) -> Optional[int]:
         """Create a new group"""
@@ -421,10 +423,16 @@ class SimpleDatabase:
             
             # Add naval unit memberships
             for unit_id in naval_unit_ids:
-                cursor.execute('''
-                    INSERT INTO group_memberships (group_id, naval_unit_id)
-                    VALUES (?, ?)
-                ''', (group_id, unit_id))
+                try:
+                    cursor.execute('''
+                        INSERT INTO group_memberships (group_id, naval_unit_id)
+                        VALUES (?, ?)
+                    ''', (group_id, unit_id))
+                except Exception as e:
+                    if "UNIQUE constraint failed" in str(e):
+                        continue  # Skip duplicates
+                    else:
+                        raise e
             
             conn.commit()
             return group_id
@@ -528,12 +536,19 @@ class SimpleDatabase:
     
     @staticmethod
     def delete_group(group_id: int) -> bool:
-        """Delete a group"""
+        """Delete a group and all its memberships"""
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            
+            # First, explicitly delete memberships
+            cursor.execute('DELETE FROM group_memberships WHERE group_id = ?', (group_id,))
+            
+            # Then delete the group itself
             cursor.execute('DELETE FROM groups WHERE id = ?', (group_id,))
+            group_deleted = cursor.rowcount > 0
+            
             conn.commit()
-            return cursor.rowcount > 0
+            return group_deleted
     
     # Naval unit file upload operations
     @staticmethod
