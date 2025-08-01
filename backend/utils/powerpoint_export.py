@@ -301,7 +301,8 @@ def _create_unit_slide(prs: Presentation, unit: Dict[str, Any], group_data: Dict
             background = slide.background
             fill = background.fill
             fill.solid()
-            fill.fore_color.rgb = _hex_to_rgb(canvas_background)
+            safe_canvas_background = canvas_background if canvas_background else '#ffffff'
+            fill.fore_color.rgb = _hex_to_rgb(safe_canvas_background)
         except Exception as bg_error:
             print(f"Failed to set background color: {bg_error}")
         
@@ -321,7 +322,8 @@ def _create_unit_slide(prs: Presentation, unit: Dict[str, Any], group_data: Dict
                 
                 # Configure border
                 border_shape.fill.background()  # No fill, just border
-                border_shape.line.color.rgb = _hex_to_rgb(canvas_border_color)
+                safe_canvas_border_color = canvas_border_color if canvas_border_color else '#000000'
+                border_shape.line.color.rgb = _hex_to_rgb(safe_canvas_border_color)
                 border_shape.line.width = Pt(canvas_border_width)
                 
                 print(f"Added canvas border: {canvas_border_width}pt, color: {canvas_border_color}")
@@ -450,8 +452,10 @@ def _add_element_to_slide(slide: Any, element: Dict[str, Any], unit: Dict[str, A
         font.size = Pt(style.get('fontSize', 16))
         font.bold = style.get('fontWeight') == 'bold'
         
-        # Text color
+        # Text color with safe handling
         color = style.get('color', '#000000')
+        if not color:
+            color = '#000000'  # Default to black if None or empty
         font.color.rgb = _hex_to_rgb(color)
         
         # Text alignment
@@ -462,14 +466,18 @@ def _add_element_to_slide(slide: Any, element: Dict[str, Any], unit: Dict[str, A
             paragraph.alignment = PP_ALIGN.RIGHT
         
         # Apply background color and borders
-        if style.get('backgroundColor'):
+        background_color = style.get('backgroundColor')
+        if background_color:
             text_box.fill.solid()
-            text_box.fill.fore_color.rgb = _hex_to_rgb(style.get('backgroundColor'))
+            text_box.fill.fore_color.rgb = _hex_to_rgb(background_color)
         
         # Apply borders
         border_width = style.get('borderWidth', 0)
         if border_width > 0:
-            text_box.line.color.rgb = _hex_to_rgb(style.get('borderColor', '#000000'))
+            border_color = style.get('borderColor', '#000000')
+            if not border_color:
+                border_color = '#000000'
+            text_box.line.color.rgb = _hex_to_rgb(border_color)
             text_box.line.width = Pt(border_width)
             border_style = style.get('borderStyle', 'solid')
             # PowerPoint supports different line styles, but solid is most compatible
@@ -836,9 +844,23 @@ def _convert_base64_to_temp_file(base64_data: str) -> Optional[str]:
 
 def _hex_to_rgb(hex_color: str):
     """Convert hex color to RGB"""
+    if not hex_color or hex_color == '':
+        # Default to black if color is empty/None
+        return RGBColor(0, 0, 0)
+    
     hex_color = hex_color.lstrip('#')
-    return RGBColor(
-        int(hex_color[0:2], 16),
-        int(hex_color[2:4], 16),
-        int(hex_color[4:6], 16)
-    )
+    
+    # Ensure we have a valid 6-character hex string
+    if len(hex_color) != 6:
+        print(f"⚠️ Invalid hex color format: '{hex_color}', using black as fallback")
+        return RGBColor(0, 0, 0)
+    
+    try:
+        return RGBColor(
+            int(hex_color[0:2], 16),
+            int(hex_color[2:4], 16),
+            int(hex_color[4:6], 16)
+        )
+    except ValueError as e:
+        print(f"⚠️ Failed to parse hex color '{hex_color}': {e}, using black as fallback")
+        return RGBColor(0, 0, 0)

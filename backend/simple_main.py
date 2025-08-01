@@ -369,16 +369,108 @@ async def upload_flag(unit_id: int, file: UploadFile = File(...), user: dict = D
 @app.post("/api/units/{unit_id}/export/powerpoint")
 async def export_unit_powerpoint(unit_id: int, export_data: dict = None):
     """Export a single naval unit to PowerPoint presentation (authenticated)"""
-    template_config = export_data.get('template_config') if export_data else None
-    element_states = export_data.get('element_states') if export_data else None
-    return await _export_unit_powerpoint_internal(unit_id, template_config, element_states)
+    if export_data:
+        # Portfolio approach: template_id + customizations
+        if 'template_id' in export_data and 'customizations' in export_data:
+            print(f"🎯 Portfolio PowerPoint export - template_id: {export_data.get('template_id')}")
+            return await _export_portfolio_powerpoint_internal(unit_id, export_data['template_id'], export_data['customizations'])
+        # Regular approach: template_config + element_states
+        else:
+            template_config = export_data.get('template_config')
+            element_states = export_data.get('element_states')
+            return await _export_unit_powerpoint_internal(unit_id, template_config, element_states)
+    
+    # Default: use unit's original config
+    return await _export_unit_powerpoint_internal(unit_id, None, None)
 
 @app.post("/api/public/units/{unit_id}/export/powerpoint")
 async def export_unit_powerpoint_public(unit_id: int, export_data: dict = None):
     """Export a single naval unit to PowerPoint presentation (public, no auth required)"""
-    template_config = export_data.get('template_config') if export_data else None
-    element_states = export_data.get('element_states') if export_data else None
-    return await _export_unit_powerpoint_internal(unit_id, template_config, element_states)
+    if export_data:
+        # Portfolio approach: template_id + customizations
+        if 'template_id' in export_data and 'customizations' in export_data:
+            print(f"🎯 Portfolio PowerPoint export - template_id: {export_data.get('template_id')}")
+            return await _export_portfolio_powerpoint_internal(unit_id, export_data['template_id'], export_data['customizations'])
+        # Regular approach: template_config + element_states
+        else:
+            template_config = export_data.get('template_config')
+            element_states = export_data.get('element_states')
+            return await _export_unit_powerpoint_internal(unit_id, template_config, element_states)
+    
+    # Default: use unit's original config
+    return await _export_unit_powerpoint_internal(unit_id, None, None)
+
+async def _export_portfolio_powerpoint_internal(unit_id: int, template_id: str, customizations: dict):
+    """Export a portfolio unit to PowerPoint using template + customizations approach"""
+    try:
+        print(f"🎯 Portfolio PowerPoint export - unit: {unit_id}, template: {template_id}")
+        
+        # Get the unit
+        unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Naval unit not found")
+        
+        # Get the template  
+        template = SimpleDatabase.get_template_by_id_public(template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        print(f"📋 Template found: {template['name']}")
+        print(f"🎨 Customizations: element_states={len(customizations.get('element_states', {}))}, canvas_config={bool(customizations.get('canvas_config'))}")
+        
+        # Build layout config using template + customizations (same logic as PNG)
+        layout_config = template['config'].copy() if template['config'] else {}
+        
+        # Apply canvas customizations
+        if customizations.get('canvas_config'):
+            layout_config.update(customizations['canvas_config'])
+        
+        # Apply element state customizations and unit data
+        if layout_config.get('elements'):
+            for element in layout_config['elements']:
+                # First apply unit data for special element types
+                if element.get('type') == 'unit_name':
+                    element['content'] = unit.get('name', element.get('content', '[NOME UNITÀ]'))
+                elif element.get('type') == 'unit_class':
+                    element['content'] = unit.get('unit_class', element.get('content', '[CLASSE]'))
+                elif element.get('type') == 'logo' and unit.get('logo_path'):
+                    element['image'] = unit['logo_path']
+                elif element.get('type') == 'flag' and unit.get('flag_path'):
+                    element['image'] = unit['flag_path']
+                elif element.get('type') == 'silhouette' and unit.get('silhouette_path'):
+                    element['image'] = unit['silhouette_path']
+                
+                # Then apply portfolio customizations if they exist
+                if customizations.get('element_states'):
+                    element_state = customizations['element_states'].get(element['id'])
+                    if element_state:
+                        element.update(element_state)
+        
+        print(f"✅ Built layout config with {len(layout_config.get('elements', []))} elements")
+        
+        # Override unit's layout_config with the built one (same as PNG export)
+        unit['layout_config'] = layout_config
+        
+        # Use standard PowerPoint creation
+        from utils.powerpoint_export import create_unit_powerpoint_to_buffer
+        output_buffer = io.BytesIO()
+        create_unit_powerpoint_to_buffer(unit, output_buffer, template_config=layout_config)
+        
+        # Return as response
+        output_buffer.seek(0)
+        from fastapi.responses import StreamingResponse
+        safe_name = "".join(c for c in unit['name'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        filename = f"{safe_name}_{template['name']}.pptx"
+        
+        return StreamingResponse(
+            io.BytesIO(output_buffer.read()),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"❌ Portfolio PowerPoint export error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Portfolio PowerPoint export failed: {str(e)}")
 
 async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict = None, element_states: dict = None):
     """Export a single naval unit to PowerPoint presentation"""

@@ -1,30 +1,41 @@
 version: '3.8'
 
 services:
-  backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./data:/app/data
-      - backend_uploads:/app/data/uploads
-    environment:
-      - PYTHONPATH=/app
-    restart: unless-stopped
-    
-  frontend:
+  # Container unificato con Frontend + Backend + Nginx
+  app:
     build:
-      context: ./frontend
+      context: .
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "3000:80"  # Mappa porta 3000 locale alla 80 del container
+    volumes:
+      # Dati persistenti per database e uploads
+      - ./data:/app/backend/data
+      # Opzionale: per sviluppo, mount del codice sorgente
+      # - ./backend:/app/backend
+      # - ./frontend/dist:/app/frontend/dist
     environment:
-      - VITE_API_BASE_URL=http://localhost:8001
-    depends_on:
-      - backend
+      - NODE_ENV=production
+      - PYTHONPATH=/app/backend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
-volumes:
-  backend_uploads:
+  # Opzionale: container separato per il database (se vuoi usare PostgreSQL invece di SQLite)
+  # db:
+  #   image: postgres:13
+  #   environment:
+  #     POSTGRES_DB: schede_uunn
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:

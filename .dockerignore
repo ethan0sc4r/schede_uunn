@@ -1,0 +1,76 @@
+# Node modules e cache
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/nul
+
+# Python cache e virtual env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.pyc
+venv/
+
+# Git e editor files
+.git/
+.gitignore
+*.swp
+*.swo
+*~
+
+# Documentation e development files
+*.md
+DEVELOPMENT_GUIDE.md
+GUIDA_FUNZIONI.md
+QUICK_START.md
+README.md
+REPORT_*.md
+SIMPLE_VERSION.md
+
+# Test files
+backend/test/
+test_*.py
+pytest.ini
+
+# Development scripts
+*.bat
+run_dev.py
+setup_windows.bat
+start_*.bat
+stop_*.bat
+test_*.bat
+
+# Temporary e log files
+*.log
+backend/server_output.log
+nul
+temp/
+backend/data/temp/
+
+# Build artifacts
+exports/
+static/
+uploads/ 
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Images per documentazione
+*.png
+*.jpg
+*.jpeg
+
+# Old files
+*.old
+backend/main.old
+
+# Dockerfiles separati (usiamo quello unificato)
+backend/Dockerfile
+frontend/Dockerfile
