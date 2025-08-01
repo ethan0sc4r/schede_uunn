@@ -3,6 +3,17 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { groupsApi, navalUnitsApi } from '../services/api';
 import type { Group, CreateGroupRequest } from '../types/index.ts';
 
+interface PortfolioUnit {
+  id: number;
+  naval_unit_id: number;
+  template_id: string;
+  custom_name?: string;
+  name: string;
+  unit_class: string;
+  nation: string;
+  template_name: string;
+}
+
 interface GroupModalProps {
   group?: Group | null;
   onClose: () => void;
@@ -16,11 +27,37 @@ export default function GroupModal({ group, onClose, onSave }: GroupModalProps) 
   });
   const [selectedUnitIds, setSelectedUnitIds] = useState<number[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'standard' | 'portfolio'>('standard');
+  const [portfolioUnits, setPortfolioUnits] = useState<PortfolioUnit[]>([]);
 
   const { data: availableUnits } = useQuery({
     queryKey: ['navalUnits'],
     queryFn: () => navalUnitsApi.getAll(),
   });
+
+  // Carica unità del portfolio
+  const loadPortfolioUnits = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+
+      const response = await fetch('/api/portfolio', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPortfolioUnits(data.portfolio_units);
+      }
+    } catch (error) {
+      console.error('Error loading portfolio units:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadPortfolioUnits();
+  }, []);
 
   useEffect(() => {
     if (group) {
@@ -96,6 +133,32 @@ export default function GroupModal({ group, onClose, onSave }: GroupModalProps) 
     setDraggedIndex(null);
   };
 
+  // Helper function to find unit details from either standard units or portfolio
+  const getUnitDetails = (unitId: number) => {
+    // First check standard units
+    const standardUnit = availableUnits?.find(u => u.id === unitId);
+    if (standardUnit) {
+      return {
+        ...standardUnit,
+        displayName: standardUnit.name,
+        source: 'standard' as const
+      };
+    }
+    
+    // Then check portfolio units
+    const portfolioUnit = portfolioUnits.find(u => u.naval_unit_id === unitId);
+    if (portfolioUnit) {
+      return {
+        ...portfolioUnit,
+        id: portfolioUnit.naval_unit_id,
+        displayName: portfolioUnit.custom_name || portfolioUnit.name,
+        source: 'portfolio' as const
+      };
+    }
+    
+    return null;
+  };
+
   const moveUnit = (fromIndex: number, direction: 'up' | 'down') => {
     const newOrder = [...selectedUnitIds];
     const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
@@ -146,39 +209,112 @@ export default function GroupModal({ group, onClose, onSave }: GroupModalProps) 
               Unità Navali
             </label>
             
-            {!availableUnits || availableUnits.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                Nessuna unità navale disponibile. 
-                <br />
-                Crea prima delle unità navali per aggiungerle ai gruppi.
-              </div>
-            ) : (
-              <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-                {availableUnits.map((unit) => (
-                  <label
-                    key={unit.id}
-                    className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                  >
-                    <input
-                      type="checkbox"
-                      className="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      checked={selectedUnitIds.includes(unit.id)}
-                      onChange={() => handleUnitToggle(unit.id)}
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{unit.name}</div>
-                      <div className="text-sm text-gray-600">
-                        {unit.unit_class}
-                        {unit.nation && ` • ${unit.nation}`}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
+            {/* Tab selectors */}
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit mb-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab('standard')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeTab === 'standard'
+                    ? 'bg-white shadow text-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Unità Standard
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('portfolio')}
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  activeTab === 'portfolio'
+                    ? 'bg-white shadow text-blue-600'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Dal Portfolio ({portfolioUnits.length})
+              </button>
+            </div>
+
+            {/* Standard Units Tab */}
+            {activeTab === 'standard' && (
+              <>
+                {!availableUnits || availableUnits.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Nessuna unità navale disponibile. 
+                    <br />
+                    Crea prima delle unità navali per aggiungerle ai gruppi.
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                    {availableUnits.map((unit) => (
+                      <label
+                        key={unit.id}
+                        className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={selectedUnitIds.includes(unit.id)}
+                          onChange={() => handleUnitToggle(unit.id)}
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{unit.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {unit.unit_class}
+                            {unit.nation && ` • ${unit.nation}`}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Portfolio Units Tab */}
+            {activeTab === 'portfolio' && (
+              <>
+                {portfolioUnits.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Nessuna unità nel portfolio. 
+                    <br />
+                    Aggiungi unità al portfolio applicando template personalizzati.
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                    {portfolioUnits.map((unit) => (
+                      <label
+                        key={`portfolio-${unit.naval_unit_id}`}
+                        className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          checked={selectedUnitIds.includes(unit.naval_unit_id)}
+                          onChange={() => handleUnitToggle(unit.naval_unit_id)}
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">
+                            {unit.custom_name || unit.name}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {unit.unit_class}
+                            {unit.nation && ` • ${unit.nation}`}
+                            <span className="text-blue-600"> • Template: {unit.template_name}</span>
+                            {unit.custom_name && (
+                              <div className="text-xs text-gray-500">Originale: {unit.name}</div>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
             
             {/* Selected Units with Drag & Drop Ordering */}
-            {selectedUnitIds.length > 0 && availableUnits && (
+            {selectedUnitIds.length > 0 && (
               <div className="mt-6 border-t border-gray-200 pt-6">
                 <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
                   <svg className="w-5 h-5 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
@@ -191,7 +327,7 @@ export default function GroupModal({ group, onClose, onSave }: GroupModalProps) 
                 </p>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-3 bg-gray-50">
                   {selectedUnitIds.map((unitId, index) => {
-                    const unit = availableUnits.find(u => u.id === unitId);
+                    const unit = getUnitDetails(unitId);
                     if (!unit) return null;
                     
                     return (
@@ -216,10 +352,13 @@ export default function GroupModal({ group, onClose, onSave }: GroupModalProps) 
                             </svg>
                           </div>
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-900">{unit.name}</div>
+                            <div className="font-semibold text-gray-900">{unit.displayName}</div>
                             <div className="text-sm text-gray-600">
                               {unit.unit_class}
                               {unit.nation && ` • ${unit.nation}`}
+                              {unit.source === 'portfolio' && (
+                                <span className="text-blue-600"> • Da Portfolio</span>
+                              )}
                             </div>
                           </div>
                         </div>

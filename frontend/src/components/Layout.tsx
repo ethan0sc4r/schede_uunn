@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   Palette,
-  Brain
+  Brain,
+  Briefcase
 } from 'lucide-react';
 
 const Layout: React.FC = () => {
@@ -28,6 +29,7 @@ const Layout: React.FC = () => {
     { name: 'Naval Units', href: '/units', icon: Ship },
     { name: 'Groups', href: '/groups', icon: Users },
     { name: 'Templates', href: '/templates', icon: Palette },
+    { name: 'Portfolio', href: '/portfolio', icon: Briefcase },
     { name: 'Search', href: '/search', icon: Search },
   ];
 

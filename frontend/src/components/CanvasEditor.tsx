@@ -4,7 +4,7 @@ import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from './TemplateManager';
 
 import { getImageUrl } from '../utils/imageUtils';
-import { navalUnitsApi } from '../services/api';
+import { navalUnitsApi, templatesApi, portfolioApi } from '../services/api';
 
 interface CanvasElement {
   id: string;
@@ -139,6 +139,8 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   );
   const [zoomLevel, setZoomLevel] = useState(1);
   const [nationUpdateKey, setNationUpdateKey] = useState(0);
+  const [templateChanged, setTemplateChanged] = useState(false); // Traccia se il template è stato modificato
+  const [originalTemplateId, setOriginalTemplateId] = useState<string | null>(null); // Template originale dell'unità
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Initialize other state variables
@@ -158,21 +160,40 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   const [templateStatesLoaded, setTemplateStatesLoaded] = useState(false);
   const [allTemplates, setAllTemplates] = useState<Template[]>(DEFAULT_TEMPLATES);
 
-  // Load user templates from localStorage
+  // Load templates from API
   useEffect(() => {
-    const savedTemplates = localStorage.getItem('naval-templates');
-    const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
-    const combinedTemplates = [...DEFAULT_TEMPLATES, ...userTemplates];
+    const loadTemplates = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          console.log('⚠️ No auth token found, using only default templates');
+          setAllTemplates(DEFAULT_TEMPLATES);
+          return;
+        }
+
+        console.log('🔄 Loading templates from API...');
+        const apiTemplates = await templatesApi.getAll();
+        const combinedTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+        
+        console.log('🔄 Loading templates in CanvasEditor:');
+        console.log('   DEFAULT_TEMPLATES count:', DEFAULT_TEMPLATES.length);
+        console.log('   DEFAULT_TEMPLATES IDs:', DEFAULT_TEMPLATES.map(t => t.id));
+        console.log('   API templates count:', apiTemplates.length);
+        console.log('   API template IDs:', apiTemplates.map(t => t.id));
+        console.log('   Combined templates count:', combinedTemplates.length);
+        console.log('   Combined template IDs:', combinedTemplates.map(t => t.id));
+        console.log('   naval-card-powerpoint found:', combinedTemplates.some(t => t.id === 'naval-card-powerpoint') ? '✅' : '❌');
+        
+        setAllTemplates(combinedTemplates);
+      } catch (error) {
+        console.error('❌ Error loading templates from API:', error);
+        // Fallback to default templates
+        console.log('⚠️ Falling back to default templates only');
+        setAllTemplates(DEFAULT_TEMPLATES);
+      }
+    };
     
-    console.log('🔄 Loading templates in CanvasEditor:');
-    console.log('   DEFAULT_TEMPLATES count:', DEFAULT_TEMPLATES.length);
-    console.log('   DEFAULT_TEMPLATES IDs:', DEFAULT_TEMPLATES.map(t => t.id));
-    console.log('   User templates count:', userTemplates.length);
-    console.log('   Combined templates count:', combinedTemplates.length);
-    console.log('   Combined template IDs:', combinedTemplates.map(t => t.id));
-    console.log('   naval-card-powerpoint found:', combinedTemplates.some(t => t.id === 'naval-card-powerpoint') ? '✅' : '❌');
-    
-    setAllTemplates(combinedTemplates);
+    loadTemplates();
   }, []);
 
   // Auto-save current template state when elements change (debounced)
@@ -209,6 +230,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       
       setElements(defaultElements);
       setCurrentTemplateId(defaultTemplate.id);
+      setOriginalTemplateId(defaultTemplate.id); // Imposta il template originale per nuove unità
       
       // Set canvas config from default template
       setCanvasWidth(defaultTemplate.canvasWidth || DEFAULT_CANVAS_WIDTH);
@@ -252,7 +274,9 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       }));
       
       setElements(savedElements);
-      setCurrentTemplateId(unit.current_template_id || 'naval-card-standard');
+      const unitTemplateId = unit.current_template_id || 'naval-card-powerpoint';
+      setCurrentTemplateId(unitTemplateId);
+      setOriginalTemplateId(unitTemplateId); // Salva il template originale dell'unità
       
       // Initialize visibility based on saved state
       const initialVisibility: {[key: string]: boolean} = {};
@@ -307,7 +331,9 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         });
         
         setElements(defaultElements);
-        setCurrentTemplateId(unit.current_template_id || defaultTemplate.id);
+        const templateId = unit.current_template_id || defaultTemplate.id;
+        setCurrentTemplateId(templateId);
+        setOriginalTemplateId(templateId); // Imposta il template originale
         
         // Initialize visibility - all elements visible by default
         const initialVisibility: {[key: string]: boolean} = {};
@@ -318,7 +344,8 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         console.log('📭 Unit is intentionally empty');
         setElements([]);
         setVisibleElements({});
-        setCurrentTemplateId('naval-card-standard');
+        setCurrentTemplateId('naval-card-powerpoint');
+        setOriginalTemplateId('naval-card-powerpoint'); // Imposta il template originale per nuove unità
       }
     }
   }, [unit?.id]);
@@ -368,7 +395,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         setAllElementStates(elementStates);
         
         // Set current template from unit data or use default
-        const currentTemplate = unit.current_template_id || 'naval-card-standard';
+        const currentTemplate = unit.current_template_id || 'naval-card-powerpoint';
         setCurrentTemplateId(currentTemplate);
         
         // ⚠️ CRITICAL: DO NOT override elements here! 
@@ -386,7 +413,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         console.error('Error loading template states:', error);
         
         // Set current template from unit data or use default
-        const currentTemplate = unit.current_template_id || 'naval-card-standard';
+        const currentTemplate = unit.current_template_id || 'naval-card-powerpoint';
         setCurrentTemplateId(currentTemplate);
         
         setTemplateStatesLoaded(true);
@@ -438,9 +465,12 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       };
       
       console.log(`💾 Saving template state for ${currentTemplateId}:`, stateData);
-      await navalUnitsApi.saveTemplateState(unit.id, currentTemplateId, stateData);
+      const result = await navalUnitsApi.saveTemplateState(unit.id, currentTemplateId, stateData);
       
-      // Update local state
+      // Log success without showing automatic messages
+      console.log(`✅ Template state saved successfully for ${currentTemplateId}`);
+      
+      // Update local state (for backward compatibility)
       setAllElementStates(prev => ({
         ...prev,
         [currentTemplateId]: elements
@@ -449,6 +479,99 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       console.log(`✅ Saved state for template: ${currentTemplateId}`);
     } catch (error) {
       console.error('Error saving template state:', error);
+    }
+  };
+
+  // Funzione per salvare nel portfolio
+  const saveToPortfolio = async () => {
+    console.log('🔥 saveToPortfolio called - START');
+    console.log('🔥 Current elements:', elements.length);
+    console.log('🔥 Unit data:', { id: unit?.id, name: unit?.name, logo: unit?.logo_path });
+    
+    if (!unit?.id) {
+      alert('Errore: unità non valida per il salvataggio nel portfolio');
+      return;
+    }
+
+    // Se il template è cambiato, mostra avviso
+    if (templateChanged) {
+      const confirmSave = confirm(
+        `⚠️ Attenzione: Hai modificato il template.\n\n` +
+        `Salvando nel portfolio:\n` +
+        `• Verrà salvata solo la modifica del template\n` +
+        `• Le modifiche alle proprietà dell'unità (nome, classe, caratteristiche, etc.) NON verranno salvate\n` +
+        `• L'unità originale rimarrà invariata\n\n` +
+        `Vuoi continuare?`
+      );
+      
+      if (!confirmSave) {
+        return;
+      }
+    }
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      alert('Sessione scaduta. Effettua nuovamente il login.');
+      return;
+    }
+
+    try {
+      // Raccogli lo stato attuale degli elementi con dati unità aggiornati
+      const customizations = {
+        element_states: elements.reduce((acc, el) => {
+          const elementData = { ...el };
+          
+          // Aggiorna contenuto con dati dell'unità
+          if (el.type === 'unit_name') {
+            elementData.content = unit.name || el.content;
+          } else if (el.type === 'unit_class') {
+            elementData.content = unit.unit_class || el.content;
+          }
+          
+          // Aggiorna immagini con dati dell'unità
+          if (el.type === 'logo' && unit.logo_path) {
+            elementData.image = unit.logo_path;
+          } else if (el.type === 'flag' && unit.flag_path) {
+            elementData.image = unit.flag_path;
+          } else if (el.type === 'silhouette' && unit.silhouette_path) {
+            elementData.image = unit.silhouette_path;
+          }
+          
+          acc[el.id] = elementData;
+          return acc;
+        }, {} as any),
+        canvas_config: {
+          width: canvasWidth,
+          height: canvasHeight,
+          background: canvasBackground,
+          borderWidth: canvasBorderWidth,
+          borderColor: canvasBorderColor
+        }
+      };
+
+      const result = await portfolioApi.addToPortfolio({
+        naval_unit_id: unit.id,
+        template_id: currentTemplateId,
+        customizations
+      });
+      
+      console.log('✅ Portfolio entry created:', result);
+      console.log('📊 Debug - Customizations sent:', customizations);
+      console.log('📊 Debug - Elements count:', elements.length);
+      console.log('📊 Debug - Unit data:', { name: unit.name, logo: unit.logo_path, flag: unit.flag_path });
+      alert(`✅ Variante salvata nel portfolio con template "${currentTemplateId}"`);
+      
+      // Reset template changed state dopo il salvataggio
+      setTemplateChanged(false);
+      
+      // Se il template era cambiato, chiudi l'editor dopo il salvataggio
+      if (templateChanged) {
+        onCancel(); // Chiude l'editor come se si premesse Annulla
+      }
+    } catch (error: any) {
+      console.error('❌ Errore salvataggio portfolio:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Errore sconosciuto';
+      alert(`Errore nel salvare nel portfolio: ${errorMessage}`);
     }
   };
 
@@ -659,6 +782,14 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       }
       
       setCurrentTemplateId(newTemplateId);
+      
+      // Traccia se il template è cambiato rispetto all'originale
+      if (originalTemplateId && newTemplateId !== originalTemplateId) {
+        setTemplateChanged(true);
+        console.log(`📝 Template changed from ${originalTemplateId} to ${newTemplateId}`);
+      } else {
+        setTemplateChanged(false);
+      }
       
       // Verify that the template change was successful
       setTimeout(() => {
@@ -877,7 +1008,9 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       elements: template.elements?.length || 0,
       canvasWidth: template.canvasWidth,
       canvasHeight: template.canvasHeight,
-      isDefault: template.isDefault
+      isDefault: template.isDefault,
+      unitId: unit?.id,
+      isEditMode: !!unit?.id
     });
     
     try {
@@ -885,8 +1018,22 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       setShowTemplateManager(false);
       setSelectedElement(null);
       
-      // Use the unified changeTemplate function
-      await changeTemplate(template.id);
+      // Se siamo in modalità edit (unit?.id esiste) e cambiamo template, 
+      // chiedi conferma per salvare nel portfolio
+      if (unit?.id && template.id !== currentTemplateId) {
+        console.log('📋 Edit mode detected - template change requires portfolio decision');
+        
+        // Applica il template direttamente senza chiedere conferma
+        const shouldSaveToPortfolio = false;
+
+        // Non salvare automaticamente nel portfolio - ora è manuale
+        
+        // Applica il template visivamente in ogni caso (per preview)
+        await changeTemplate(template.id);
+      } else {
+        // Modalità creazione o stesso template - usa il comportamento standard
+        await changeTemplate(template.id);
+      }
       
       console.log('✅ Template application completed successfully');
     } catch (error) {
@@ -1036,6 +1183,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   textAlign: element.style?.textAlign || 'left',
                 }}
                 autoFocus
+                onFocus={(e) => e.target.select()}
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
@@ -1192,6 +1340,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                               onChange={(e) => updateTableCell(element.id, rowIndex, colIndex, e.target.value)}
                               className="w-full bg-transparent text-xs border-none outline-none"
                               autoFocus
+                              onFocus={(e) => e.target.select()}
                               onBlur={() => setEditingTableCell(null)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
@@ -1283,62 +1432,83 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           </div>
 
           <div className="space-y-2 mb-4">
-            <button
-              onClick={() => setShowTemplateManager(true)}
-              className="w-full flex items-center justify-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-            >
-              <Palette className="h-4 w-4 mr-2" />
-              Gestisci Template
-            </button>
+            {/* Template manager solo in modalità edit, non in creazione */}
+            {unit?.id && (
+              <button
+                onClick={() => setShowTemplateManager(true)}
+                className="w-full flex items-center justify-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                <Palette className="h-4 w-4 mr-2" />
+                Gestisci Template
+              </button>
+            )}
             <div className="flex space-x-2">
               <button
                 onClick={onCancel}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 Annulla
               </button>
-              <button
-                onClick={async () => {
-                  // Save current template state first
-                  console.log('💾 Saving canvas data:', { 
-                    elementsCount: elements.length, 
-                    templateId: currentTemplateId,
-                    unitId: unit?.id,
-                    isNewUnit: !unit
-                  });
-                  
-                  // For new units, ensure we have elements from template
-                  if (!unit && elements.length === 0) {
-                    console.log('⚠️ WARNING: New unit has no elements! Applying default template now...');
-                    const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-powerpoint') || DEFAULT_TEMPLATES[0];
-                    setElements(defaultTemplate.elements);
-                    setCurrentTemplateId(defaultTemplate.id);
-                    console.log('✅ Applied default template with', defaultTemplate.elements.length, 'elements');
-                  }
-                  
-                  await saveCurrentTemplateState();
-                  
-                  const saveData = { 
-                    elements, 
-                    canvasWidth, 
-                    canvasHeight, 
-                    canvasBackground, 
-                    canvasBorderWidth, 
-                    canvasBorderColor, 
-                    nation: getNationFromFlag(),
-                    current_template_id: currentTemplateId
-                  };
-                  console.log('💾 Final save data being sent to onSave:', {
-                    ...saveData,
-                    elementDetails: elements.map(el => ({ id: el.id, type: el.type, content: el.content }))
-                  });
-                  onSave(saveData);
-                }}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Salva
-              </button>
+              
+              {/* Se il template è cambiato in modalità edit, mostra solo pulsante portfolio */}
+              {unit?.id && templateChanged ? (
+                <button
+                  onClick={saveToPortfolio}
+                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Salva nel Portfolio
+                </button>
+              ) : (
+                /* Modalità normale: uno o due pulsanti in base al contesto */
+                <>
+                  {/* Pulsante salva comunità - nascosto se template è cambiato */}
+                  {!templateChanged && (
+                    <button
+                      onClick={async () => {
+                        // Save current template state first
+                        console.log('💾 Saving canvas data:', { 
+                          elementsCount: elements.length, 
+                          templateId: currentTemplateId,
+                          unitId: unit?.id,
+                          isNewUnit: !unit
+                        });
+                        
+                        // For new units, ensure we have elements from template
+                        if (!unit && elements.length === 0) {
+                          console.log('⚠️ WARNING: New unit has no elements! Applying default template now...');
+                          const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'naval-card-powerpoint') || DEFAULT_TEMPLATES[0];
+                          setElements(defaultTemplate.elements);
+                          setCurrentTemplateId(defaultTemplate.id);
+                          console.log('✅ Applied default template with', defaultTemplate.elements.length, 'elements');
+                        }
+                        
+                        await saveCurrentTemplateState();
+                        
+                        const saveData = { 
+                          elements, 
+                          canvasWidth, 
+                          canvasHeight, 
+                          canvasBackground, 
+                          canvasBorderWidth, 
+                          canvasBorderColor, 
+                          nation: getNationFromFlag(),
+                          current_template_id: currentTemplateId
+                        };
+                        console.log('💾 Final save data being sent to onSave:', {
+                          ...saveData,
+                          elementDetails: elements.map(el => ({ id: el.id, type: el.type, content: el.content }))
+                        });
+                        onSave(saveData);
+                      }}
+                      className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Salva
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1604,6 +1774,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                           type="text"
                           value={element.content || ''}
                           onChange={(e) => handleTextEdit(element.id, e.target.value)}
+                          onFocus={(e) => e.target.select()}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                           placeholder={element.type === 'unit_name' ? 'Inserisci nome unità...' : 'Inserisci classe unità...'}
                         />
@@ -1768,6 +1939,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                         <input
                           type="text"
                           value={element.style?.columnWidths ? element.style.columnWidths.join(',') : '25,25,25,25'}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => {
                             const widths = e.target.value.split(',').map(w => parseInt(w.trim()) || 25);
                             setElements(prev => prev.map(el => 
@@ -2063,11 +2235,27 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <TemplateManager
             onSelectTemplate={applyTemplate}
             onClose={() => setShowTemplateManager(false)}
-            onTemplatesUpdate={() => {
-              // Reload templates when they're updated
-              const savedTemplates = localStorage.getItem('naval-templates');
-              const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
-              setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+            onTemplatesUpdate={async () => {
+              // Reload templates from API when they're updated
+              try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                  console.log('⚠️ No auth token found during template update');
+                  setAllTemplates(DEFAULT_TEMPLATES);
+                  return;
+                }
+
+                console.log('🔄 Template updated, reloading from API...');
+                const apiTemplates = await templatesApi.getAll();
+                const allTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+                console.log('🔄 Template updated, reloading from API. Total templates:', allTemplates.length);
+                console.log('   API templates:', apiTemplates.map(t => `${t.id}: ${t.name}`));
+                setAllTemplates(allTemplates);
+              } catch (error) {
+                console.error('❌ Error reloading templates after update:', error);
+                // Fallback to default templates
+                setAllTemplates(DEFAULT_TEMPLATES);
+              }
             }}
             currentElements={elements}
             currentCanvasWidth={canvasWidth}

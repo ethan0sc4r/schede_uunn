@@ -2,48 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Palette, Download, Upload, Copy, Trash2, Plus, Edit, Save } from 'lucide-react';
 import TemplateManager, { type Template, CANVAS_SIZES } from '../components/TemplateManager';
 import TemplateEditor from '../components/TemplateEditor';
+import { templatesApi } from '../services/api';
 
-// Template predefiniti - duplicati da TemplateManager per evitare dipendenze circolari
+// Template predefiniti - Solo PowerPoint editabile
 const DEFAULT_TEMPLATES: Template[] = [
-  {
-    id: 'naval-card-standard',
-    name: 'Scheda Navale Standard',
-    description: 'Layout classico con logo, bandiera, silhouette e tabella caratteristiche',
-    isDefault: true,
-    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
-    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
-    canvasBackground: '#ffffff',
-    canvasBorderWidth: 2,
-    canvasBorderColor: '#000000',
-    createdAt: new Date().toISOString(),
-    elements: []
-  },
-  {
-    id: 'naval-card-minimal',
-    name: 'Scheda Navale Minimalista',
-    description: 'Layout semplificato con solo silhouette e informazioni essenziali',
-    isDefault: true,
-    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
-    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
-    canvasBackground: '#f8fafc',
-    canvasBorderWidth: 1,
-    canvasBorderColor: '#e2e8f0',
-    createdAt: new Date().toISOString(),
-    elements: []
-  },
-  {
-    id: 'naval-card-detailed',
-    name: 'Scheda Navale Dettagliata',
-    description: 'Layout completo con sezioni multiple per informazioni estese',
-    isDefault: true,
-    canvasWidth: CANVAS_SIZES.A4_LANDSCAPE.width,
-    canvasHeight: CANVAS_SIZES.A4_LANDSCAPE.height,
-    canvasBackground: '#ffffff',
-    canvasBorderWidth: 3,
-    canvasBorderColor: '#1f2937',
-    createdAt: new Date().toISOString(),
-    elements: []
-  },
   {
     id: 'naval-card-powerpoint',
     name: 'Template PowerPoint',
@@ -55,7 +17,72 @@ const DEFAULT_TEMPLATES: Template[] = [
     canvasBorderWidth: 2,
     canvasBorderColor: '#1e40af',
     createdAt: new Date().toISOString(),
-    elements: []
+    elements: [
+      {
+        id: 'logo',
+        type: 'logo',
+        x: 50,
+        y: 30,
+        width: 100,
+        height: 100,
+        style: { backgroundColor: '#1e40af', borderRadius: 8 }
+      },
+      {
+        id: 'flag',
+        type: 'flag',
+        x: 1130,
+        y: 30,
+        width: 100,
+        height: 67,
+        style: { backgroundColor: '#1e40af', borderRadius: 8 }
+      },
+      {
+        id: 'unit_name',
+        type: 'unit_name',
+        x: 170,
+        y: 30,
+        width: 500,
+        height: 40,
+        content: '[NOME UNITÀ]',
+        isFixed: true,
+        style: { fontSize: 28, fontWeight: 'bold', color: '#1e40af' }
+      },
+      {
+        id: 'unit_class',
+        type: 'unit_class',
+        x: 170,
+        y: 80,
+        width: 500,
+        height: 30,
+        content: '[CLASSE]',
+        isFixed: true,
+        style: { fontSize: 20, fontWeight: 'normal', color: '#374151' }
+      },
+      {
+        id: 'silhouette',
+        type: 'silhouette',
+        x: 50,
+        y: 150,
+        width: 1180,
+        height: 300,
+        style: { backgroundColor: '#3b82f6', borderRadius: 8 }
+      },
+      {
+        id: 'characteristics-table',
+        type: 'table',
+        x: 50,
+        y: 480,
+        width: 1180,
+        height: 200,
+        tableData: [
+          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
+          ['LUNGHEZZA', 'XXX m', 'LARGHEZZA', 'XXX m'],
+          ['DISLOCAMENTO', 'XXX t', 'VELOCITÀ', 'XXX kn'],
+          ['EQUIPAGGIO', 'XXX', 'ARMA', 'XXX']
+        ],
+        style: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' }
+      }
+    ]
   }
 ];
 
@@ -67,10 +94,66 @@ export default function Templates() {
 
   // Carica templates all'avvio
   useEffect(() => {
-    const saved = localStorage.getItem('naval-templates');
-    const userTemplates = saved ? JSON.parse(saved) : [];
-    setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+    loadTemplates();
   }, []);
+
+  const loadTemplates = async () => {
+    try {
+      const apiTemplates = await templatesApi.getAll();
+      const allTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+      setTemplates(allTemplates);
+    } catch (error) {
+      console.error('❌ Errore caricamento template:', error);
+      setTemplates(DEFAULT_TEMPLATES);
+    }
+  };
+
+  const handleSaveTemplate = async (templateData: Template) => {
+    try {
+      if (templateData.id && templates.find(t => t.id === templateData.id && !t.isDefault)) {
+        // Update existing template
+        await templatesApi.update(templateData.id, templateData);
+      } else {
+        // Create new template
+        await templatesApi.create(templateData);
+      }
+      await loadTemplates(); // Reload templates
+      setShowTemplateEditor(false);
+      setEditingTemplateId(undefined);
+    } catch (error) {
+      console.error('❌ Errore salvataggio template:', error);
+      alert('Errore nel salvare il template');
+    }
+  };
+
+  const handleDuplicateTemplate = async (template: Template) => {
+    try {
+      const duplicated: Template = {
+        ...template,
+        id: `template-${Date.now()}`,
+        name: `${template.name} (Copia)`,
+        isDefault: false,
+        createdAt: new Date().toISOString()
+      };
+      await templatesApi.create(duplicated);
+      await loadTemplates();
+    } catch (error) {
+      console.error('❌ Errore duplicazione template:', error);
+      alert('Errore nella duplicazione del template');
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (confirm('Sei sicuro di voler eliminare questo template?')) {
+      try {
+        await templatesApi.delete(templateId);
+        await loadTemplates();
+      } catch (error) {
+        console.error('❌ Errore eliminazione template:', error);
+        alert('Errore nell\'eliminazione del template');
+      }
+    }
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -172,19 +255,7 @@ export default function Templates() {
                     </button>
                     
                     <button
-                      onClick={() => {
-                        const duplicated: Template = {
-                          ...template,
-                          id: `template-${Date.now()}`,
-                          name: `${template.name} (Copia)`,
-                          isDefault: false,
-                          createdAt: new Date().toISOString()
-                        };
-                        const userTemplates = templates.filter(t => !t.isDefault);
-                        userTemplates.push(duplicated);
-                        localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-                        setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
-                      }}
+                      onClick={() => handleDuplicateTemplate(template)}
                       className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 transition-colors"
                       title="Duplica template"
                     >
@@ -193,13 +264,7 @@ export default function Templates() {
                     
                     {!template.isDefault && (
                       <button
-                        onClick={() => {
-                          if (confirm('Sei sicuro di voler eliminare questo template?')) {
-                            const userTemplates = templates.filter(t => !t.isDefault && t.id !== template.id);
-                            localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-                            setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
-                          }
-                        }}
+                        onClick={() => handleDeleteTemplate(template.id)}
                         className="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
                         title="Elimina template"
                       >
@@ -253,22 +318,7 @@ export default function Templates() {
         <div className="fixed inset-0 bg-white z-50">
           <TemplateEditor
             templateId={editingTemplateId}
-            onSave={(templateData) => {
-              // Save template to localStorage
-              const saved = localStorage.getItem('naval-templates');
-              const userTemplates = saved ? JSON.parse(saved) : [];
-              
-              const existingIndex = userTemplates.findIndex((t: Template) => t.id === templateData.id);
-              if (existingIndex >= 0) {
-                userTemplates[existingIndex] = templateData;
-              } else {
-                userTemplates.push(templateData);
-              }
-              
-              localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-              setShowTemplateEditor(false);
-              setEditingTemplateId(undefined);
-            }}
+            onSave={handleSaveTemplate}
             onCancel={() => {
               setShowTemplateEditor(false);
               setEditingTemplateId(undefined);

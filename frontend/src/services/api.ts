@@ -145,8 +145,9 @@ export const navalUnitsApi = {
   },
 
   // Template state management
-  saveTemplateState: async (unitId: number, templateId: string, stateData: any): Promise<void> => {
-    await api.post(`/api/units/${unitId}/template-states/${templateId}`, stateData);
+  saveTemplateState: async (unitId: number, templateId: string, stateData: any): Promise<any> => {
+    const response = await api.post(`/api/units/${unitId}/template-states/${templateId}`, stateData);
+    return response.data;
   },
 
   getTemplateState: async (unitId: number, templateId: string): Promise<any> => {
@@ -287,6 +288,58 @@ export const templatesApi = {
 
   delete: async (id: string): Promise<{ message: string }> => {
     const response = await api.delete(`/api/templates/${id}`);
+    return response.data;
+  },
+};
+
+// Portfolio API
+export const portfolioApi = {
+  getUserPortfolio: async (search?: string): Promise<{ portfolio_units: any[]; total: number }> => {
+    const url = search ? `/api/portfolio?search=${encodeURIComponent(search)}` : '/api/portfolio';
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  addToPortfolio: async (data: {
+    naval_unit_id: number;
+    template_id: string;
+    customizations?: any;
+  }): Promise<{ message: string; portfolio_unit_id: string }> => {
+    const response = await api.post('/api/portfolio/add', data);
+    return response.data;
+  },
+
+  getPortfolioUnit: async (navalUnitId: number, templateId: string): Promise<any> => {
+    const response = await api.get(`/api/portfolio/${navalUnitId}/templates/${templateId}`);
+    return response.data;
+  },
+
+  removeFromPortfolio: async (navalUnitId: number, templateId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/portfolio/${navalUnitId}/templates/${templateId}`);
+    return response.data;
+  },
+
+  createGroupFromPortfolio: async (data: {
+    name: string;
+    description?: string;
+    portfolio_unit_ids: number[];
+  }): Promise<{ message: string; group_id: number }> => {
+    const response = await api.post('/api/portfolio/create-group', data);
+    return response.data;
+  },
+
+  getAllPortfolios: async (): Promise<any[]> => {
+    const response = await api.get('/api/portfolios');
+    return response.data;
+  },
+
+  getPortfolioById: async (portfolioId: number): Promise<any> => {
+    const response = await api.get(`/api/portfolios/${portfolioId}`);
+    return response.data;
+  },
+
+  deletePortfolio: async (portfolioId: number): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/portfolios/${portfolioId}`);
     return response.data;
   },
 };

@@ -1,18 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Share2, FileImage, Printer, Presentation, X } from 'lucide-react';
-import { navalUnitsApi, templatesApi } from '../services/api';
+import { navalUnitsApi, templatesApi, portfolioApi } from '../services/api';
 import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
 
 export default function UnitView() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [unit, setUnit] = useState<NavalUnit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [portfolioData, setPortfolioData] = useState<any>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -43,19 +46,101 @@ export default function UnitView() {
     loadUnit();
   }, [id]);
 
-  // Load available templates
+  // Load available templates and portfolio data
   useEffect(() => {
-    const loadTemplates = async () => {
+    const loadTemplatesAndPortfolio = async () => {
       try {
+        // Load templates
         const templates = await templatesApi.getAll();
         setAvailableTemplates(templates);
+        
+        // Check if a specific template is requested in URL
+        const templateParam = searchParams.get('template');
+        const portfolioParam = searchParams.get('portfolio');
+        
+        if (templateParam && portfolioParam === 'true' && id) {
+          // This is a portfolio view - load portfolio data
+          try {
+            const portfolioUnitData = await portfolioApi.getPortfolioUnit(parseInt(id), templateParam);
+            setPortfolioData(portfolioUnitData);
+            console.log('✅ Portfolio data loaded:', portfolioUnitData);
+            
+            // Find and set the template
+            const requestedTemplate = templates.find(t => t.id === templateParam);
+            if (requestedTemplate) {
+              setSelectedTemplate(requestedTemplate);
+              console.log('✅ Portfolio template applied:', requestedTemplate.name);
+            }
+          } catch (portfolioError) {
+            console.warn('⚠️ Portfolio data not found, using regular template view');
+            // Fall back to regular template view
+            const requestedTemplate = templates.find(t => t.id === templateParam);
+            if (requestedTemplate) {
+              setSelectedTemplate(requestedTemplate);
+              console.log('✅ Template from URL applied (fallback):', requestedTemplate.name);
+            }
+          }
+        } else if (templateParam) {
+          // Regular template view
+          const requestedTemplate = templates.find(t => t.id === templateParam);
+          if (requestedTemplate) {
+            setSelectedTemplate(requestedTemplate);
+            console.log('✅ Template from URL applied:', requestedTemplate.name);
+          } else {
+            console.warn('⚠️ Template not found:', templateParam);
+          }
+        }
       } catch (error) {
         console.error('Error loading templates:', error);
         setAvailableTemplates([]);
       }
     };
-    loadTemplates();
-  }, []);
+    
+    if (id) {
+      loadTemplatesAndPortfolio();
+    }
+  }, [searchParams, id]);
+
+  // Build current layout config including portfolio customizations
+  const buildCurrentLayoutConfig = () => {
+    if (!unit) return null;
+    
+    console.log('🔍 DEBUGGING - Unit layout config:', {
+      hasLayoutConfig: !!unit.layout_config,
+      elementsCount: unit.layout_config?.elements?.length || 0,
+      canvasWidth: unit.layout_config?.canvasWidth,
+      canvasBackground: unit.layout_config?.canvasBackground
+    });
+    
+    if (portfolioData) {
+      console.log('🔍 DEBUGGING - Portfolio data:', {
+        hasElementStates: !!portfolioData.element_states,
+        elementStatesCount: Object.keys(portfolioData.element_states || {}).length,
+        hasCanvasConfig: !!portfolioData.canvas_config,
+        canvasConfig: portfolioData.canvas_config
+      });
+      
+      if (selectedTemplate) {
+        console.log('🔍 DEBUGGING - Selected template:', {
+          templateName: selectedTemplate.name,
+          templateId: selectedTemplate.id,
+          hasConfig: !!selectedTemplate.config,
+          templateElementsCount: selectedTemplate.config?.elements?.length || 0
+        });
+      }
+    }
+    
+    // For Portfolio mode, DON'T modify the layout_config
+    // Let backend handle Portfolio mode differently
+    if (portfolioData && selectedTemplate) {
+      console.log('🎯 PORTFOLIO MODE: Returning NULL to use backend Portfolio approach');
+      return null; // Signal to use Portfolio backend approach
+    }
+    
+    // Regular mode - use unit layout config (this works for non-Portfolio)
+    console.log('📄 REGULAR MODE: Using original unit layout config');
+    return { ...unit.layout_config };
+  };
 
   const handlePrint = async () => {
     if (!unit || !canvasRef.current) {
@@ -76,55 +161,27 @@ export default function UnitView() {
   };
 
   const handleExportPNG = async () => {
-    if (!unit) {
-      alert('Errore: Unità non disponibile per l\'esportazione');
+    if (!unit || !canvasRef.current) {
+      alert('Errore: Canvas non disponibile per l\'esportazione PNG');
       return;
     }
     
-    console.log('Starting server-side PNG export for:', unit.name);
+    console.log('Starting PNG export for:', unit.name);
     
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const currentLayoutConfig = buildCurrentLayoutConfig();
       
-      // Try public endpoint first, then authenticated endpoint as fallback
-      let response;
-      try {
-        response = await fetch(`${API_BASE_URL}/api/public/units/${unit.id}/export/png`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-      } catch (publicError) {
-        console.log('Public PNG export failed, trying authenticated endpoint...');
-        response = await fetch(`${API_BASE_URL}/api/units/${unit.id}/export/png`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          }
-        });
+      // If currentLayoutConfig is null, we're in Portfolio mode
+      if (currentLayoutConfig === null && portfolioData && selectedTemplate) {
+        console.log('🎯 Using Portfolio PNG export approach');
+        return await handlePortfolioPNGExport();
       }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('PNG export error response:', response.status, errorText);
-        throw new Error(`Errore durante l'export PNG: ${response.status} - ${errorText}`);
-      }
-
-      // Get the blob and create download link
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${unit.name.replace(/\s+/g, '_')}_scheda.png`;
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
       
+      // Regular PNG export
+      console.log('📄 Using regular PNG export approach');
+      const filename = `${unit.name.replace(/\s+/g, '_')}_scheda.png`;
+      await exportCanvasToPNG(canvasRef.current, filename, unit.id, currentLayoutConfig);
       console.log('PNG export completed successfully');
-      alert(`PNG di "${unit.name}" esportato con successo!`);
     } catch (error: any) {
       console.error('PNG export error:', error);
       alert(`Errore durante l'esportazione PNG: ${error.message || error}`);
@@ -132,10 +189,117 @@ export default function UnitView() {
   };
 
 
+  // Portfolio-style PNG export (similar to Portfolio PowerPoint approach)
+  const handlePortfolioPNGExport = async () => {
+    if (!portfolioData || !selectedTemplate) {
+      alert('Errore: Dati Portfolio non disponibili');
+      return;
+    }
+    
+    try {
+      console.log('📤 Portfolio PNG export starting:', {
+        unitId: unit.id,
+        templateId: selectedTemplate.id,
+        templateName: selectedTemplate.name
+      });
+      
+      // Use the same approach as Portfolio PowerPoint but call PNG endpoint
+      const response = await fetch(`/api/public/units/${unit.id}/export/png`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template_id: selectedTemplate.id,
+          customizations: {
+            element_states: portfolioData.element_states,
+            canvas_config: portfolioData.canvas_config
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `${unit.name}_${selectedTemplate.name}.png`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        console.log('✅ Portfolio PNG export completed');
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Portfolio PNG export failed:', errorText);
+        alert('Errore durante l\'esportazione PNG');
+      }
+    } catch (error) {
+      console.error('❌ Portfolio PNG export error:', error);
+      alert('Errore di connessione durante l\'esportazione PNG');
+    }
+  };
+
+  // Portfolio-style PowerPoint export (same as Portfolio.tsx)
+  const handlePortfolioPowerPointExport = async () => {
+    if (!portfolioData || !selectedTemplate) {
+      alert('Errore: Dati Portfolio non disponibili');
+      return;
+    }
+    
+    try {
+      console.log('📤 Portfolio PowerPoint export starting:', {
+        unitId: unit.id,
+        templateId: selectedTemplate.id,
+        templateName: selectedTemplate.name
+      });
+      
+      const response = await fetch(`/api/units/${unit.id}/export/powerpoint`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template_id: selectedTemplate.id,
+          customizations: {
+            element_states: portfolioData.element_states,
+            canvas_config: portfolioData.canvas_config
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `${unit.name}_${selectedTemplate.name}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        console.log('✅ Portfolio PowerPoint export completed');
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Portfolio PowerPoint export failed:', errorText);
+        alert('Errore durante l\'esportazione PowerPoint');
+      }
+    } catch (error) {
+      console.error('❌ Portfolio PowerPoint export error:', error);
+      alert('Errore di connessione durante l\'esportazione PowerPoint');
+    }
+  };
+
   const handleExportPowerPointWithTemplate = async (templateConfig: any = null) => {
     if (!unit) {
       alert('Errore: Unità non disponibile per l\'esportazione');
       return;
+    }
+    
+    // If we're in Portfolio mode, use Portfolio approach
+    if (portfolioData && selectedTemplate) {
+      console.log('🎯 Using Portfolio PowerPoint export approach');
+      return await handlePortfolioPowerPointExport();
     }
     
     console.log('Starting PowerPoint export for unit:', unit.id);
@@ -145,16 +309,10 @@ export default function UnitView() {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
       
-      // Extract only canvas properties for template config
+      // Use current layout config including portfolio customizations
     let finalTemplateConfig = templateConfig;
-    if (!finalTemplateConfig && unit.layout_config) {
-      finalTemplateConfig = {
-        canvasWidth: unit.layout_config.canvasWidth,
-        canvasHeight: unit.layout_config.canvasHeight,
-        canvasBackground: unit.layout_config.canvasBackground,
-        canvasBorderWidth: unit.layout_config.canvasBorderWidth,
-        canvasBorderColor: unit.layout_config.canvasBorderColor
-      };
+    if (!finalTemplateConfig) {
+      finalTemplateConfig = buildCurrentLayoutConfig();
     }
       console.log('🔍 PowerPoint export starting from View:', {
         unitId: unit.id,
@@ -239,15 +397,48 @@ export default function UnitView() {
   const renderCanvas = () => {
     if (!unit) return null;
     
-    // Use layout_config if available, otherwise create basic elements from direct fields
-    const elements = unit.layout_config?.elements || [];
-    const canvasConfig = unit.layout_config || {
-      canvasWidth: 1123,
-      canvasHeight: 794,
-      canvasBackground: '#ffffff',
-      canvasBorderWidth: 4,
-      canvasBorderColor: '#000000'
-    };
+    // Use selected template if available, otherwise use unit's layout_config
+    let elements = [];
+    let canvasConfig = {};
+    
+    if (selectedTemplate) {
+      // Use template configuration
+      elements = selectedTemplate.elements || [];
+      canvasConfig = {
+        canvasWidth: selectedTemplate.canvasWidth || 1123,
+        canvasHeight: selectedTemplate.canvasHeight || 794,
+        canvasBackground: selectedTemplate.canvasBackground || '#ffffff',
+        canvasBorderWidth: selectedTemplate.canvasBorderWidth || 4,
+        canvasBorderColor: selectedTemplate.canvasBorderColor || '#000000'
+      };
+      console.log('🎨 Using template configuration:', selectedTemplate.name);
+      
+      // If we have portfolio data, apply the element_states customizations
+      if (portfolioData && portfolioData.element_states) {
+        console.log('📋 Applying portfolio element states:', portfolioData.element_states);
+        elements = elements.map(element => {
+          const portfolioElementState = portfolioData.element_states[element.id];
+          if (portfolioElementState) {
+            // Merge portfolio customizations with template element
+            return {
+              ...element,
+              ...portfolioElementState
+            };
+          }
+          return element;
+        });
+      }
+    } else {
+      // Use layout_config if available, otherwise create basic elements from direct fields
+      elements = unit.layout_config?.elements || [];
+      canvasConfig = unit.layout_config || {
+        canvasWidth: 1123,
+        canvasHeight: 794,
+        canvasBackground: '#ffffff',
+        canvasBorderWidth: 4,
+        canvasBorderColor: '#000000'
+      };
+    }
     
     // If no elements but unit has direct image fields, create basic elements
     if (elements.length === 0 && (unit.logo_path || unit.flag_path || unit.silhouette_path)) {
@@ -570,7 +761,22 @@ export default function UnitView() {
                     </div>
                     <button
                       onClick={() => {
-                        handleExportPowerPointWithTemplate(null);
+                        // Pass current template data instead of null
+                        const currentTemplateConfig = selectedTemplate ? {
+                          canvasWidth: selectedTemplate.canvasWidth,
+                          canvasHeight: selectedTemplate.canvasHeight,
+                          canvasBackground: selectedTemplate.canvasBackground,
+                          canvasBorderWidth: selectedTemplate.canvasBorderWidth,
+                          canvasBorderColor: selectedTemplate.canvasBorderColor
+                        } : (unit?.layout_config ? {
+                          canvasWidth: unit.layout_config.canvasWidth,
+                          canvasHeight: unit.layout_config.canvasHeight,
+                          canvasBackground: unit.layout_config.canvasBackground,
+                          canvasBorderWidth: unit.layout_config.canvasBorderWidth,
+                          canvasBorderColor: unit.layout_config.canvasBorderColor
+                        } : null);
+                        
+                        handleExportPowerPointWithTemplate(currentTemplateConfig);
                         setShowTemplateSelector(false);
                       }}
                       className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"

@@ -9,6 +9,7 @@ import Register from './pages/Register';
 import NavalUnits from './pages/NavalUnits';
 import Groups from './pages/Groups';
 import Templates from './pages/Templates';
+import Portfolio from './pages/Portfolio';
 import Search from './pages/Search';
 import Admin from './pages/Admin';
 import UnitView from './pages/UnitView';
@@ -49,6 +50,7 @@ function App() {
               <Route path="units" element={<NavalUnits />} />
               <Route path="groups" element={<Groups />} />
               <Route path="templates" element={<Templates />} />
+              <Route path="portfolio" element={<Portfolio />} />
               <Route path="search" element={<Search />} />
               <Route
                 path="admin"

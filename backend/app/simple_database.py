@@ -141,6 +141,7 @@ def init_database():
                 silhouette_visible BOOLEAN DEFAULT 1,
                 created_by INTEGER NOT NULL,
                 is_default BOOLEAN DEFAULT 0,
+                is_public BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (created_by) REFERENCES users (id)
@@ -160,6 +161,43 @@ def init_database():
             cursor.execute('ALTER TABLE templates ADD COLUMN silhouette_visible BOOLEAN DEFAULT 1')
         except sqlite3.OperationalError:
             pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE templates ADD COLUMN is_public BOOLEAN DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        # User portfolios table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_portfolios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Portfolio units table - rappresenta "viste personalizzate" delle navi
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS portfolio_units (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,  -- proprietario del portfolio (non serve portfolio_id)
+                naval_unit_id INTEGER NOT NULL,  -- riferimento alla nave originale
+                template_id TEXT NOT NULL,  -- template applicato
+                custom_name TEXT,  -- nome personalizzato opzionale
+                element_states TEXT,  -- stati elementi per questo template
+                canvas_config TEXT,   -- configurazione canvas per questo template
+                notes TEXT,  -- note personali
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE,
+                FOREIGN KEY (template_id) REFERENCES templates (id),
+                UNIQUE(user_id, naval_unit_id, template_id)
+            )
+        ''')
         
         # Quiz sessions table
         cursor.execute('''
@@ -769,8 +807,8 @@ class SimpleDatabase:
                     INSERT OR REPLACE INTO templates 
                     (id, name, description, elements, canvas_width, canvas_height, 
                      canvas_background, canvas_border_width, canvas_border_color, 
-                     logo_visible, flag_visible, silhouette_visible, created_by, is_default, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     logo_visible, flag_visible, silhouette_visible, created_by, is_default, is_public, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ''', (
                     template_id,
                     template_data['name'],
@@ -785,7 +823,8 @@ class SimpleDatabase:
                     template_data.get('flagVisible', True),
                     template_data.get('silhouetteVisible', True),
                     user_id,
-                    template_data.get('isDefault', False)
+                    template_data.get('isDefault', False),
+                    template_data.get('isPublic', False)
                 ))
                 conn.commit()
                 return template_id
@@ -795,15 +834,15 @@ class SimpleDatabase:
 
     @staticmethod
     def get_templates(user_id: int) -> List[Dict]:
-        """Get all templates for a user"""
+        """Get all templates for a user (own + public + default)"""
         try:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT * FROM templates 
-                    WHERE created_by = ? OR is_default = 1
-                    ORDER BY is_default DESC, created_at DESC
-                ''', (user_id,))
+                    WHERE created_by = ? OR is_default = 1 OR is_public = 1
+                    ORDER BY is_default DESC, created_by = ? DESC, created_at DESC
+                ''', (user_id, user_id))
                 
                 templates = []
                 for row in cursor.fetchall():
@@ -819,6 +858,7 @@ class SimpleDatabase:
                     template['flagVisible'] = bool(template.get('flag_visible', True))
                     template['silhouetteVisible'] = bool(template.get('silhouette_visible', True))
                     template['isDefault'] = bool(template['is_default'])
+                    template['isPublic'] = bool(template.get('is_public', False))
                     template['createdAt'] = template['created_at']
                     templates.append(template)
                 
@@ -826,6 +866,75 @@ class SimpleDatabase:
         except Exception as e:
             print(f"Error getting templates: {e}")
             return []
+
+    @staticmethod
+    def get_user_templates(user_id: int) -> List[Dict]:
+        """Get only user's own templates"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM templates 
+                    WHERE created_by = ?
+                    ORDER BY created_at DESC
+                ''', (user_id,))
+                
+                templates = []
+                for row in cursor.fetchall():
+                    template = dict(row)
+                    template['elements'] = json.loads(template['elements'])
+                    template['canvasWidth'] = template['canvas_width']
+                    template['canvasHeight'] = template['canvas_height']
+                    template['canvasBackground'] = template['canvas_background']
+                    template['canvasBorderWidth'] = template['canvas_border_width']
+                    template['canvasBorderColor'] = template['canvas_border_color']
+                    template['logoVisible'] = bool(template.get('logo_visible', True))
+                    template['flagVisible'] = bool(template.get('flag_visible', True))
+                    template['silhouetteVisible'] = bool(template.get('silhouette_visible', True))
+                    template['isDefault'] = bool(template['is_default'])
+                    template['isPublic'] = bool(template.get('is_public', False))
+                    template['createdAt'] = template['created_at']
+                    templates.append(template)
+                
+                return templates
+        except Exception as e:
+            print(f"Error getting user templates: {e}")
+            return []
+
+    @staticmethod
+    def get_template_by_id_public(template_id: str) -> Optional[Dict]:
+        """Get a template by ID (public access for exports)"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM templates 
+                    WHERE id = ?
+                ''', (template_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    template = dict(row)
+                    
+                    # Parse elements from JSON
+                    template['elements'] = json.loads(template['elements']) if template['elements'] else []
+                    
+                    # Build config object from database fields (same structure as frontend expects)
+                    template['config'] = {
+                        'elements': template['elements'],
+                        'canvasWidth': template['canvas_width'],
+                        'canvasHeight': template['canvas_height'],
+                        'canvasBackground': template['canvas_background'],
+                        'canvasBorderWidth': template['canvas_border_width'],
+                        'canvasBorderColor': template['canvas_border_color']
+                    }
+                    
+                    print(f"✅ Template loaded: {template['name']} with {len(template['elements'])} elements")
+                    return template
+                return None
+        except Exception as e:
+            print(f"Error getting template by ID: {e}")
+            return None
 
     @staticmethod
     def get_template(template_id: str, user_id: int) -> Optional[Dict]:
@@ -852,6 +961,7 @@ class SimpleDatabase:
                     template['flagVisible'] = bool(template.get('flag_visible', True))
                     template['silhouetteVisible'] = bool(template.get('silhouette_visible', True))
                     template['isDefault'] = bool(template['is_default'])
+                    template['isPublic'] = bool(template.get('is_public', False))
                     template['createdAt'] = template['created_at']
                     return template
                 return None
@@ -869,7 +979,7 @@ class SimpleDatabase:
                     UPDATE templates SET 
                     name = ?, description = ?, elements = ?, canvas_width = ?, canvas_height = ?,
                     canvas_background = ?, canvas_border_width = ?, canvas_border_color = ?,
-                    logo_visible = ?, flag_visible = ?, silhouette_visible = ?, updated_at = CURRENT_TIMESTAMP
+                    logo_visible = ?, flag_visible = ?, silhouette_visible = ?, is_public = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND created_by = ?
                 ''', (
                     template_data['name'],
@@ -883,6 +993,7 @@ class SimpleDatabase:
                     template_data.get('logoVisible', True),
                     template_data.get('flagVisible', True),
                     template_data.get('silhouetteVisible', True),
+                    template_data.get('isPublic', False),
                     template_id,
                     user_id
                 ))
@@ -1236,6 +1347,348 @@ class SimpleDatabase:
             print(f"Error getting nations with units: {e}")
             return []
 
+    # Portfolio management methods (nuovo approccio)
+    @staticmethod
+    def add_unit_to_user_portfolio(user_id: int, naval_unit_id: int, template_id: str, 
+                                   element_states: dict = None, canvas_config: dict = None,
+                                   custom_name: str = None, notes: str = None) -> Optional[int]:
+        """Aggiungi unità al portfolio utente con template specifico"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO portfolio_units 
+                    (user_id, naval_unit_id, template_id, custom_name, element_states, canvas_config, notes, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (user_id, naval_unit_id, template_id, custom_name, 
+                      json.dumps(element_states) if element_states else None,
+                      json.dumps(canvas_config) if canvas_config else None,
+                      notes))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"Error adding unit to portfolio: {e}")
+            return None
+
+    @staticmethod
+    def get_user_portfolio(user_id: int, search_query: str = None) -> List[Dict]:
+        """Ottieni tutte le unità nel portfolio dell'utente con dati aggiornati"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                base_query = '''
+                    SELECT pu.*, nu.name, nu.unit_class, nu.nation, nu.logo_path, nu.silhouette_path, nu.flag_path,
+                           t.name as template_name, t.description as template_description
+                    FROM portfolio_units pu
+                    JOIN naval_units nu ON pu.naval_unit_id = nu.id
+                    JOIN templates t ON pu.template_id = t.id
+                    WHERE pu.user_id = ?
+                '''
+                
+                params = [user_id]
+                
+                if search_query:
+                    base_query += '''
+                        AND (nu.name LIKE ? OR nu.unit_class LIKE ? OR nu.nation LIKE ? 
+                             OR pu.custom_name LIKE ? OR pu.notes LIKE ?)
+                    '''
+                    search_param = f"%{search_query}%"
+                    params.extend([search_param] * 5)
+                
+                base_query += ' ORDER BY pu.updated_at DESC'
+                
+                cursor.execute(base_query, params)
+                
+                units = []
+                for row in cursor.fetchall():
+                    unit = dict(row)
+                    # Parse JSON fields
+                    if unit['element_states']:
+                        try:
+                            unit['element_states'] = json.loads(unit['element_states'])
+                        except:
+                            unit['element_states'] = {}
+                    if unit['canvas_config']:
+                        try:
+                            unit['canvas_config'] = json.loads(unit['canvas_config'])
+                        except:
+                            unit['canvas_config'] = {}
+                    units.append(unit)
+                
+                return units
+        except Exception as e:
+            print(f"Error getting user portfolio: {e}")
+            return []
+
+    @staticmethod
+    def remove_from_user_portfolio(user_id: int, naval_unit_id: int, template_id: str) -> bool:
+        """Rimuovi unità dal portfolio utente"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    DELETE FROM portfolio_units 
+                    WHERE user_id = ? AND naval_unit_id = ? AND template_id = ?
+                ''', (user_id, naval_unit_id, template_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error removing from portfolio: {e}")
+            return False
+
+    @staticmethod
+    def get_user_portfolio_unit_state(user_id: int, naval_unit_id: int, template_id: str) -> Optional[Dict]:
+        """Ottieni lo stato di una specifica unità nel portfolio dell'utente"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT element_states, canvas_config, custom_name, notes
+                    FROM portfolio_units 
+                    WHERE user_id = ? AND naval_unit_id = ? AND template_id = ?
+                ''', (user_id, naval_unit_id, template_id))
+                row = cursor.fetchone()
+                
+                if row:
+                    return {
+                        'element_states': json.loads(row[0]) if row[0] else {},
+                        'canvas_config': json.loads(row[1]) if row[1] else {},
+                        'custom_name': row[2],
+                        'notes': row[3] or ''
+                    }
+                return None
+        except Exception as e:
+            print(f"Error getting portfolio unit state: {e}")
+            return None
+
+    @staticmethod
+    def get_user_portfolio_unit(user_id: int, naval_unit_id: int, template_id: str) -> Optional[Dict]:
+        """Ottieni i dati completi di una specifica unità nel portfolio dell'utente"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT pu.*, nu.name, nu.unit_class, nu.nation, nu.logo_path, nu.silhouette_path, nu.flag_path,
+                           t.name as template_name, t.description as template_description
+                    FROM portfolio_units pu
+                    JOIN naval_units nu ON pu.naval_unit_id = nu.id
+                    LEFT JOIN templates t ON pu.template_id = t.id
+                    WHERE pu.user_id = ? AND pu.naval_unit_id = ? AND pu.template_id = ?
+                ''', (user_id, naval_unit_id, template_id))
+                
+                row = cursor.fetchone()
+                if row:
+                    portfolio_unit = dict(row)
+                    # Parse JSON fields
+                    portfolio_unit['element_states'] = json.loads(portfolio_unit['element_states']) if portfolio_unit['element_states'] else {}
+                    portfolio_unit['canvas_config'] = json.loads(portfolio_unit['canvas_config']) if portfolio_unit['canvas_config'] else {}
+                    return portfolio_unit
+                return None
+        except Exception as e:
+            print(f"Error getting portfolio unit: {e}")
+            return None
+
+    @staticmethod
+    def create_group_from_portfolio_selection(user_id: int, group_name: str, description: str, 
+                                             selected_portfolio_units: List[int]) -> Optional[int]:
+        """Crea un gruppo dalle unità selezionate nel portfolio"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Ottieni gli ID delle navi originali dalle unità del portfolio
+                placeholders = ','.join(['?'] * len(selected_portfolio_units))
+                cursor.execute(f'''
+                    SELECT DISTINCT naval_unit_id FROM portfolio_units 
+                    WHERE user_id = ? AND id IN ({placeholders})
+                ''', [user_id] + selected_portfolio_units)
+                
+                naval_unit_ids = [row[0] for row in cursor.fetchall()]
+                
+                if not naval_unit_ids:
+                    return None
+                
+                # Crea il gruppo usando la funzione esistente
+                return SimpleDatabase.create_group(group_name, description, user_id, naval_unit_ids)
+        except Exception as e:
+            print(f"Error creating group from portfolio: {e}")
+            return None
+
+    # Metodi legacy per compatibilità (possono essere rimossi dopo)
+    @staticmethod
+    def create_portfolio(user_id: int, name: str, description: str = "") -> Optional[int]:
+        """Legacy method - ora il portfolio è unico per utente"""
+        return user_id  # Ritorna l'user_id come portfolio_id
+
+    @staticmethod
+    def get_user_portfolios(user_id: int) -> List[Dict]:
+        """Get all portfolios for a user"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM user_portfolios 
+                    WHERE user_id = ? 
+                    ORDER BY created_at DESC
+                ''', (user_id,))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error getting user portfolios: {e}")
+            return []
+
+    @staticmethod
+    def get_portfolio_by_id(portfolio_id: int, user_id: int) -> Optional[Dict]:
+        """Get a specific portfolio with its units"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT * FROM user_portfolios 
+                    WHERE id = ? AND user_id = ?
+                ''', (portfolio_id, user_id))
+                portfolio_row = cursor.fetchone()
+                
+                if not portfolio_row:
+                    return None
+                
+                portfolio = dict(portfolio_row)
+                
+                # Get portfolio units with template and naval unit details
+                cursor.execute('''
+                    SELECT pu.*, nu.name as unit_name, nu.unit_class, nu.nation,
+                           t.name as template_name, t.description as template_description
+                    FROM portfolio_units pu
+                    JOIN naval_units nu ON pu.naval_unit_id = nu.id
+                    JOIN templates t ON pu.template_id = t.id
+                    WHERE pu.portfolio_id = ?
+                    ORDER BY pu.created_at DESC
+                ''', (portfolio_id,))
+                
+                units = []
+                for row in cursor.fetchall():
+                    unit = dict(row)
+                    if unit['customizations']:
+                        try:
+                            unit['customizations'] = json.loads(unit['customizations'])
+                        except:
+                            unit['customizations'] = {}
+                    units.append(unit)
+                
+                portfolio['units'] = units
+                return portfolio
+        except Exception as e:
+            print(f"Error getting portfolio: {e}")
+            return None
+
+    @staticmethod
+    def add_unit_to_portfolio(portfolio_id: int, naval_unit_id: int, template_id: str, customizations: dict = None) -> Optional[int]:
+        """Add a unit with specific template to portfolio"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO portfolio_units 
+                    (portfolio_id, naval_unit_id, template_id, customizations, updated_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (portfolio_id, naval_unit_id, template_id, json.dumps(customizations) if customizations else None))
+                conn.commit()
+                return cursor.lastrowid
+        except Exception as e:
+            print(f"Error adding unit to portfolio: {e}")
+            return None
+
+    @staticmethod
+    def update_portfolio_unit_customizations(portfolio_id: int, naval_unit_id: int, template_id: str, customizations: dict) -> bool:
+        """Update customizations for a specific unit in portfolio"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE portfolio_units 
+                    SET customizations = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE portfolio_id = ? AND naval_unit_id = ? AND template_id = ?
+                ''', (json.dumps(customizations), portfolio_id, naval_unit_id, template_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating portfolio unit customizations: {e}")
+            return False
+
+    @staticmethod
+    def remove_unit_from_portfolio(portfolio_id: int, naval_unit_id: int, template_id: str) -> bool:
+        """Remove a unit from portfolio"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    DELETE FROM portfolio_units 
+                    WHERE portfolio_id = ? AND naval_unit_id = ? AND template_id = ?
+                ''', (portfolio_id, naval_unit_id, template_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error removing unit from portfolio: {e}")
+            return False
+
+    @staticmethod
+    def delete_portfolio(portfolio_id: int, user_id: int) -> bool:
+        """Delete a portfolio and all its units"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    DELETE FROM user_portfolios 
+                    WHERE id = ? AND user_id = ?
+                ''', (portfolio_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting portfolio: {e}")
+            return False
+
+    @staticmethod
+    def get_public_templates_with_users() -> List[Dict]:
+        """Get all public templates with creator information for portfolio browsing"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT t.*, u.first_name, u.last_name, u.email
+                    FROM templates t
+                    JOIN users u ON t.created_by = u.id
+                    WHERE t.is_public = 1
+                    ORDER BY t.created_at DESC
+                ''', ())
+                
+                templates = []
+                for row in cursor.fetchall():
+                    template = dict(row)
+                    template['elements'] = json.loads(template['elements'])
+                    template['canvasWidth'] = template['canvas_width']
+                    template['canvasHeight'] = template['canvas_height']
+                    template['canvasBackground'] = template['canvas_background']
+                    template['canvasBorderWidth'] = template['canvas_border_width']
+                    template['canvasBorderColor'] = template['canvas_border_color']
+                    template['logoVisible'] = bool(template.get('logo_visible', True))
+                    template['flagVisible'] = bool(template.get('flag_visible', True))
+                    template['silhouetteVisible'] = bool(template.get('silhouette_visible', True))
+                    template['isDefault'] = bool(template['is_default'])
+                    template['isPublic'] = bool(template.get('is_public', False))
+                    template['createdAt'] = template['created_at']
+                    template['creator'] = {
+                        'first_name': template['first_name'],
+                        'last_name': template['last_name'],
+                        'email': template['email']
+                    }
+                    templates.append(template)
+                
+                return templates
+        except Exception as e:
+            print(f"Error getting public templates: {e}")
+            return []
+
 # Initialize database on import
 init_database()
 
@@ -1265,7 +1718,7 @@ def migrate_database():
                 
             # Add current_template_id column if it doesn't exist
             if 'current_template_id' not in columns:
-                cursor.execute("ALTER TABLE naval_units ADD COLUMN current_template_id TEXT DEFAULT 'naval-card-standard'")
+                cursor.execute("ALTER TABLE naval_units ADD COLUMN current_template_id TEXT DEFAULT 'naval-card-powerpoint'")
                 conn.commit()
                 print("Added current_template_id column to naval_units table")
                 
@@ -1285,6 +1738,77 @@ def migrate_database():
             ''')
             conn.commit()
             print("Created unit_template_states table")
+            
+            # Check and migrate portfolio_units table
+            cursor.execute("PRAGMA table_info(portfolio_units)")
+            portfolio_columns = [column[1] for column in cursor.fetchall()]
+            print(f"Portfolio_units columns: {portfolio_columns}")
+            
+            if 'user_id' not in portfolio_columns:
+                # Need to recreate the table with user_id
+                print("Migrating portfolio_units table to add user_id column...")
+                
+                # Backup existing data
+                cursor.execute("SELECT * FROM portfolio_units")
+                existing_data = cursor.fetchall()
+                
+                # Drop old table
+                cursor.execute("DROP TABLE IF EXISTS portfolio_units_old")
+                cursor.execute("ALTER TABLE portfolio_units RENAME TO portfolio_units_old")
+                
+                # Create new table with correct schema
+                cursor.execute('''
+                    CREATE TABLE portfolio_units (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL DEFAULT 1,  -- proprietario del portfolio
+                        naval_unit_id INTEGER NOT NULL,  -- riferimento alla nave originale
+                        template_id TEXT NOT NULL,  -- template applicato
+                        custom_name TEXT,  -- nome personalizzato opzionale
+                        element_states TEXT,  -- stati elementi per questo template
+                        canvas_config TEXT,   -- configurazione canvas per questo template
+                        notes TEXT,  -- note personali
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                        FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE,
+                        UNIQUE(user_id, naval_unit_id, template_id)
+                    )
+                ''')
+                
+                # Migrate existing data (if any) - assign to admin user (id=1)
+                if existing_data:
+                    for row in existing_data:
+                        cursor.execute('''
+                            INSERT OR IGNORE INTO portfolio_units 
+                            (user_id, naval_unit_id, template_id, custom_name, element_states, canvas_config, notes)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (1, row[1], row[2], row[3] if len(row) > 3 else None, 
+                              row[4] if len(row) > 4 else None, row[5] if len(row) > 5 else None,
+                              row[6] if len(row) > 6 else None))
+                
+                # Drop old table
+                cursor.execute("DROP TABLE IF EXISTS portfolio_units_old")
+                conn.commit()
+                print("Successfully migrated portfolio_units table")
+            else:
+                print("Portfolio_units table already has user_id column")
+                
+            # Clean up old default templates, keep only PowerPoint
+            cursor.execute("SELECT id FROM templates WHERE is_default = 1")
+            default_templates = cursor.fetchall()
+            
+            templates_to_keep = ['naval-card-powerpoint']
+            templates_removed = 0
+            
+            for template_row in default_templates:
+                template_id = template_row[0]
+                if template_id not in templates_to_keep:
+                    cursor.execute("DELETE FROM templates WHERE id = ? AND is_default = 1", (template_id,))
+                    templates_removed += 1
+            
+            if templates_removed > 0:
+                conn.commit()
+                print(f"Removed {templates_removed} old default templates, kept only PowerPoint")
     except Exception as e:
         print(f"Migration error: {e}")
 

@@ -13,6 +13,8 @@ COPY . .
 
 # Crea la directory per i file statici e uploads
 RUN mkdir -p data/uploads
+RUN mkdir -p data/temp
+RUN mkdir -p data/exports
 RUN mkdir -p static
 
 # Esponi la porta 8001

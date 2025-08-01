@@ -27,20 +27,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Include quiz router
+# Include routers
+from api.portfolio import router as portfolio_router
 app.include_router(quiz_router, prefix="/api", tags=["quiz"])
+app.include_router(portfolio_router, prefix="/api", tags=["portfolio"])
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", "http://127.0.0.1:5173",
-        "http://localhost:5174", "http://127.0.0.1:5174", 
-        "http://localhost:5175", "http://127.0.0.1:5175",
-        "http://localhost:5176", "http://127.0.0.1:5176",
-        "http://localhost:5177", "http://127.0.0.1:5177",
-        "http://localhost:3000", "http://127.0.0.1:3000"
-    ],
+    #allow_origins=[
+    #    "http://localhost:5173"
+    #],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -369,16 +367,20 @@ async def upload_flag(unit_id: int, file: UploadFile = File(...), user: dict = D
     return {"message": "Flag uploaded successfully", "file_path": file_path}
 
 @app.post("/api/units/{unit_id}/export/powerpoint")
-async def export_unit_powerpoint(unit_id: int, template_config: dict = None):
+async def export_unit_powerpoint(unit_id: int, export_data: dict = None):
     """Export a single naval unit to PowerPoint presentation (authenticated)"""
-    return await _export_unit_powerpoint_internal(unit_id, template_config)
+    template_config = export_data.get('template_config') if export_data else None
+    element_states = export_data.get('element_states') if export_data else None
+    return await _export_unit_powerpoint_internal(unit_id, template_config, element_states)
 
 @app.post("/api/public/units/{unit_id}/export/powerpoint")
-async def export_unit_powerpoint_public(unit_id: int, template_config: dict = None):
+async def export_unit_powerpoint_public(unit_id: int, export_data: dict = None):
     """Export a single naval unit to PowerPoint presentation (public, no auth required)"""
-    return await _export_unit_powerpoint_internal(unit_id, template_config)
+    template_config = export_data.get('template_config') if export_data else None
+    element_states = export_data.get('element_states') if export_data else None
+    return await _export_unit_powerpoint_internal(unit_id, template_config, element_states)
 
-async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict = None):
+async def _export_unit_powerpoint_internal(unit_id: int, template_config: dict = None, element_states: dict = None):
     """Export a single naval unit to PowerPoint presentation"""
     
     try:
@@ -436,16 +438,87 @@ async def export_unit_pdf(unit_id: int, group_id: Optional[int] = None, user: di
     raise HTTPException(status_code=501, detail="PDF export not implemented")
 
 @app.post("/api/units/{unit_id}/export/png")
-async def export_unit_png(unit_id: int):
+async def export_unit_png(unit_id: int, export_data: dict = None):
     """Export a single naval unit to PNG image (server-side rendering)"""
-    return await _export_unit_png_internal(unit_id)
+    layout_config = export_data.get('layout_config') if export_data else None
+    return await _export_unit_png_internal(unit_id, layout_config)
 
 @app.post("/api/public/units/{unit_id}/export/png")
-async def export_unit_png_public(unit_id: int):
+async def export_unit_png_public(unit_id: int, export_data: dict = None):
     """Export a single naval unit to PNG image (public, no auth required)"""
-    return await _export_unit_png_internal(unit_id)
+    if export_data:
+        # Portfolio approach: template_id + customizations
+        if 'template_id' in export_data and 'customizations' in export_data:
+            print(f"🎯 Portfolio PNG export - template_id: {export_data.get('template_id')}")
+            return await _export_portfolio_png_internal(unit_id, export_data['template_id'], export_data['customizations'])
+        # Regular approach: layout_config
+        elif 'layout_config' in export_data:
+            print(f"📄 Regular PNG export with custom layout_config")
+            return await _export_unit_png_internal(unit_id, export_data['layout_config'])
+    
+    # Default: use unit's original layout_config
+    print(f"📄 Regular PNG export with unit's original layout_config")
+    return await _export_unit_png_internal(unit_id, None)
 
-async def _export_unit_png_internal(unit_id: int):
+async def _export_portfolio_png_internal(unit_id: int, template_id: str, customizations: dict):
+    """Export a portfolio unit to PNG using template + customizations approach"""
+    try:
+        print(f"🎯 Portfolio PNG export - unit: {unit_id}, template: {template_id}")
+        
+        # Get the unit
+        unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+        if not unit:
+            raise HTTPException(status_code=404, detail="Naval unit not found")
+        
+        # Get the template  
+        template = SimpleDatabase.get_template_by_id_public(template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        print(f"📋 Template found: {template['name']}")
+        print(f"🎨 Customizations: element_states={len(customizations.get('element_states', {}))}, canvas_config={bool(customizations.get('canvas_config'))}")
+        
+        # Build layout config using template + customizations (same logic as PowerPoint)
+        layout_config = template['config'].copy() if template['config'] else {}
+        
+        # Apply canvas customizations
+        if customizations.get('canvas_config'):
+            layout_config.update(customizations['canvas_config'])
+        
+        # Apply element state customizations
+        if customizations.get('element_states') and layout_config.get('elements'):
+            for element in layout_config['elements']:
+                element_state = customizations['element_states'].get(element['id'])
+                if element_state:
+                    element.update(element_state)
+        
+        # Override unit's layout_config with the built one
+        unit['layout_config'] = layout_config
+        
+        print(f"✅ Built layout config with {len(layout_config.get('elements', []))} elements")
+        
+        # Use standard PNG creation
+        from utils.png_export import create_unit_png_to_buffer
+        output_buffer = io.BytesIO()
+        create_unit_png_to_buffer(unit, output_buffer)
+        
+        # Return as response
+        output_buffer.seek(0)
+        from fastapi.responses import StreamingResponse
+        safe_name = "".join(c for c in unit['name'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        filename = f"{safe_name}_{template['name']}.png"
+        
+        return StreamingResponse(
+            io.BytesIO(output_buffer.read()),
+            media_type="image/png",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"❌ Portfolio PNG export error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Portfolio PNG export failed: {str(e)}")
+
+async def _export_unit_png_internal(unit_id: int, custom_layout_config: dict = None):
     """Export a single naval unit to PNG image"""
     
     try:
@@ -458,6 +531,13 @@ async def _export_unit_png_internal(unit_id: int):
             raise HTTPException(status_code=404, detail="Naval unit not found")
         
         print(f"Unit found: {unit['name']}")
+        
+        # Override layout_config if custom one provided
+        if custom_layout_config:
+            print(f"Using custom layout config with {len(custom_layout_config.get('elements', []))} elements")
+            unit['layout_config'] = custom_layout_config
+        else:
+            print(f"Using unit's original layout config")
         
         # Create PNG using server-side rendering in memory
         from utils.png_export import create_unit_png_to_buffer
@@ -778,14 +858,24 @@ async def export_group_powerpoint(group_id: int, user: dict = Depends(get_curren
 # Template state endpoints
 @app.post("/api/units/{unit_id}/template-states/{template_id}")
 async def save_template_state(unit_id: int, template_id: str, state_data: dict, user: dict = Depends(get_current_user)):
-    """Save the state of elements for a specific template"""
+    """Save the state of elements for a specific template - for internal state management only"""
     try:
         element_states = state_data.get('element_states', {})
         canvas_config = state_data.get('canvas_config', {})
         
-        success = SimpleDatabase.save_unit_template_state(unit_id, template_id, element_states, canvas_config)
+        # Save to template states for this unit (NOT to portfolio)
+        success = SimpleDatabase.save_unit_template_state(
+            unit_id=unit_id,
+            template_id=template_id,
+            element_states=element_states,
+            canvas_config=canvas_config
+        )
+        
         if success:
-            return {"message": "Template state saved successfully"}
+            return {
+                "message": "Template state saved successfully", 
+                "template_id": template_id
+            }
         else:
             raise HTTPException(status_code=500, detail="Error saving template state")
     except Exception as e:
@@ -793,12 +883,20 @@ async def save_template_state(unit_id: int, template_id: str, state_data: dict, 
 
 @app.get("/api/units/{unit_id}/template-states/{template_id}")
 async def get_template_state(unit_id: int, template_id: str, user: dict = Depends(get_current_user)):
-    """Get the saved state for a specific template"""
-    state = SimpleDatabase.get_unit_template_state(unit_id, template_id)
-    if state:
-        return state
-    else:
-        return {"element_states": {}, "canvas_config": {}}
+    """Get the saved state for a specific template - checks user's portfolio first"""
+    # Prima controlla se l'utente ha questa combinazione nel portfolio
+    portfolio_state = SimpleDatabase.get_user_portfolio_unit_state(user['id'], unit_id, template_id)
+    if portfolio_state:
+        return {
+            "element_states": portfolio_state.get('element_states', {}),
+            "canvas_config": portfolio_state.get('canvas_config', {}),
+            "custom_name": portfolio_state.get('custom_name'),
+            "notes": portfolio_state.get('notes', ''),
+            "from_portfolio": True
+        }
+    
+    # Se non c'è nel portfolio, ritorna stato vuoto (non più dall'originale)
+    return {"element_states": {}, "canvas_config": {}, "from_portfolio": False}
 
 @app.get("/api/units/{unit_id}/template-states")
 async def get_all_template_states(unit_id: int, user: dict = Depends(get_current_user)):
@@ -838,54 +936,90 @@ async def get_template(template_id: str, user: dict = Depends(get_current_user))
 
 @app.put("/api/templates/{template_id}")
 async def update_template(template_id: str, template_data: dict, user: dict = Depends(get_current_user)):
-    """Update a template and automatically apply changes to all units using this template"""
+    """Update a template - NON modifica più le unità originali automaticamente"""
     try:
-        # Update the template
+        # Update only the template
         success = SimpleDatabase.update_template(template_id, template_data, user['id'])
         if not success:
             raise HTTPException(status_code=404, detail="Template not found")
         
-        # Get all units using this template
-        units_using_template = SimpleDatabase.get_units_using_template(template_id)
-        print(f"🔄 Template {template_id} updated, propagating to {len(units_using_template)} units")
-        
-        # Update each unit that uses this template
-        updated_units = []
-        for unit in units_using_template:
-            try:
-                # Apply template changes to unit's layout_config
-                # The template visibility settings should drive the unit's presentation
-                updated_layout = unit.get('layout_config', {})
-                
-                # Update canvas settings from template
-                updated_layout.update({
-                    'canvasWidth': template_data.get('canvasWidth', 1123),
-                    'canvasHeight': template_data.get('canvasHeight', 794),
-                    'canvasBackground': template_data.get('canvasBackground', '#ffffff'),
-                    'canvasBorderWidth': template_data.get('canvasBorderWidth', 2),
-                    'canvasBorderColor': template_data.get('canvasBorderColor', '#000000'),
-                    'templateId': template_id
-                })
-                
-                # Update elements from template
-                if 'elements' in template_data:
-                    updated_layout['elements'] = template_data['elements']
-                
-                # Update the unit in database
-                SimpleDatabase.update_naval_unit(unit['id'], layout_config=updated_layout)
-                updated_units.append(unit['id'])
-                print(f"✅ Updated unit {unit['id']} ({unit['name']})")
-                
-            except Exception as unit_error:
-                print(f"❌ Error updating unit {unit['id']}: {unit_error}")
-        
-        return {
-            "message": "Template updated successfully", 
-            "units_updated": len(updated_units),
-            "updated_unit_ids": updated_units
-        }
+        return {"message": "Template updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating template: {str(e)}")
+
+# Nuovo endpoint per applicare template a una o più unità
+@app.post("/api/templates/{template_id}/apply")
+async def apply_template_to_units(
+    template_id: str, 
+    unit_ids: dict,  # {"unit_ids": [1, 2, 3]}
+    user: dict = Depends(get_current_user)
+):
+    """Applica template a una o più unità - le aggiunge al portfolio utente"""
+    print(f"🔍 APPLY TEMPLATE ENDPOINT CALLED:")
+    print(f"  Template ID: {template_id}")
+    print(f"  Unit IDs: {unit_ids.get('unit_ids', [])}")
+    print(f"  User: {user['id']}")
+    try:
+        template = SimpleDatabase.get_template(template_id, user['id'])
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        applied_units = []
+        for unit_id in unit_ids.get('unit_ids', []):
+            # Verifica che l'unità esista
+            unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+            if not unit:
+                continue
+                
+            # Convert template elements array to element_states object and apply unit data
+            template_elements = template.get('elements', [])
+            element_states = {}
+            
+            for element in template_elements:
+                element_data = element.copy()
+                
+                # Apply unit data to replace placeholders
+                if element.get('type') == 'unit_name':
+                    element_data['content'] = unit.get('name', element.get('content', '[NOME UNITÀ]'))
+                elif element.get('type') == 'unit_class':
+                    element_data['content'] = unit.get('unit_class', element.get('content', '[CLASSE]'))
+                elif element.get('type') == 'logo' and unit.get('logo_path'):
+                    element_data['image'] = unit['logo_path']
+                elif element.get('type') == 'flag' and unit.get('flag_path'):
+                    element_data['image'] = unit['flag_path']
+                elif element.get('type') == 'silhouette' and unit.get('silhouette_path'):
+                    element_data['image'] = unit['silhouette_path']
+                
+                element_states[element['id']] = element_data
+            
+            # Aggiungi al portfolio utente con dati corretti
+            portfolio_unit_id = SimpleDatabase.add_unit_to_user_portfolio(
+                user_id=user['id'],
+                naval_unit_id=unit_id,
+                template_id=template_id,
+                element_states=element_states,
+                canvas_config={
+                    'canvasWidth': template.get('canvasWidth', 1123),
+                    'canvasHeight': template.get('canvasHeight', 794),
+                    'canvasBackground': template.get('canvasBackground', '#ffffff'),
+                    'canvasBorderWidth': template.get('canvasBorderWidth', 2),
+                    'canvasBorderColor': template.get('canvasBorderColor', '#000000')
+                }
+            )
+            
+            if portfolio_unit_id:
+                applied_units.append({
+                    'unit_id': unit_id,
+                    'unit_name': unit['name'],
+                    'portfolio_unit_id': portfolio_unit_id
+                })
+        
+        return {
+            "message": f"Template applicato a {len(applied_units)} unità nel tuo portfolio",
+            "applied_units": applied_units
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error applying template: {str(e)}")
 
 @app.get("/api/templates/{template_id}/units")
 async def get_units_using_template(template_id: str, user: dict = Depends(get_current_user)):
@@ -997,4 +1131,4 @@ if __name__ == "__main__":
     start_cleanup_scheduler()
     
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
