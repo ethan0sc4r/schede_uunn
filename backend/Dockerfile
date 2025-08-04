@@ -1,5 +1,5 @@
 # Dockerfile per il backend (simple_main.py)
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 # Imposta la directory di lavoro
 WORKDIR /app
