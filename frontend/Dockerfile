@@ -42,7 +42,5 @@ RUN mkdir -p /var/run && \
 # Esponi la porta 80
 EXPOSE 80
 
-# Avvia nginx come utente nginx (non root)
-USER nginx
 
 CMD ["nginx", "-g", "daemon off;"]
