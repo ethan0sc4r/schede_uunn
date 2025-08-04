@@ -40,7 +40,7 @@ RUN mkdir -p /var/run && \
     chown -R nginx:nginx /var/run
 
 # Esponi la porta 80
-EXPOSE 80
+EXPOSE 8081
 
 
 CMD ["nginx", "-g", "daemon off;"]
