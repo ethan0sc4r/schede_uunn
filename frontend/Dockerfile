@@ -28,6 +28,9 @@ COPY nginx.conf /etc/nginx/conf.d/
 # Copia i file build nella directory di nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Concede i permessi all'utente 'nginx' per accedere alla cache
+RUN chown -R nginx:nginx /var/cache/nginx
+
 # Esponi la porta 80
 EXPOSE 80
 
