@@ -34,12 +34,7 @@ app.include_router(quiz_router, prefix="/api", tags=["quiz"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173", "http://127.0.0.1:5173",
-        "http://localhost:5174", "http://127.0.0.1:5174", 
-        "http://localhost:5175", "http://127.0.0.1:5175",
-        "http://localhost:5176", "http://127.0.0.1:5176",
-        "http://localhost:5177", "http://127.0.0.1:5177",
-        "http://localhost:3000", "http://127.0.0.1:3000"
+        "http://localhost:5173","10.252.49.179:8081", "http://10.252.49.179:8081"
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -997,4 +992,4 @@ if __name__ == "__main__":
     start_cleanup_scheduler()
     
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
