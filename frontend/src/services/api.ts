@@ -84,7 +84,7 @@ export const authApi = {
 export const navalUnitsApi = {
   getAll: async (skip = 0, limit = 100): Promise<NavalUnit[]> => {
     const response = await api.get(`/api/units?skip=${skip}&limit=${limit}`);
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   getById: async (id: number): Promise<NavalUnit> => {
@@ -170,7 +170,7 @@ export const navalUnitsApi = {
 export const groupsApi = {
   getAll: async (skip = 0, limit = 100): Promise<Group[]> => {
     const response = await api.get(`/api/groups?skip=${skip}&limit=${limit}`);
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   getById: async (id: number): Promise<Group> => {
@@ -218,12 +218,12 @@ export const groupsApi = {
 export const adminApi = {
   getAllUsers: async (skip = 0, limit = 100): Promise<User[]> => {
     const response = await api.get(`/api/admin/users?skip=${skip}&limit=${limit}`);
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   getPendingUsers: async (): Promise<User[]> => {
     const response = await api.get('/api/admin/users/pending');
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   activateUser: async (userId: number): Promise<{ message: string }> => {
