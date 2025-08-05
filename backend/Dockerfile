@@ -11,8 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia il codice dell'applicazione
 COPY . .
 
-# Crea la directory per i file statici e uploads
-RUN mkdir -p data/uploads
+# Crea tutte le directory per i dati
+RUN mkdir -p data/uploads/flags
+RUN mkdir -p data/uploads/logos
+RUN mkdir -p data/uploads/silhouettes
+RUN mkdir -p data/exports
+RUN mkdir -p data/temp
 RUN mkdir -p static
 
 # Esponi la porta 8001
