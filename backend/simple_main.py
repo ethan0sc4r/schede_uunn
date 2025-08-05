@@ -66,6 +66,11 @@ app.add_middleware(StaticFilesCORSMiddleware)
 os.makedirs("./data", exist_ok=True)
 UPLOAD_DIR = "./data/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "silhouettes"), exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "logos"), exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "flags"), exist_ok=True)
+os.makedirs("./data/exports", exist_ok=True)
+os.makedirs("./data/temp", exist_ok=True)
 
 # Static files for uploaded images
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
