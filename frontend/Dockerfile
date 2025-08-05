@@ -1,47 +1,121 @@
-# Dockerfile per il frontend React/Vite - Versione Bulletproof
+# Build stage
 FROM node:18-alpine as builder
-
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage di produzione
-FROM nginx:alpine
+# Production stage
+FROM caddy:alpine
 
-# Crea le directory temporanee in /tmp con i permessi giusti
-RUN mkdir -p /tmp/nginx-cache /tmp/nginx-client /tmp/nginx-proxy /tmp/nginx-fastcgi /tmp/nginx-uwsgi /tmp/nginx-scgi && \
-    chmod -R 777 /tmp/nginx-*
+# Copia i file della build
+COPY --from=builder /app/dist /usr/share/caddy
 
-# Rimuove configurazione default
-RUN rm /etc/nginx/conf.d/default.conf
+# Crea il Caddyfile per SPA sulla porta 8081
+RUN echo ':8081' > /etc/caddy/Caddyfile && \
+    echo 'root * /usr/share/caddy' >> /etc/caddy/Caddyfile && \
+    echo 'try_files {path} /index.html' >> /etc/caddy/Caddyfile && \
+    echo 'file_server' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Gzip compression' >> /etc/caddy/Caddyfile && \
+    echo 'encode gzip' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Cache headers for static assets' >> /etc/caddy/Caddyfile && \
+    echo '@static {' >> /etc/caddy/Caddyfile && \
+    echo '    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2' >> /etc/caddy/Caddyfile && \
+    echo '}' >> /etc/caddy/Caddyfile && \
+    echo 'header @static Cache-Control "public, max-age=31536000, immutable"' >> /etc/caddy/Caddyfile
 
-# Crea una configurazione nginx principale personalizzata che evita i problemi di cache
-RUN echo 'user nginx;' > /etc/nginx/nginx.conf && \
-    echo 'worker_processes auto;' >> /etc/nginx/nginx.conf && \
-    echo 'error_log /var/log/nginx/error.log warn;' >> /etc/nginx/nginx.conf && \
-    echo 'pid /var/run/nginx.pid;' >> /etc/nginx/nginx.conf && \
-    echo 'events { worker_connections 1024; }' >> /etc/nginx/nginx.conf && \
-    echo 'http {' >> /etc/nginx/nginx.conf && \
-    echo '    include /etc/nginx/mime.types;' >> /etc/nginx/nginx.conf && \
-    echo '    default_type application/octet-stream;' >> /etc/nginx/nginx.conf && \
-    echo '    sendfile on;' >> /etc/nginx/nginx.conf && \
-    echo '    keepalive_timeout 65;' >> /etc/nginx/nginx.conf && \
-    echo '    client_body_temp_path /tmp/nginx-client;' >> /etc/nginx/nginx.conf && \
-    echo '    proxy_temp_path /tmp/nginx-proxy;' >> /etc/nginx/nginx.conf && \
-    echo '    fastcgi_temp_path /tmp/nginx-fastcgi;' >> /etc/nginx/nginx.conf && \
-    echo '    uwsgi_temp_path /tmp/nginx-uwsgi;' >> /etc/nginx/nginx.conf && \
-    echo '    scgi_temp_path /tmp/nginx-scgi;' >> /etc/nginx/nginx.conf && \
-    echo '    include /etc/nginx/conf.d/*.conf;' >> /etc/nginx/nginx.conf && \
-    echo '}' >> /etc/nginx/nginx.conf
-
-# Copia configurazione e file statici
-COPY nginx.conf /etc/nginx/conf.d/
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Esponi la porta
 EXPOSE 8081
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]# Build stage
+FROM node:18-alpine as builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Avvia nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Production stage
+FROM caddy:alpine
+
+# Copia i file della build
+COPY --from=builder /app/dist /usr/share/caddy
+
+# Crea il Caddyfile per SPA sulla porta 8081
+RUN echo ':8081' > /etc/caddy/Caddyfile && \
+    echo 'root * /usr/share/caddy' >> /etc/caddy/Caddyfile && \
+    echo 'try_files {path} /index.html' >> /etc/caddy/Caddyfile && \
+    echo 'file_server' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Gzip compression' >> /etc/caddy/Caddyfile && \
+    echo 'encode gzip' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Cache headers for static assets' >> /etc/caddy/Caddyfile && \
+    echo '@static {' >> /etc/caddy/Caddyfile && \
+    echo '    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2' >> /etc/caddy/Caddyfile && \
+    echo '}' >> /etc/caddy/Caddyfile && \
+    echo 'header @static Cache-Control "public, max-age=31536000, immutable"' >> /etc/caddy/Caddyfile
+
+EXPOSE 8081
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]# Build stage
+FROM node:18-alpine as builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM caddy:alpine
+
+# Copia i file della build
+COPY --from=builder /app/dist /usr/share/caddy
+
+# Crea il Caddyfile per SPA sulla porta 8081
+RUN echo ':8081' > /etc/caddy/Caddyfile && \
+    echo 'root * /usr/share/caddy' >> /etc/caddy/Caddyfile && \
+    echo 'try_files {path} /index.html' >> /etc/caddy/Caddyfile && \
+    echo 'file_server' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Gzip compression' >> /etc/caddy/Caddyfile && \
+    echo 'encode gzip' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Cache headers for static assets' >> /etc/caddy/Caddyfile && \
+    echo '@static {' >> /etc/caddy/Caddyfile && \
+    echo '    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2' >> /etc/caddy/Caddyfile && \
+    echo '}' >> /etc/caddy/Caddyfile && \
+    echo 'header @static Cache-Control "public, max-age=31536000, immutable"' >> /etc/caddy/Caddyfile
+
+EXPOSE 8081
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]# Build stage
+FROM node:18-alpine as builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM caddy:alpine
+
+# Copia i file della build
+COPY --from=builder /app/dist /usr/share/caddy
+
+# Crea il Caddyfile per SPA sulla porta 8081
+RUN echo ':8081' > /etc/caddy/Caddyfile && \
+    echo 'root * /usr/share/caddy' >> /etc/caddy/Caddyfile && \
+    echo 'try_files {path} /index.html' >> /etc/caddy/Caddyfile && \
+    echo 'file_server' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Gzip compression' >> /etc/caddy/Caddyfile && \
+    echo 'encode gzip' >> /etc/caddy/Caddyfile && \
+    echo '' >> /etc/caddy/Caddyfile && \
+    echo '# Cache headers for static assets' >> /etc/caddy/Caddyfile && \
+    echo '@static {' >> /etc/caddy/Caddyfile && \
+    echo '    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2' >> /etc/caddy/Caddyfile && \
+    echo '}' >> /etc/caddy/Caddyfile && \
+    echo 'header @static Cache-Control "public, max-age=31536000, immutable"' >> /etc/caddy/Caddyfile
+
+EXPOSE 8081
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
