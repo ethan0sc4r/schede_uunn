@@ -27,6 +27,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Aumenta il limite per il file upload (default è 1MB)
+app.add_middleware(
+    lambda app: app,  # Placeholder middleware per configurazioni
+)
+
+import uvicorn.config
+# Imposta limite file upload a 50MB
+MAX_FILE_SIZE = 50 * 1024 * 1024
+
 # Include quiz router
 app.include_router(quiz_router, prefix="/api", tags=["quiz"])
 
@@ -173,23 +182,64 @@ def get_admin_user(user: dict = Depends(get_current_user)):
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".svg"}
 
 def save_uploaded_file(file: UploadFile, subfolder: str) -> str:
+    print(f"🔍 save_uploaded_file called - filename: {file.filename}, subfolder: {subfolder}")
+    
     if not file.filename:
+        print("❌ No filename provided")
         raise HTTPException(status_code=400, detail="No file selected")
     
     file_extension = os.path.splitext(file.filename)[1].lower()
+    print(f"🔍 File extension: {file_extension}")
+    
     if file_extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Invalid file type")
+        print(f"❌ Invalid file extension. Allowed: {ALLOWED_EXTENSIONS}")
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
     
     unique_filename = f"{uuid4()}{file_extension}"
     full_file_path = os.path.join(UPLOAD_DIR, subfolder, unique_filename)
     
-    os.makedirs(os.path.dirname(full_file_path), exist_ok=True)
+    print(f"🔍 Full file path: {full_file_path}")
+    print(f"🔍 UPLOAD_DIR: {UPLOAD_DIR}")
+    print(f"🔍 Directory exists: {os.path.exists(os.path.dirname(full_file_path))}")
     
-    with open(full_file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        os.makedirs(os.path.dirname(full_file_path), exist_ok=True)
+        print(f"✅ Directory created/exists: {os.path.dirname(full_file_path)}")
+        
+        # Check directory permissions
+        dir_path = os.path.dirname(full_file_path)
+        print(f"🔍 Directory writable: {os.access(dir_path, os.W_OK)}")
+        print(f"🔍 Directory readable: {os.access(dir_path, os.R_OK)}")
+        
+        with open(full_file_path, "wb") as buffer:
+            file.file.seek(0)  # Reset file pointer
+            content = file.file.read()
+            print(f"🔍 File content length: {len(content)} bytes")
+            buffer.write(content)
+        
+        print(f"✅ File written successfully: {full_file_path}")
+        print(f"🔍 File exists after write: {os.path.exists(full_file_path)}")
+        
+        if os.path.exists(full_file_path):
+            file_size = os.path.getsize(full_file_path)
+            print(f"🔍 Final file size: {file_size} bytes")
+    
+    except PermissionError as e:
+        print(f"❌ Permission error: {e}")
+        raise HTTPException(status_code=500, detail=f"Permission denied: {str(e)}")
+    except OSError as e:
+        print(f"❌ OS error: {e}")
+        raise HTTPException(status_code=500, detail=f"File system error: {str(e)}")
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
     # Return relative path for database storage (subfolder/filename) with forward slashes
-    return f"{subfolder}/{unique_filename}"
+    relative_path = f"{subfolder}/{unique_filename}"
+    print(f"✅ Returning relative path: {relative_path}")
+    return relative_path
 
 # Routes
 @app.get("/")
@@ -199,6 +249,26 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/debug/upload-dirs")
+async def debug_upload_dirs():
+    """Debug endpoint to check upload directories"""
+    debug_info = {
+        "UPLOAD_DIR": UPLOAD_DIR,
+        "directories": {},
+        "permissions": {}
+    }
+    
+    for subfolder in ["flags", "logos", "silhouettes", "general"]:
+        dir_path = os.path.join(UPLOAD_DIR, subfolder)
+        debug_info["directories"][subfolder] = {
+            "path": dir_path,
+            "exists": os.path.exists(dir_path),
+            "writable": os.access(dir_path, os.W_OK) if os.path.exists(dir_path) else False,
+            "readable": os.access(dir_path, os.R_OK) if os.path.exists(dir_path) else False,
+        }
+    
+    return debug_info
 
 @app.post("/api/upload-image")
 async def upload_image(image: UploadFile = File(...), subfolder: str = Form("general")):

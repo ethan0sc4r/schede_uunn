@@ -4,6 +4,9 @@ FROM python:3.10-slim
 # Imposta la directory di lavoro
 WORKDIR /app
 
+# Installa curl per debug
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copia requirements.txt e installa le dipendenze
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -10,8 +10,9 @@ RUN npm run build
 FROM node:18-alpine
 WORKDIR /app
 
-# Installa serve globalmente
+# Installa serve globalmente e curl per debug
 RUN npm install -g serve
+RUN apk add --no-cache curl
 
 # Copia i file della build
 COPY --from=builder /app/dist ./dist
