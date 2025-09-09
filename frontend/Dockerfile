@@ -11,8 +11,6 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# Ensure .env is available during build for Vite to read
-COPY .env .env
 RUN npm run build
 
 # Production stage
