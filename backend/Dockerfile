@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Crea tutte le directory per i dati con permessi appropriati
-RUN mkdir -p data/uploads/flags data/uploads/logos data/uploads/silhouettes data/exports data/temp static
+RUN mkdir -p data/uploads/flags data/uploads/logos data/uploads/silhouettes data/uploads/general data/exports data/temp static
 RUN chmod -R 777 data/
 RUN chmod -R 755 static/
 

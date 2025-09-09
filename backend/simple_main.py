@@ -81,6 +81,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(os.path.join(UPLOAD_DIR, "silhouettes"), exist_ok=True)
 os.makedirs(os.path.join(UPLOAD_DIR, "logos"), exist_ok=True)
 os.makedirs(os.path.join(UPLOAD_DIR, "flags"), exist_ok=True)
+os.makedirs(os.path.join(UPLOAD_DIR, "general"), exist_ok=True)
 os.makedirs("./data/exports", exist_ok=True)
 os.makedirs("./data/temp", exist_ok=True)
 
