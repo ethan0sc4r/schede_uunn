@@ -312,7 +312,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
                       elementType === 'flag' ? 'flags' : 'general';
       formData.append('subfolder', subfolder);
       
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload-image`, {
         method: 'POST',
         body: formData,
       });

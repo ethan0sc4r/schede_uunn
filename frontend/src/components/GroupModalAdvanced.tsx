@@ -128,17 +128,17 @@ export default function GroupModalAdvanced({
   const handleTemplateLogoUpload = async (file: File) => {
     const formData = new FormData();
     formData.append('image', file);
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, { method: 'POST', body: formData });
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload-image`, { method: 'POST', body: formData });
     const data = await response.json();
-    setTemplateLogoPath(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/static/${data.file_path}`);
+    setTemplateLogoPath(`${import.meta.env.VITE_API_BASE_URL}/api/static/${data.file_path}`);
   };
 
   const handleTemplateFlagUpload = async (file: File) => {
     const formData = new FormData();
     formData.append('image', file);
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, { method: 'POST', body: formData });
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload-image`, { method: 'POST', body: formData });
     const data = await response.json();
-    setTemplateFlagPath(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/static/${data.file_path}`);
+    setTemplateFlagPath(`${import.meta.env.VITE_API_BASE_URL}/api/static/${data.file_path}`);
   };
 
   if (!isOpen) return null;

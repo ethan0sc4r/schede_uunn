@@ -795,7 +795,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                       elementType === 'flag' ? 'flags' : 'general';
       formData.append('subfolder', subfolder);
       
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload-image`, {
         method: 'POST',
         body: formData,
       });
@@ -832,7 +832,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       formData.append('image', file);
       formData.append('subfolder', 'flags');
       
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'}/api/upload-image`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/upload-image`, {
         method: 'POST',
         body: formData,
       });
