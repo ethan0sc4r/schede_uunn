@@ -11,13 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia il codice dell'applicazione
 COPY . .
 
-# Crea tutte le directory per i dati
-RUN mkdir -p data/uploads/flags
-RUN mkdir -p data/uploads/logos
-RUN mkdir -p data/uploads/silhouettes
-RUN mkdir -p data/exports
-RUN mkdir -p data/temp
-RUN mkdir -p static
+# Crea tutte le directory per i dati con permessi appropriati
+RUN mkdir -p data/uploads/flags data/uploads/logos data/uploads/silhouettes data/exports data/temp static
+RUN chmod -R 777 data/
+RUN chmod -R 755 static/
 
 # Esponi la porta 8001
 EXPOSE 8001

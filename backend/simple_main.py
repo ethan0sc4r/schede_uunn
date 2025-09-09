@@ -34,7 +34,10 @@ app.include_router(quiz_router, prefix="/api", tags=["quiz"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173","10.252.49.179:8081", "http://10.252.49.179:8081"
+        "http://localhost:5173",
+        "http://10.252.117.167:8081", 
+        "https://10.252.117.167:8081",
+        "*"  # Temporaneo per debug su OpenShift
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -201,17 +204,30 @@ async def health_check():
 async def upload_image(image: UploadFile = File(...), subfolder: str = Form("general")):
     """Upload an image file and return the file path"""
     try:
+        print(f"🔍 Upload request - File: {image.filename}, Content-Type: {image.content_type}, Subfolder: {subfolder}")
+        
         # Validate file type
         if not image.content_type or not image.content_type.startswith("image/"):
+            print(f"❌ Invalid content type: {image.content_type}")
             raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Check if upload directory exists and is writable
+        upload_path = os.path.join(UPLOAD_DIR, subfolder)
+        print(f"🔍 Upload path: {upload_path}")
+        print(f"🔍 Upload dir exists: {os.path.exists(upload_path)}")
+        print(f"🔍 Upload dir writable: {os.access(upload_path, os.W_OK) if os.path.exists(upload_path) else 'N/A'}")
         
         # Use the same save function to maintain consistency
         file_path = save_uploaded_file(image, subfolder)
+        print(f"✅ File saved successfully: {file_path}")
         
         # Return relative path for database storage
         return {"file_path": file_path}
         
     except Exception as e:
+        print(f"❌ Upload error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
 # Auth routes
