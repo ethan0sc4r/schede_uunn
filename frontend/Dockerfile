@@ -3,7 +3,7 @@ FROM node:18-alpine as builder
 WORKDIR /app
 
 # Accept build arguments for environment variables
-ARG VITE_API_BASE_URL=http://10.252.117.211:8001
+ARG VITE_API_BASE_URL=https://schede-uunn-be-ns-cdg.apps.openshift.marina.difesa.it:8001
 
 # Set environment variables for Vite build
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
