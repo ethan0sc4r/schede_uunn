@@ -4,7 +4,7 @@ import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from './TemplateManager';
 
 import { getImageUrl } from '../utils/imageUtils';
-import { navalUnitsApi } from '../services/api';
+import { navalUnitsApi, templatesApi } from '../services/api';
 
 interface CanvasElement {
   id: string;
@@ -396,11 +396,20 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
     loadTemplateStates();
   }, [unit?.id]);
 
-  // Load user templates from localStorage
+  // Load user templates from API
   useEffect(() => {
-    const savedTemplates = localStorage.getItem('naval-templates');
-    const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
-    setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+    const loadTemplatesFromApi = async () => {
+      try {
+        const apiTemplates = await templatesApi.getAll();
+        setAllTemplates([...DEFAULT_TEMPLATES, ...apiTemplates]);
+        console.log('✅ Templates loaded from API:', [...DEFAULT_TEMPLATES, ...apiTemplates].length);
+      } catch (error) {
+        console.error('❌ Error loading templates from API, falling back to defaults:', error);
+        setAllTemplates(DEFAULT_TEMPLATES);
+      }
+    };
+    
+    loadTemplatesFromApi();
   }, []);
 
   // Function to get nation from flag element
@@ -472,18 +481,28 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       }
       
       // Find the target template
-      const template = allTemplates.find(t => t.id === newTemplateId);
+      let template = allTemplates.find(t => t.id === newTemplateId);
+      
+      // If template not found, try to reload from API (maybe it was just created)
       if (!template) {
-        console.error(`❌ CRITICAL: Template ID not found: ${newTemplateId}`);
+        console.log('🔄 Template not found locally, reloading from API...');
+        try {
+          const apiTemplates = await templatesApi.getAll();
+          const updatedTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+          setAllTemplates(updatedTemplates);
+          template = updatedTemplates.find(t => t.id === newTemplateId);
+        } catch (error) {
+          console.error('❌ Failed to reload templates from API:', error);
+        }
+      }
+      
+      if (!template) {
+        console.error(`❌ CRITICAL: Template ID not found even after API reload: ${newTemplateId}`);
         console.log('🔍 DEBUG: Complete template analysis:');
         console.log('   Requested template ID:', newTemplateId);
         console.log('   Total available templates:', allTemplates.length);
         console.log('   Available template IDs:', allTemplates.map(t => t.id));
         console.log('   Available template names:', allTemplates.map(t => t.name));
-        console.log('   DEFAULT_TEMPLATES loaded:', DEFAULT_TEMPLATES.length);
-        console.log('   DEFAULT_TEMPLATES IDs:', DEFAULT_TEMPLATES.map(t => t.id));
-        console.log('   Is naval-card-powerpoint in DEFAULT_TEMPLATES?', DEFAULT_TEMPLATES.some(t => t.id === 'naval-card-powerpoint'));
-        console.log('   Is naval-card-powerpoint in allTemplates?', allTemplates.some(t => t.id === 'naval-card-powerpoint'));
         throw new Error(`Template "${newTemplateId}" not found in available templates`);
       }
       
@@ -2063,11 +2082,15 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <TemplateManager
             onSelectTemplate={applyTemplate}
             onClose={() => setShowTemplateManager(false)}
-            onTemplatesUpdate={() => {
-              // Reload templates when they're updated
-              const savedTemplates = localStorage.getItem('naval-templates');
-              const userTemplates = savedTemplates ? JSON.parse(savedTemplates) : [];
-              setAllTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+            onTemplatesUpdate={async () => {
+              // Reload templates when they're updated from API
+              try {
+                const apiTemplates = await templatesApi.getAll();
+                setAllTemplates([...DEFAULT_TEMPLATES, ...apiTemplates]);
+                console.log('✅ Templates reloaded after update from API');
+              } catch (error) {
+                console.error('❌ Error reloading templates after update:', error);
+              }
             }}
             currentElements={elements}
             currentCanvasWidth={canvasWidth}
