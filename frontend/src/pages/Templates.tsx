@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Palette, Download, Upload, Copy, Trash2, Plus, Edit, Save } from 'lucide-react';
 import TemplateManager, { type Template, CANVAS_SIZES } from '../components/TemplateManager';
 import TemplateEditor from '../components/TemplateEditor';
+import { templatesApi } from '../services/api';
 
 // Template predefiniti - duplicati da TemplateManager per evitare dipendenze circolari
 const DEFAULT_TEMPLATES: Template[] = [
@@ -64,13 +65,60 @@ export default function Templates() {
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Carica templates all'avvio
+  // Carica templates dall'API
   useEffect(() => {
-    const saved = localStorage.getItem('naval-templates');
-    const userTemplates = saved ? JSON.parse(saved) : [];
-    setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
+    loadTemplates();
   }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setIsLoading(true);
+      const apiTemplates = await templatesApi.getAll();
+      const allTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+      setTemplates(allTemplates);
+    } catch (error) {
+      console.error('❌ Errore caricamento template:', error);
+      setTemplates(DEFAULT_TEMPLATES);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const duplicateTemplate = async (template: Template) => {
+    try {
+      const duplicated = {
+        ...template,
+        id: undefined, // L'API genererà un nuovo ID
+        name: `Copia di ${template.name}`,
+        isDefault: false,
+        createdAt: new Date().toISOString()
+      };
+      
+      await templatesApi.create(duplicated);
+      await loadTemplates(); // Ricarica i template
+      console.log('✅ Template duplicato con successo');
+    } catch (error) {
+      console.error('❌ Errore duplicazione template:', error);
+      alert('Errore durante la duplicazione del template');
+    }
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    if (!confirm('Sei sicuro di voler eliminare questo template?')) {
+      return;
+    }
+    
+    try {
+      await templatesApi.delete(templateId);
+      await loadTemplates(); // Ricarica i template
+      console.log('✅ Template eliminato con successo');
+    } catch (error) {
+      console.error('❌ Errore eliminazione template:', error);
+      alert('Errore durante l\'eliminazione del template');
+    }
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -106,9 +154,16 @@ export default function Templates() {
       {/* Content */}
       <div className="flex-1 overflow-auto bg-gray-50">
         <div className="p-8">
-          {/* Templates Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((template) => (
+          {/* Loading State */}
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-gray-500">Caricamento template...</div>
+            </div>
+          ) : (
+            <>
+              {/* Templates Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {templates.map((template) => (
               <div key={template.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="h-40 bg-gradient-to-br from-blue-50 to-blue-100 relative">
                   {template.thumbnail ? (
@@ -142,17 +197,28 @@ export default function Templates() {
                   </div>
 
                   <div className="flex space-x-2">
-                    <button
-                      onClick={() => {
-                        setEditingTemplateId(template.id);
-                        setShowTemplateEditor(true);
-                      }}
-                      className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors flex items-center justify-center"
-                      title="Modifica template"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Modifica
-                    </button>
+                    {!template.isDefault ? (
+                      <button
+                        onClick={() => {
+                          setEditingTemplateId(template.id);
+                          setShowTemplateEditor(true);
+                        }}
+                        className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors flex items-center justify-center"
+                        title="Modifica template"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Modifica
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => duplicateTemplate(template)}
+                        className="flex-1 px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors flex items-center justify-center"
+                        title="Duplica template (i template di default non sono modificabili)"
+                      >
+                        <Copy className="h-4 w-4 mr-1" />
+                        Duplica
+                      </button>
+                    )}
                     
                     <button
                       onClick={() => {
@@ -172,19 +238,7 @@ export default function Templates() {
                     </button>
                     
                     <button
-                      onClick={() => {
-                        const duplicated: Template = {
-                          ...template,
-                          id: `template-${Date.now()}`,
-                          name: `${template.name} (Copia)`,
-                          isDefault: false,
-                          createdAt: new Date().toISOString()
-                        };
-                        const userTemplates = templates.filter(t => !t.isDefault);
-                        userTemplates.push(duplicated);
-                        localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-                        setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
-                      }}
+                      onClick={() => duplicateTemplate(template)}
                       className="px-3 py-2 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 transition-colors"
                       title="Duplica template"
                     >
@@ -193,13 +247,7 @@ export default function Templates() {
                     
                     {!template.isDefault && (
                       <button
-                        onClick={() => {
-                          if (confirm('Sei sicuro di voler eliminare questo template?')) {
-                            const userTemplates = templates.filter(t => !t.isDefault && t.id !== template.id);
-                            localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-                            setTemplates([...DEFAULT_TEMPLATES, ...userTemplates]);
-                          }
-                        }}
+                        onClick={() => deleteTemplate(template.id)}
                         className="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
                         title="Elimina template"
                       >
@@ -209,29 +257,31 @@ export default function Templates() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+                ))}
+              </div>
 
-          {templates.length === 0 && (
-            <div className="text-center py-16">
-              <Palette className="h-24 w-24 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-gray-900 mb-2">
-                Nessun template disponibile
-              </h3>
-              <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                Crea il tuo primo template per iniziare a organizzare i layout delle schede navali.
-              </p>
-              <button
-                onClick={() => {
-                  setEditingTemplateId(undefined);
-                  setShowTemplateEditor(true);
-                }}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center mx-auto"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Crea Primo Template
-              </button>
-            </div>
+              {templates.length === 0 && (
+                <div className="text-center py-16">
+                  <Palette className="h-24 w-24 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">
+                    Nessun template disponibile
+                  </h3>
+                  <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                    Crea il tuo primo template per iniziare a organizzare i layout delle schede navali.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setEditingTemplateId(undefined);
+                      setShowTemplateEditor(true);
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center mx-auto"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Crea Primo Template
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -253,21 +303,24 @@ export default function Templates() {
         <div className="fixed inset-0 bg-white z-50">
           <TemplateEditor
             templateId={editingTemplateId}
-            onSave={(templateData) => {
-              // Save template to localStorage
-              const saved = localStorage.getItem('naval-templates');
-              const userTemplates = saved ? JSON.parse(saved) : [];
-              
-              const existingIndex = userTemplates.findIndex((t: Template) => t.id === templateData.id);
-              if (existingIndex >= 0) {
-                userTemplates[existingIndex] = templateData;
-              } else {
-                userTemplates.push(templateData);
+            onSave={async (templateData) => {
+              try {
+                if (editingTemplateId) {
+                  // Update existing template
+                  await templatesApi.update(editingTemplateId, templateData);
+                } else {
+                  // Create new template
+                  await templatesApi.create(templateData);
+                }
+                
+                await loadTemplates(); // Reload templates
+                setShowTemplateEditor(false);
+                setEditingTemplateId(undefined);
+                console.log('✅ Template salvato con successo');
+              } catch (error) {
+                console.error('❌ Errore salvataggio template:', error);
+                alert('Errore durante il salvataggio del template');
               }
-              
-              localStorage.setItem('naval-templates', JSON.stringify(userTemplates));
-              setShowTemplateEditor(false);
-              setEditingTemplateId(undefined);
             }}
             onCancel={() => {
               setShowTemplateEditor(false);
