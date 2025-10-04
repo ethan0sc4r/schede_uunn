@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, GitBranch, Tag, User, Trash2, RotateCcw, Plus } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 
 interface Version {
   id: number;
@@ -26,11 +27,12 @@ interface VersionManagerProps {
   onVersionSelected?: (version: Version) => void;
 }
 
-const VersionManager: React.FC<VersionManagerProps> = ({ 
-  unitId, 
-  isOpen, 
+const VersionManager: React.FC<VersionManagerProps> = ({
+  unitId,
+  isOpen,
   onClose
 }) => {
+  const { success, error: showError, warning, info } = useToast();
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newVersionData, setNewVersionData] = useState({
@@ -94,7 +96,7 @@ const VersionManager: React.FC<VersionManagerProps> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unit-versions', unitId] });
       queryClient.invalidateQueries({ queryKey: ['unit', unitId] });
-      alert('Versione ripristinata con successo!');
+      success('Versione ripristinata con successo!');
     }
   });
 

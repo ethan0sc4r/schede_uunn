@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { groupsApi, navalUnitsApi } from '../services/api';
 import type { Group, CreateGroupRequest } from '../types/index.ts';
+import { useToast } from '../contexts/ToastContext';
 
 interface GroupModalProps {
   group?: Group | null;
@@ -10,6 +11,7 @@ interface GroupModalProps {
 }
 
 export default function GroupModal({ group, onClose, onSave }: GroupModalProps) {
+  const { success, error: showError, warning, info } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -62,7 +64,7 @@ export default function GroupModal({ group, onClose, onSave }: GroupModalProps) 
       }
     } catch (error) {
       console.error('Errore durante il salvataggio:', error);
-      alert('Errore durante il salvataggio del gruppo');
+      showError('Errore durante il salvataggio del gruppo');
     }
   };
 

@@ -5,6 +5,7 @@ import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from 
 
 import { getImageUrl } from '../utils/imageUtils';
 import { navalUnitsApi, templatesApi } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 interface CanvasElement {
   id: string;
@@ -117,6 +118,7 @@ const PREDEFINED_FLAGS = [
 ];
 
 export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorProps) {
+  const { success, error: showError, warning, info } = useToast();
   // Initialize elements state - start with empty and let useEffect handle the initialization
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [visibleElements, setVisibleElements] = useState<{[key: string]: boolean}>({});
@@ -840,7 +842,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       
     } catch (error) {
       console.error('❌ Image upload failed:', error);
-      alert('Errore durante l\'upload dell\'immagine');
+      showError('Errore durante l\'upload dell\'immagine');
     }
   };
 
@@ -871,7 +873,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       
     } catch (error) {
       console.error('❌ Flag upload failed:', error);
-      alert('Errore durante l\'upload della bandiera');
+      showError('Errore durante l\'upload della bandiera');
     }
   };
 
@@ -910,10 +912,10 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       console.log('✅ Template application completed successfully');
     } catch (error) {
       console.error('❌ Error applying template:', error);
-      
+
       // Show user-friendly error message
-      alert(`Errore nell'applicazione del template "${template.name}". Controlla la console per i dettagli.`);
-      
+      showError(`Errore nell'applicazione del template "${template.name}". Controlla la console per i dettagli.`);
+
       // Reopen template manager if there was an error
       setShowTemplateManager(true);
     }
@@ -1981,7 +1983,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                         const template = JSON.parse(event.target?.result as string);
                         applyTemplate(template);
                       } catch (error) {
-                        alert('Errore nel caricamento del template');
+                        showError('Errore nel caricamento del template');
                       }
                     };
                     reader.readAsText(file);

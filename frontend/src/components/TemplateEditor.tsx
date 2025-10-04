@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Save, Settings, RotateCcw, Move, Trash2, Plus, X } from 'lucide-react';
 import { templatesApi } from '../services/api';
 import LayoutSettingsModal from './LayoutSettingsModal';
+import { useToast } from '../contexts/ToastContext';
 
 // Re-defining CANVAS_PRESETS here as it's used by the modal
 const CANVAS_PRESETS = {
@@ -76,6 +77,7 @@ const getImageUrl = (path: string) => {
 };
 
 export default function TemplateEditor({ templateId, onSave, onCancel }: TemplateEditorProps) {
+  const { success, error: showError, warning, info } = useToast();
   const [elements, setElements] = useState<TemplateElement[]>([]);
   const [canvasWidth, setCanvasWidth] = useState(DEFAULT_CANVAS_WIDTH);
   const [canvasHeight, setCanvasHeight] = useState(DEFAULT_CANVAS_HEIGHT);
@@ -336,7 +338,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
       
     } catch (error) {
       console.error('Image upload failed:', error);
-      alert('Errore durante l\'upload dell\'immagine');
+      showError('Errore durante l\'upload dell\'immagine');
     }
   };
 
@@ -360,7 +362,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
 
   const handleSave = async () => {
     if (!templateName.trim()) {
-      alert('Inserisci il nome del template');
+      showError('Inserisci il nome del template');
       return;
     }
     const templateData = { id: templateId || `template-${Date.now()}`, name: templateName, description: templateDescription, elements, canvasWidth, canvasHeight, canvasBackground, canvasBorderWidth, canvasBorderColor, createdAt: templateId ? undefined : new Date().toISOString(), updatedAt: new Date().toISOString(), isDefault: false };
@@ -374,7 +376,7 @@ export default function TemplateEditor({ templateId, onSave, onCancel }: Templat
       onSave(templateData);
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Errore nel salvare il template. Riprova.');
+      showError('Errore nel salvare il template. Riprova.');
     }
   };
 

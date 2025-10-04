@@ -9,7 +9,7 @@ router = APIRouter()
 class QuizSessionCreate(BaseModel):
     participant_name: str
     participant_surname: str
-    quiz_type: str  # 'name_to_class', 'nation_to_class', 'class_to_flag'
+    quiz_type: str  # 'name_to_class', 'nation_to_class', 'class_to_flag', 'silhouette_to_class'
     total_questions: int
     time_per_question: int  # in seconds
 
@@ -54,9 +54,9 @@ class QuizQuestionResponse(BaseModel):
 @router.get("/quiz/available-units/{quiz_type}")
 async def get_available_units_for_quiz(quiz_type: str):
     """Get available naval units for a specific quiz type"""
-    if quiz_type not in ['name_to_class', 'nation_to_class', 'class_to_flag']:
+    if quiz_type not in ['name_to_class', 'nation_to_class', 'class_to_flag', 'silhouette_to_class']:
         raise HTTPException(status_code=400, detail="Invalid quiz type")
-    
+
     units = SimpleDatabase.get_available_naval_units_for_quiz(quiz_type)
     return {
         "quiz_type": quiz_type,
@@ -74,7 +74,7 @@ async def get_nations_with_units():
 async def create_quiz_session(quiz_data: QuizSessionCreate):
     """Create a new quiz session"""
     # Validate quiz type
-    if quiz_data.quiz_type not in ['name_to_class', 'nation_to_class', 'class_to_flag']:
+    if quiz_data.quiz_type not in ['name_to_class', 'nation_to_class', 'class_to_flag', 'silhouette_to_class']:
         raise HTTPException(status_code=400, detail="Invalid quiz type")
     
     # Validate question count

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye, FileText } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import { navalUnitsApi } from '../services/api';
 import { getImageUrl } from '../utils/imageUtils';
 import PowerPointTemplateSelector from './PowerPointTemplateSelector';
+import { useToast } from '../contexts/ToastContext';
 
 interface NavalUnitCardProps {
   unit: NavalUnit;
@@ -12,20 +13,21 @@ interface NavalUnitCardProps {
   onEditNotes?: () => void;
 }
 
-export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardProps) {
+function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardProps) {
   const [showActions, setShowActions] = useState(false);
   const [showPowerPointSelector, setShowPowerPointSelector] = useState(false);
+  const { success, error: showError, warning, info } = useToast();
 
   const handlePrint = async () => {
     try {
-      // Open unit view in new window 
+      // Open unit view in new window
       const viewWindow = window.open(`/units/${unit.id}/view`, '_blank');
       if (viewWindow) {
-        alert('Per stampare: apri la pagina di visualizzazione e usa il pulsante Stampa');
+        info('Per stampare: apri la pagina di visualizzazione e usa il pulsante Stampa');
       }
     } catch (error) {
       console.error('Errore stampa:', error);
-      alert('Errore durante l\'apertura pagina di stampa');
+      showError('Errore durante l\'apertura pagina di stampa');
     }
   };
 
@@ -60,10 +62,10 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
       document.body.removeChild(link);
       
       console.log('PNG export completed successfully');
-      alert(`PNG di "${unit.name}" esportato con successo!`);
+      success(`PNG di "${unit.name}" esportato con successo!`);
     } catch (error: any) {
       console.error('Errore esportazione PNG:', error);
-      alert(`Errore durante l'esportazione PNG: ${error.message || error}`);
+      showError(`Errore durante l'esportazione PNG: ${error.message || error}`);
     }
   };
 
@@ -72,10 +74,10 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
     const shareMessage = `Nave ${unit.name} classe ${unit.unit_class} è stato copiato in memoria`;
     try {
       await navigator.clipboard.writeText(shareUrl);
-      alert(shareMessage);
+      success(shareMessage);
     } catch (error) {
       console.error('Errore copia link:', error);
-      alert('Errore durante la copia del link');
+      showError('Errore durante la copia del link');
     }
   };
 
@@ -114,12 +116,12 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
       if (!response.ok) {
         const errorText = await response.text();
         console.error('PowerPoint export error response:', response.status, errorText);
-        
+
         if (response.status === 401) {
-          alert('Sessione scaduta. Ricarica la pagina e rieffettua il login.');
+          showError('Sessione scaduta. Ricarica la pagina e rieffettua il login.');
           return;
         }
-        
+
         throw new Error(`Errore durante l'export PowerPoint: ${response.status} - ${errorText}`);
       }
 
@@ -134,10 +136,10 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
       window.URL.revokeObjectURL(url);
       document.body.removeChild(link);
 
-      alert(`PowerPoint di "${unit.name}" esportato con successo!`);
+      success(`PowerPoint di "${unit.name}" esportato con successo!`);
     } catch (error) {
       console.error('Errore export PowerPoint:', error);
-      alert('Errore durante l\'export PowerPoint');
+      showError('Errore durante l\'export PowerPoint');
     }
   };
 
@@ -319,3 +321,6 @@ export default function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: N
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(NavalUnitCard);

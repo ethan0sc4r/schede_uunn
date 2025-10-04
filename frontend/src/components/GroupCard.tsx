@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Play, Edit3, Trash2, Users, Layers, Download } from 'lucide-react';
 import type { Group } from '../types/index.ts';
 import { getImageUrl } from '../utils/imageUtils';
@@ -10,7 +11,7 @@ interface GroupCardProps {
   onExportPowerPoint?: () => void;
 }
 
-export default function GroupCard({ group, onEdit, onDelete, onPresentation, onExportPowerPoint }: GroupCardProps) {
+function GroupCard({ group, onEdit, onDelete, onPresentation, onExportPowerPoint }: GroupCardProps) {
   return (
     <div className="card hover:shadow-xl transition-shadow duration-200">
       <div className="relative">
@@ -128,3 +129,6 @@ export default function GroupCard({ group, onEdit, onDelete, onPresentation, onE
     </div>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(GroupCard);

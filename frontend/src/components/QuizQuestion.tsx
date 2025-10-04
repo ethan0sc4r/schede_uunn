@@ -215,6 +215,8 @@ export default function QuizQuestion({
         return `Quale è la classe di questa unità navale della ${question.nation}?`;
       case 'class_to_flag':
         return `Quale bandiera appartiene alla classe "${question.unit_class}"?`;
+      case 'silhouette_to_class':
+        return `Quale è la classe di questa unità navale?`;
       default:
         return 'Domanda quiz';
     }

@@ -5,7 +5,7 @@ import { Clock, Users, AlertCircle, CheckCircle } from 'lucide-react';
 type QuizConfigType = {
   participantName: string;
   participantSurname: string;
-  quizType: 'name_to_class' | 'nation_to_class' | 'class_to_flag';
+  quizType: 'name_to_class' | 'nation_to_class' | 'class_to_flag' | 'silhouette_to_class';
   totalQuestions: number;
   timePerQuestion: number;
 };
@@ -23,13 +23,18 @@ const QUIZ_TYPES = [
   },
   {
     id: 'nation_to_class' as const,
-    title: 'Nazione → Classe', 
+    title: 'Nazione → Classe',
     description: 'Visualizzi la silhouette e la nazione, devi riconoscere la classe'
   },
   {
     id: 'class_to_flag' as const,
     title: 'Classe → Bandiera',
     description: 'Visualizzi la silhouette e la classe, devi riconoscere la bandiera'
+  },
+  {
+    id: 'silhouette_to_class' as const,
+    title: 'Silhouette → Classe',
+    description: 'Visualizzi solo la silhouette, devi indovinare la classe'
   }
 ];
 

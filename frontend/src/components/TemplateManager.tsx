@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Download, Trash2, Copy } from 'lucide-react';
 import { templatesApi } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 export interface Template {
   id: string;
@@ -313,9 +314,9 @@ export const DEFAULT_TEMPLATES: Template[] = [
   }
 ];
 
-export default function TemplateManager({ 
-  onSelectTemplate, 
-  onClose, 
+export default function TemplateManager({
+  onSelectTemplate,
+  onClose,
   onTemplatesUpdate,
   currentElements,
   currentCanvasWidth,
@@ -324,6 +325,7 @@ export default function TemplateManager({
   currentCanvasBorderWidth,
   currentCanvasBorderColor
 }: TemplateManagerProps) {
+  const { success, error: showError, warning, info } = useToast();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -396,7 +398,7 @@ export default function TemplateManager({
       setTemplateDescription('');
     } catch (error) {
       console.error('❌ Errore salvataggio template:', error);
-      alert('Errore nel salvare il template');
+      showError('Errore nel salvare il template');
     }
   };
 
@@ -417,7 +419,7 @@ export default function TemplateManager({
       }
     } catch (error) {
       console.error('❌ Errore eliminazione template:', error);
-      alert('Errore nell\'eliminare il template');
+      showError('Errore nell\'eliminare il template');
     }
   };
 
@@ -440,7 +442,7 @@ export default function TemplateManager({
       }
     } catch (error) {
       console.error('❌ Errore duplicazione template:', error);
-      alert('Errore nel duplicare il template');
+      showError('Errore nel duplicare il template');
     }
   };
 

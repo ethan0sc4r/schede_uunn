@@ -3,6 +3,7 @@ import { Palette, Download, Upload, Copy, Trash2, Plus, Edit, Save } from 'lucid
 import TemplateManager, { type Template, CANVAS_SIZES } from '../components/TemplateManager';
 import TemplateEditor from '../components/TemplateEditor';
 import { templatesApi } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 // Template predefiniti - duplicati da TemplateManager per evitare dipendenze circolari
 const DEFAULT_TEMPLATES: Template[] = [
@@ -61,6 +62,7 @@ const DEFAULT_TEMPLATES: Template[] = [
 ];
 
 export default function Templates() {
+  const { success, error: showError, warning, info } = useToast();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
@@ -101,7 +103,7 @@ export default function Templates() {
       console.log('✅ Template duplicato con successo');
     } catch (error) {
       console.error('❌ Errore duplicazione template:', error);
-      alert('Errore durante la duplicazione del template');
+      showError('Errore durante la duplicazione del template');
     }
   };
 
@@ -116,7 +118,7 @@ export default function Templates() {
       console.log('✅ Template eliminato con successo');
     } catch (error) {
       console.error('❌ Errore eliminazione template:', error);
-      alert('Errore durante l\'eliminazione del template');
+      showError('Errore durante l\'eliminazione del template');
     }
   };
 
@@ -319,7 +321,7 @@ export default function Templates() {
                 console.log('✅ Template salvato con successo');
               } catch (error) {
                 console.error('❌ Errore salvataggio template:', error);
-                alert('Errore durante il salvataggio del template');
+                showError('Errore durante il salvataggio del template');
               }
             }}
             onCancel={() => {

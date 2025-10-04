@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ship, Search, Grid, List, Eye, Edit3, Trash2, FileText } from 'lucide-react';
 import { navalUnitsApi } from '../services/api';
@@ -7,6 +7,8 @@ import NavalUnitCard from '../components/NavalUnitCard';
 import CanvasEditor from '../components/CanvasEditor';
 import NotesEditor from '../components/NotesEditor';
 import { getImageUrl, migrateLayoutConfigImages } from '../utils/imageUtils';
+import { useToast } from '../contexts/ToastContext';
+import logger from '../utils/logger';
 
 export default function NavalUnits() {
   const [showEditor, setShowEditor] = useState(false);
@@ -15,6 +17,7 @@ export default function NavalUnits() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
+  const { success, error: showError } = useToast();
 
   const { data: navalUnits, isLoading, error } = useQuery({
     queryKey: ['navalUnits'],
@@ -53,55 +56,57 @@ export default function NavalUnits() {
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedUnit(null);
     setShowEditor(true);
-  };
+  }, []);
 
-  const handleEdit = (unit: NavalUnit) => {
+  const handleEdit = useCallback((unit: NavalUnit) => {
     setSelectedUnit(unit);
     setShowEditor(true);
-  };
+  }, []);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = useCallback(async (id: number) => {
     if (window.confirm('Sei sicuro di voler eliminare questa unità navale?')) {
       try {
         await deleteMutation.mutateAsync(id);
+        success('Unità navale eliminata con successo');
       } catch (error) {
-        console.error('Errore durante l\'eliminazione:', error);
-        alert('Errore durante l\'eliminazione dell\'unità navale');
+        logger.error('Errore durante l\'eliminazione:', error);
+        showError('Errore durante l\'eliminazione dell\'unità navale');
       }
     }
-  };
+  }, [deleteMutation, success, showError]);
 
-  const handleEditorClose = () => {
+  const handleEditorClose = useCallback(() => {
     setShowEditor(false);
     setSelectedUnit(null);
-  };
+  }, []);
 
-  const handleEditNotes = (unit: NavalUnit) => {
+  const handleEditNotes = useCallback((unit: NavalUnit) => {
     setSelectedUnit(unit);
     setShowNotesEditor(true);
-  };
+  }, []);
 
-  const handleNotesEditorClose = () => {
+  const handleNotesEditorClose = useCallback(() => {
     setShowNotesEditor(false);
     setSelectedUnit(null);
-  };
+  }, []);
 
-  const handleSaveNotes = async (notes: string) => {
+  const handleSaveNotes = useCallback(async (notes: string) => {
     if (!selectedUnit) return;
-    
+
     try {
       await updateMutation.mutateAsync({
         id: selectedUnit.id,
         data: { notes }
       });
+      success('Note salvate con successo');
     } catch (error) {
-      console.error('Errore salvando le note:', error);
-      alert('Errore durante il salvataggio delle note');
+      logger.error('Errore salvando le note:', error);
+      showError('Errore durante il salvataggio delle note');
     }
-  };
+  }, [selectedUnit, updateMutation, success, showError]);
 
   if (isLoading) {
     return (
@@ -482,10 +487,11 @@ export default function NavalUnits() {
                   }
                 }
                 
+                success('Scheda salvata con successo');
                 handleEditorClose();
               } catch (error) {
                 console.error('Errore durante il salvataggio:', error);
-                alert('Errore durante il salvataggio della scheda');
+                showError('Errore durante il salvataggio della scheda');
               }
             }}
             onCancel={handleEditorClose}

@@ -5,9 +5,11 @@ import { navalUnitsApi, templatesApi } from '../services/api';
 import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
+import { useToast } from '../contexts/ToastContext';
 
 export default function UnitView() {
   const { id } = useParams<{ id: string }>();
+  const { success, error: showError, warning, info } = useToast();
   const [unit, setUnit] = useState<NavalUnit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export default function UnitView() {
 
   const handlePrint = async () => {
     if (!unit || !canvasRef.current) {
-      alert('Errore: Canvas non disponibile per la stampa');
+      showError('Errore: Canvas non disponibile per la stampa');
       return;
     }
     
@@ -71,13 +73,13 @@ export default function UnitView() {
       console.log('Print initiated successfully');
     } catch (error: any) {
       console.error('Print error:', error);
-      alert(`Errore durante la stampa: ${error.message || error}`);
+      showError(`Errore durante la stampa: ${error.message || error}`);
     }
   };
 
   const handleExportPNG = async () => {
     if (!unit) {
-      alert('Errore: Unità non disponibile per l\'esportazione');
+      showError('Errore: Unità non disponibile per l\'esportazione');
       return;
     }
     
@@ -124,17 +126,17 @@ export default function UnitView() {
       document.body.removeChild(link);
       
       console.log('PNG export completed successfully');
-      alert(`PNG di "${unit.name}" esportato con successo!`);
+      success(`PNG di "${unit.name}" esportato con successo!`);
     } catch (error: any) {
       console.error('PNG export error:', error);
-      alert(`Errore durante l'esportazione PNG: ${error.message || error}`);
+      showError(`Errore durante l'esportazione PNG: ${error.message || error}`);
     }
   };
 
 
   const handleExportPowerPointWithTemplate = async (templateConfig: any = null) => {
     if (!unit) {
-      alert('Errore: Unità non disponibile per l\'esportazione');
+      showError('Errore: Unità non disponibile per l\'esportazione');
       return;
     }
     
@@ -191,12 +193,12 @@ export default function UnitView() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('PowerPoint export error response:', response.status, errorText);
-        
+
         if (response.status === 401) {
-          alert('Sessione scaduta. Ricarica la pagina e rieffettua il login.');
+          showError('Sessione scaduta. Ricarica la pagina e rieffettua il login.');
           return;
         }
-        
+
         throw new Error(`Errore durante l'export PowerPoint: ${response.status} - ${errorText}`);
       }
 
@@ -212,10 +214,10 @@ export default function UnitView() {
       document.body.removeChild(link);
       
       console.log('PowerPoint export completed successfully');
-      alert(`PowerPoint di "${unit.name}" esportato con successo!`);
+      success(`PowerPoint di "${unit.name}" esportato con successo!`);
     } catch (error: any) {
       console.error('PowerPoint export error:', error);
-      alert(`Errore durante l'esportazione PowerPoint: ${error.message || error}`);
+      showError(`Errore durante l'esportazione PowerPoint: ${error.message || error}`);
     }
   };
 
@@ -229,10 +231,10 @@ export default function UnitView() {
     const shareMessage = `Nave ${unit.name} classe ${unit.unit_class} è stato copiato in memoria`;
     try {
       await navigator.clipboard.writeText(shareUrl);
-      alert(shareMessage);
+      success(shareMessage);
     } catch (error) {
       console.error('Errore copia link:', error);
-      alert('Errore durante la copia del link');
+      showError('Errore durante la copia del link');
     }
   };
 

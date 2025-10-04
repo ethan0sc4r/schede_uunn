@@ -981,10 +981,17 @@ class SimpleDatabase:
                 elif quiz_type == 'class_to_flag':
                     # Need units with class and flag
                     cursor.execute('''
-                        SELECT * FROM naval_units 
+                        SELECT * FROM naval_units
                         WHERE unit_class IS NOT NULL AND unit_class != ''
-                        AND (flag_path IS NOT NULL OR 
+                        AND (flag_path IS NOT NULL OR
                              (layout_config IS NOT NULL AND layout_config LIKE '%flag%'))
+                        AND silhouette_path IS NOT NULL
+                    ''')
+                elif quiz_type == 'silhouette_to_class':
+                    # Need units with silhouette and class
+                    cursor.execute('''
+                        SELECT * FROM naval_units
+                        WHERE unit_class IS NOT NULL AND unit_class != ''
                         AND silhouette_path IS NOT NULL
                     ''')
                 else:
@@ -1051,12 +1058,22 @@ class SimpleDatabase:
                         correct_answer = unit['nation'] or 'Unknown'
                         # Get other nations as wrong options
                         cursor.execute('''
-                            SELECT DISTINCT nation FROM naval_units 
+                            SELECT DISTINCT nation FROM naval_units
                             WHERE nation != ? AND nation IS NOT NULL AND nation != ''
                             ORDER BY RANDOM() LIMIT 3
                         ''', (correct_answer,))
                         wrong_options = [row[0] for row in cursor.fetchall()]
-                    
+
+                    elif quiz_type == 'silhouette_to_class':
+                        correct_answer = unit['unit_class']
+                        # Get other classes as wrong options
+                        cursor.execute('''
+                            SELECT DISTINCT unit_class FROM naval_units
+                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+
                     # Ensure we have exactly 3 wrong options
                     while len(wrong_options) < 3:
                         wrong_options.append(f"Option {len(wrong_options) + 1}")

@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Save, X, Plus, Trash2, Eye, EyeOff, Upload, ZoomIn, ZoomOut, Settings } from 'lucide-react';
 import type { NavalUnit, UnitCharacteristic } from '../types/index.ts';
 import { templatesApi } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
 
 interface CardEditorProps {
   unit?: NavalUnit | null;
@@ -130,6 +131,7 @@ const INITIAL_CORE_ELEMENTS: CoreElement[] = [
 ];
 
 export default function CardEditor({ unit, onSave, onCancel }: CardEditorProps) {
+  const { success, error: showError, warning, info } = useToast();
   // Initialize core elements only if editing existing unit or if layout_config exists
   const initializeCoreElements = () => {
     if (unit?.layout_config?.elements) {
@@ -282,7 +284,7 @@ export default function CardEditor({ unit, onSave, onCancel }: CardEditorProps) 
       setShowTemplateSelector(false);
     } catch (error) {
       console.error('Error applying template:', error);
-      alert('Errore nell\'applicare il template');
+      showError('Errore nell\'applicare il template');
     }
   };
 
@@ -323,7 +325,7 @@ export default function CardEditor({ unit, onSave, onCancel }: CardEditorProps) 
       
     } catch (error) {
       console.error('Image upload failed:', error);
-      alert('Errore durante l\'upload dell\'immagine');
+      showError('Errore durante l\'upload dell\'immagine');
     }
   };
 

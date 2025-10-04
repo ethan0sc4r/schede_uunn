@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle, Trophy, Clock, Target, User } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 
 // Types defined inline to avoid import issues
 type QuizSessionType = {
@@ -28,6 +29,7 @@ interface QuizResultsProps {
 }
 
 export default function QuizResults({ session, onNewQuiz, onViewHistory }: QuizResultsProps) {
+  const { success, error: showError, warning, info } = useToast();
   const percentage = Math.round((session.correct_answers / session.total_questions) * 100);
   const isPassing = session.score >= 18;
   
@@ -246,7 +248,7 @@ export default function QuizResults({ session, onNewQuiz, onViewHistory }: QuizR
               });
             } else if (navigator.clipboard) {
               navigator.clipboard.writeText(text);
-              alert('Risultato copiato negli appunti!');
+              success('Risultato copiato negli appunti!');
             }
           }}
           className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"

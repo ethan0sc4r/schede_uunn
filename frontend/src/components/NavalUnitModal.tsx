@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { navalUnitsApi } from '../services/api';
 import type { NavalUnit, CreateNavalUnitRequest, CreateCharacteristicRequest } from '../types/index.ts';
+import { useToast } from '../contexts/ToastContext';
 
 interface NavalUnitModalProps {
   unit?: NavalUnit | null;
@@ -10,6 +11,7 @@ interface NavalUnitModalProps {
 }
 
 export default function NavalUnitModal({ unit, onClose, onSave }: NavalUnitModalProps) {
+  const { success, error: showError, warning, info } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     unit_class: '',
@@ -82,7 +84,7 @@ export default function NavalUnitModal({ unit, onClose, onSave }: NavalUnitModal
       }
     } catch (error) {
       console.error('Errore durante il salvataggio:', error);
-      alert('Errore durante il salvataggio dell\'unità navale');
+      showError('Errore durante il salvataggio dell\'unità navale');
     }
   };
 

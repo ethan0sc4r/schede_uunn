@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi, authApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../contexts/ToastContext';
 import type { User } from '../types/index.ts';
 import { Key, Shield, UserCheck, UserX, UserPlus, Settings } from 'lucide-react';
 
@@ -15,6 +16,7 @@ export default function Admin() {
   });
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  const { success, error: showError, warning } = useToast();
 
   const { data: allUsers, isLoading: allUsersLoading } = useQuery({
     queryKey: ['admin', 'users'],
@@ -57,38 +59,38 @@ export default function Admin() {
   });
 
   const changePasswordMutation = useMutation({
-    mutationFn: ({ userId, newPassword }: { userId: number; newPassword: string }) => 
+    mutationFn: ({ userId, newPassword }: { userId: number; newPassword: string }) =>
       adminApi.changeUserPassword(userId, newPassword),
     onSuccess: () => {
       setShowPasswordModal(null);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      alert('Password cambiata con successo!');
+      success('Password cambiata con successo!');
     },
     onError: (error: any) => {
-      alert(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
+      showError(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
     }
   });
 
   const changeOwnPasswordMutation = useMutation({
-    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => 
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
       adminApi.changeOwnPassword(currentPassword, newPassword),
     onSuccess: () => {
       setShowPasswordModal(null);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      alert('Password amministratore cambiata con successo!');
+      success('Password amministratore cambiata con successo!');
     },
     onError: (error: any) => {
-      alert(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
+      showError(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
     }
   });
 
   const handleActivate = async (userId: number) => {
     try {
       await activateMutation.mutateAsync(userId);
-      alert('Utente attivato con successo');
+      success('Utente attivato con successo');
     } catch (error) {
       console.error('Errore:', error);
-      alert('Errore durante l\'attivazione dell\'utente');
+      showError('Errore durante l\'attivazione dell\'utente');
     }
   };
 
@@ -96,10 +98,10 @@ export default function Admin() {
     if (window.confirm('Sei sicuro di voler disattivare questo utente?')) {
       try {
         await deactivateMutation.mutateAsync(userId);
-        alert('Utente disattivato con successo');
+        success('Utente disattivato con successo');
       } catch (error) {
         console.error('Errore:', error);
-        alert('Errore durante la disattivazione dell\'utente');
+        showError('Errore durante la disattivazione dell\'utente');
       }
     }
   };
@@ -108,10 +110,10 @@ export default function Admin() {
     if (window.confirm('Sei sicuro di voler rendere questo utente amministratore?')) {
       try {
         await makeAdminMutation.mutateAsync(userId);
-        alert('Utente promosso ad amministratore');
+        success('Utente promosso ad amministratore');
       } catch (error) {
         console.error('Errore:', error);
-        alert('Errore durante la promozione dell\'utente');
+        showError('Errore durante la promozione dell\'utente');
       }
     }
   };
@@ -120,10 +122,10 @@ export default function Admin() {
     if (window.confirm('Sei sicuro di voler rimuovere i privilegi di amministratore?')) {
       try {
         await removeAdminMutation.mutateAsync(userId);
-        alert('Privilegi di amministratore rimossi');
+        success('Privilegi di amministratore rimossi');
       } catch (error) {
         console.error('Errore:', error);
-        alert('Errore durante la rimozione dei privilegi');
+        showError('Errore durante la rimozione dei privilegi');
       }
     }
   };
@@ -138,14 +140,14 @@ export default function Admin() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('Le password non coincidono!');
+      warning('Le password non coincidono!');
       return;
     }
-    
+
     if (passwordForm.newPassword.length < 6) {
-      alert('La password deve essere di almeno 6 caratteri!');
+      warning('La password deve essere di almeno 6 caratteri!');
       return;
     }
     

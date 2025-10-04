@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { groupsApi, navalUnitsApi } from '../services/api';
 import type { Group, CreateGroupRequest } from '../types/index.ts';
 import GroupCard from '../components/GroupCard';
 import GroupModalAdvanced from '../components/GroupModalAdvanced';
 import PresentationMode from '../components/PresentationMode';
+import { useToast } from '../contexts/ToastContext';
 
 export default function Groups() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +13,7 @@ export default function Groups() {
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [presentationGroup, setPresentationGroup] = useState<Group | null>(null);
   const queryClient = useQueryClient();
+  const { success, error: showError } = useToast();
 
   const { data: groups, isLoading, error } = useQuery({
     queryKey: ['groups'],
@@ -44,55 +46,57 @@ export default function Groups() {
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedGroup(null);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleEdit = (group: Group) => {
+  const handleEdit = useCallback((group: Group) => {
     setSelectedGroup(group);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = useCallback(async (id: number) => {
     if (window.confirm('Sei sicuro di voler eliminare questo gruppo?')) {
       try {
         await deleteMutation.mutateAsync(id);
+        success('Gruppo eliminato con successo');
       } catch (error) {
         console.error('Errore durante l\'eliminazione:', error);
-        alert('Errore durante l\'eliminazione del gruppo');
+        showError('Errore durante l\'eliminazione del gruppo');
       }
     }
-  };
+  }, [deleteMutation, success, showError]);
 
-  const handleModalClose = () => {
+  const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
     setSelectedGroup(null);
-  };
+  }, []);
 
-  const handleGroupSave = async (groupData: CreateGroupRequest) => {
+  const handleGroupSave = useCallback(async (groupData: CreateGroupRequest) => {
     try {
       if (selectedGroup) {
         await updateMutation.mutateAsync({ id: selectedGroup.id, data: groupData });
       } else {
         await createMutation.mutateAsync(groupData);
       }
+      success('Gruppo salvato con successo');
       handleModalClose();
     } catch (error) {
       console.error('Errore durante il salvataggio:', error);
-      alert('Errore durante il salvataggio del gruppo');
+      showError('Errore durante il salvataggio del gruppo');
     }
-  };
+  }, [selectedGroup, updateMutation, createMutation, success, showError, handleModalClose]);
 
-  const handlePresentation = (group: Group) => {
+  const handlePresentation = useCallback((group: Group) => {
     setPresentationGroup(group);
     setIsPresentationOpen(true);
-  };
+  }, []);
 
-  const handlePresentationClose = () => {
+  const handlePresentationClose = useCallback(() => {
     setIsPresentationOpen(false);
     setPresentationGroup(null);
-  };
+  }, []);
 
   const handleExportPowerPoint = async (group: Group) => {
     try {
@@ -116,10 +120,11 @@ export default function Groups() {
       
       // Clean up
       window.URL.revokeObjectURL(url);
+      success('PowerPoint esportato con successo');
     } catch (error) {
       console.error('Errore durante l\'export PowerPoint:', error);
       console.error('Error details:', (error as any).response?.data || (error as any).message);
-      alert(`Errore durante l'export PowerPoint: ${(error as any).response?.data?.detail || (error as any).message}`);
+      showError(`Errore durante l'export PowerPoint: ${(error as any).response?.data?.detail || (error as any).message}`);
     }
   };
 
