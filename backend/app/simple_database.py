@@ -87,7 +87,20 @@ def init_database():
                 FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE
             )
         ''')
-        
+
+        # Unit gallery table - multiple images per unit
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS unit_gallery (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                naval_unit_id INTEGER NOT NULL,
+                image_path TEXT NOT NULL,
+                caption TEXT,
+                order_index INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id) ON DELETE CASCADE
+            )
+        ''')
+
         # Groups table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS groups (
@@ -362,19 +375,27 @@ class SimpleDatabase:
             
             # Get characteristics
             cursor.execute('''
-                SELECT * FROM unit_characteristics 
-                WHERE naval_unit_id = ? 
+                SELECT * FROM unit_characteristics
+                WHERE naval_unit_id = ?
                 ORDER BY order_index
             ''', (unit_id,))
             unit['characteristics'] = [dict(row) for row in cursor.fetchall()]
-            
+
+            # Get gallery images
+            cursor.execute('''
+                SELECT * FROM unit_gallery
+                WHERE naval_unit_id = ?
+                ORDER BY order_index
+            ''', (unit_id,))
+            unit['gallery'] = [dict(row) for row in cursor.fetchall()]
+
             # Parse JSON fields
             if unit['layout_config']:
                 try:
                     unit['layout_config'] = json.loads(unit['layout_config'])
                 except:
                     unit['layout_config'] = {}
-            
+
             return unit
     
     @staticmethod
@@ -388,7 +409,116 @@ class SimpleDatabase:
             ''', (unit_id, name, value, order_index))
             conn.commit()
             return cursor.lastrowid
-    
+
+    @staticmethod
+    def add_gallery_image(unit_id: int, image_path: str, caption: str = None, order_index: int = 0) -> int:
+        """Add an image to unit gallery"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO unit_gallery (naval_unit_id, image_path, caption, order_index)
+                VALUES (?, ?, ?, ?)
+            ''', (unit_id, image_path, caption, order_index))
+            conn.commit()
+            return cursor.lastrowid
+
+    @staticmethod
+    def get_unit_gallery(unit_id: int) -> List[Dict]:
+        """Get all gallery images for a unit"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM unit_gallery
+                WHERE naval_unit_id = ?
+                ORDER BY order_index
+            ''', (unit_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def delete_gallery_image(image_id: int) -> bool:
+        """Delete a gallery image"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM unit_gallery WHERE id = ?', (image_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def update_gallery_order(image_id: int, order_index: int) -> bool:
+        """Update gallery image order"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE unit_gallery
+                SET order_index = ?
+                WHERE id = ?
+            ''', (order_index, image_id))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def duplicate_naval_unit(unit_id: int, new_name: str, created_by: int) -> Optional[int]:
+        """Duplicate an existing naval unit with all its data"""
+        try:
+            # Get original unit
+            original = SimpleDatabase.get_naval_unit_by_id(unit_id)
+            if not original:
+                return None
+
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+
+                # Create new unit
+                cursor.execute('''
+                    INSERT INTO naval_units
+                    (name, unit_class, nation, logo_path, silhouette_path, flag_path,
+                     background_color, layout_config, current_template_id,
+                     silhouette_zoom, silhouette_position_x, silhouette_position_y,
+                     notes, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    new_name,
+                    original['unit_class'],
+                    original['nation'],
+                    original.get('logo_path'),
+                    original.get('silhouette_path'),
+                    original.get('flag_path'),
+                    original.get('background_color', '#ffffff'),
+                    json.dumps(original.get('layout_config', {})) if original.get('layout_config') else None,
+                    original.get('current_template_id', 'naval-card-standard'),
+                    original.get('silhouette_zoom', '1.0'),
+                    original.get('silhouette_position_x', '0'),
+                    original.get('silhouette_position_y', '0'),
+                    original.get('notes'),
+                    created_by
+                ))
+                new_unit_id = cursor.lastrowid
+
+                # Copy characteristics
+                if original.get('characteristics'):
+                    for char in original['characteristics']:
+                        cursor.execute('''
+                            INSERT INTO unit_characteristics
+                            (naval_unit_id, characteristic_name, characteristic_value, order_index)
+                            VALUES (?, ?, ?, ?)
+                        ''', (new_unit_id, char['characteristic_name'], char['characteristic_value'], char['order_index']))
+
+                # Copy gallery images
+                if original.get('gallery'):
+                    for img in original['gallery']:
+                        cursor.execute('''
+                            INSERT INTO unit_gallery
+                            (naval_unit_id, image_path, caption, order_index)
+                            VALUES (?, ?, ?, ?)
+                        ''', (new_unit_id, img['image_path'], img.get('caption'), img['order_index']))
+
+                conn.commit()
+                return new_unit_id
+
+        except Exception as e:
+            print(f"Error duplicating naval unit: {e}")
+            return None
+
     @staticmethod
     def search_naval_units(query: str, search_type: str = "all") -> List[Dict]:
         """Search naval units"""

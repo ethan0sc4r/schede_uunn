@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Clock, ZoomIn, ZoomOut, RotateCcw, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, ZoomIn, ZoomOut, RotateCcw, CheckCircle, XCircle, Images } from 'lucide-react';
 import { getImageUrl } from '../utils/imageUtils';
+import GalleryViewer from './GalleryViewer';
+import type { GalleryImage } from '../types/index.ts';
+import { navalUnitsApi } from '../services/api';
 
 // Types defined inline to avoid import issues
 type QuizQuestionDataType = {
@@ -55,7 +58,10 @@ export default function QuizQuestion({
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, imageX: 0, imageY: 0 });
-  
+  const [showGallery, setShowGallery] = useState(false);
+  const [gallery, setGallery] = useState<GalleryImage[]>([]);
+  const [unitDetails, setUnitDetails] = useState<any>(null);
+
   const imageRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<number | null>(null);
 
@@ -120,10 +126,17 @@ export default function QuizQuestion({
           userAnswer: selectedAnswer
         });
 
-        // Show feedback for 3 seconds, then move to next question
-        setTimeout(() => {
-          onAnswerSubmit(selectedAnswer);
-        }, 3000);
+        // Always fetch unit details for all quiz types
+        try {
+          // Fetch full unit details using API client
+          const unitData = await navalUnitsApi.getById(question.naval_unit_id);
+          setUnitDetails(unitData);
+          setGallery(unitData.gallery || []);
+        } catch (error) {
+          console.error('Error fetching unit details:', error);
+        }
+
+        // Don't auto-advance - user will click button to continue
       } else {
         console.error('Error submitting answer');
         onAnswerSubmit(selectedAnswer); // Continue anyway
@@ -245,145 +258,144 @@ export default function QuizQuestion({
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white">
+    <div className="max-w-7xl mx-auto p-6 bg-white min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+      <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-200">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-3xl font-bold text-gray-900">
             Domanda {questionNumber} di {totalQuestions}
           </h2>
-          <p className="text-gray-600 mt-1">{getQuestionText()}</p>
+          <p className="text-gray-600 mt-2 text-lg">{getQuestionText()}</p>
         </div>
-        
-        <div className={`flex items-center text-2xl font-mono ${getTimerColor()}`}>
-          <Clock className="h-6 w-6 mr-2" />
+
+        <div className={`flex items-center text-3xl font-mono ${getTimerColor()}`}>
+          <Clock className="h-8 w-8 mr-2" />
           {formatTime(timeRemaining)}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Image Section */}
-        <div className="space-y-4">
-          {/* Silhouette */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-900 mb-3">Silhouette</h3>
-            <div className="relative bg-white rounded border-2 border-gray-200 overflow-hidden">
-              {silhouetteImage ? (
-                <div
-                  ref={imageRef}
-                  className="relative h-64 cursor-move"
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                >
-                  <img
-                    src={silhouetteImage}
-                    alt="Naval unit silhouette"
-                    className="absolute inset-0 w-full h-full object-contain transition-transform duration-200"
-                    style={{
-                      transform: `scale(${zoomLevel}) translate(${imagePosition.x / zoomLevel}px, ${imagePosition.y / zoomLevel}px)`,
-                      cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
-                    }}
-                    draggable={false}
-                  />
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">🚢</div>
-                    <div>Silhouette non disponibile</div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Zoom Controls */}
-              <div className="absolute top-2 right-2 flex flex-col space-y-1">
-                <button
-                  onClick={handleZoomIn}
-                  className="p-2 bg-white rounded shadow hover:bg-gray-50 transition-colors"
-                  title="Zoom in"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={handleZoomOut}
-                  className="p-2 bg-white rounded shadow hover:bg-gray-50 transition-colors"
-                  title="Zoom out"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={handleResetZoom}
-                  className="p-2 bg-white rounded shadow hover:bg-gray-50 transition-colors"
-                  title="Reset zoom"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </button>
+      <div className="space-y-8">
+        {/* Silhouette Section - Full Width */}
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h3 className="font-semibold text-gray-900 mb-4 text-xl">Silhouette</h3>
+          <div className="relative bg-white rounded border-2 border-gray-200 overflow-hidden">
+            {silhouetteImage ? (
+              <div
+                ref={imageRef}
+                className="relative h-[500px] cursor-move"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+              >
+                <img
+                  src={silhouetteImage}
+                  alt="Naval unit silhouette"
+                  className="absolute inset-0 w-full h-full object-contain transition-transform duration-200"
+                  style={{
+                    transform: `scale(${zoomLevel}) translate(${imagePosition.x / zoomLevel}px, ${imagePosition.y / zoomLevel}px)`,
+                    cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+                  }}
+                  draggable={false}
+                />
               </div>
+            ) : (
+              <div className="h-[500px] flex items-center justify-center text-gray-500">
+                <div className="text-center">
+                  <div className="text-6xl mb-4">🚢</div>
+                  <div className="text-xl">Silhouette non disponibile</div>
+                </div>
+              </div>
+            )}
+
+            {/* Zoom Controls */}
+            <div className="absolute top-4 right-4 flex flex-col space-y-2">
+              <button
+                onClick={handleZoomIn}
+                className="p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+                title="Zoom in"
+              >
+                <ZoomIn className="h-6 w-6" />
+              </button>
+              <button
+                onClick={handleZoomOut}
+                className="p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+                title="Zoom out"
+              >
+                <ZoomOut className="h-6 w-6" />
+              </button>
+              <button
+                onClick={handleResetZoom}
+                className="p-3 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+                title="Reset zoom"
+              >
+                <RotateCcw className="h-6 w-6" />
+              </button>
             </div>
           </div>
 
           {/* Additional Info based on quiz type */}
-          {question.question_type === 'name_to_class' && (
-            <div className="bg-blue-50 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-2">Nome Unità</h4>
-              <p className="text-blue-800 text-lg font-semibold">{question.name}</p>
-            </div>
-          )}
+          <div className="mt-4">
+            {question.question_type === 'name_to_class' && (
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Nome Unità</h4>
+                <p className="text-blue-800 text-lg font-semibold">{question.name}</p>
+              </div>
+            )}
 
-          {question.question_type === 'nation_to_class' && question.nation && (
-            <div className="bg-green-50 rounded-lg p-4">
-              <h4 className="font-medium text-green-900 mb-2">Nazione</h4>
-              <p className="text-green-800 text-lg font-semibold">{question.nation}</p>
-            </div>
-          )}
+            {question.question_type === 'nation_to_class' && question.nation && (
+              <div className="bg-green-50 rounded-lg p-4">
+                <h4 className="font-medium text-green-900 mb-2">Nazione</h4>
+                <p className="text-green-800 text-lg font-semibold">{question.nation}</p>
+              </div>
+            )}
 
-          {question.question_type === 'class_to_flag' && (
-            <div className="bg-purple-50 rounded-lg p-4">
-              <h4 className="font-medium text-purple-900 mb-2">Classe</h4>
-              <p className="text-purple-800 text-lg font-semibold">{question.unit_class}</p>
-              {flagImage && (
-                <div className="mt-3">
-                  <div className="w-16 h-12 border border-gray-300 rounded overflow-hidden">
-                    <img
-                      src={flagImage}
-                      alt="Unit flag"
-                      className="w-full h-full object-cover"
-                    />
+            {question.question_type === 'class_to_flag' && (
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h4 className="font-medium text-purple-900 mb-2">Classe</h4>
+                <p className="text-purple-800 text-lg font-semibold">{question.unit_class}</p>
+                {flagImage && (
+                  <div className="mt-3">
+                    <div className="w-16 h-12 border border-gray-300 rounded overflow-hidden">
+                      <img
+                        src={flagImage}
+                        alt="Unit flag"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Answer Section */}
-        <div className="space-y-4">
-          <h3 className="font-medium text-gray-900 text-lg">Seleziona la risposta corretta:</h3>
-          
-          <div className="space-y-3">
+        {/* Answer Section - Horizontal Layout */}
+        <div className="space-y-6">
+          <h3 className="font-semibold text-gray-900 text-xl text-center">Seleziona la risposta corretta:</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {options.map((option) => (
               <button
                 key={option.key}
                 onClick={() => !isAnswered && setSelectedAnswer(option.value)}
                 disabled={isAnswered}
-                className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
+                className={`p-6 text-center rounded-lg border-2 transition-all ${
                   selectedAnswer === option.value
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 } ${isAnswered ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
               >
-                <div className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center mr-3 font-medium ${
+                <div className="flex flex-col items-center space-y-3">
+                  <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center font-bold text-xl ${
                     selectedAnswer === option.value
                       ? 'border-blue-500 bg-blue-500 text-white'
                       : 'border-gray-300 text-gray-600'
                   }`}>
                     {option.key}
                   </div>
-                  <span className="text-gray-900">{option.value}</span>
+                  <span className="text-gray-900 text-lg font-medium">{option.value}</span>
                 </div>
               </button>
             ))}
@@ -393,7 +405,7 @@ export default function QuizQuestion({
           <button
             onClick={handleAnswerSubmit}
             disabled={!selectedAnswer || isAnswered}
-            className="w-full mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full max-w-md mx-auto block px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
           >
             {isAnswered ? 'Risposta Inviata' : 'Conferma Risposta'}
           </button>
@@ -402,34 +414,120 @@ export default function QuizQuestion({
 
       {/* Feedback Modal */}
       {feedback && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="text-center">
-              {feedback.isCorrect ? (
-                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-              ) : (
-                <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-              )}
-              
-              <h3 className={`text-2xl font-bold mb-4 ${
-                feedback.isCorrect ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {feedback.isCorrect ? 'Corretto!' : 'Sbagliato!'}
-              </h3>
-              
-              <div className="space-y-2 text-gray-700">
-                <p><strong>La tua risposta:</strong> {feedback.userAnswer}</p>
-                {!feedback.isCorrect && (
-                  <p><strong>Risposta corretta:</strong> {feedback.correctAnswer}</p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className={`bg-white rounded-lg p-8 w-full mx-4 my-8 ${
+            unitDetails ? 'max-w-6xl' : 'max-w-md'
+          }`}>
+            <div>
+              {/* Feedback Header */}
+              <div className="flex items-start gap-6 mb-6">
+                {feedback.isCorrect ? (
+                  <CheckCircle className="h-20 w-20 text-green-500 flex-shrink-0" />
+                ) : (
+                  <XCircle className="h-20 w-20 text-red-500 flex-shrink-0" />
                 )}
+                <div className="flex-1">
+                  <h3 className={`text-4xl font-bold mb-3 ${
+                    feedback.isCorrect ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {feedback.isCorrect ? 'Corretto!' : 'Sbagliato!'}
+                  </h3>
+                  <div className="space-y-2 text-gray-700 text-lg">
+                    <p><strong>La tua risposta:</strong> {feedback.userAnswer}</p>
+                    {!feedback.isCorrect && (
+                      <p><strong>Risposta corretta:</strong> {feedback.correctAnswer}</p>
+                    )}
+                  </div>
+                </div>
               </div>
-              
-              <div className="mt-6 text-sm text-gray-500">
-                Prossima domanda tra qualche secondo...
-              </div>
+
+              {/* Unit Details Card - Always shown */}
+              {unitDetails && (
+                <div className={`rounded-lg p-6 mb-6 ${
+                  feedback.isCorrect ? 'bg-green-50 border-2 border-green-500' : 'bg-red-50 border-2 border-red-500'
+                }`}>
+                  <h4 className={`font-bold mb-4 text-2xl ${
+                    feedback.isCorrect ? 'text-green-900' : 'text-red-900'
+                  }`}>Scheda Completa</h4>
+                  <div className="space-y-6">
+                    {/* Info Section - Horizontal Layout */}
+                    <div className="flex flex-wrap gap-6">
+                      <div>
+                        <span className="text-base font-medium text-gray-600">Nome: </span>
+                        <span className="text-gray-900 text-xl font-semibold">{unitDetails.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-base font-medium text-gray-600">Classe: </span>
+                        <span className="text-gray-900 text-xl font-semibold">{unitDetails.unit_class}</span>
+                      </div>
+                      {unitDetails.nation && (
+                        <div>
+                          <span className="text-base font-medium text-gray-600">Nazione: </span>
+                          <span className="text-gray-900 text-xl font-semibold">{unitDetails.nation}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Characteristics */}
+                    {unitDetails.characteristics && unitDetails.characteristics.length > 0 && (
+                      <div>
+                        <span className="text-base font-medium text-gray-600 block mb-2">Caratteristiche:</span>
+                        <div className="space-y-1">
+                          {unitDetails.characteristics.slice(0, 5).map((char: any) => (
+                            <div key={char.id} className="text-base">
+                              <span className="text-gray-600 font-medium">{char.characteristic_name}: </span>
+                              <span className="text-gray-900">{char.characteristic_value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Silhouette - Full Width */}
+                    {unitDetails.silhouette_path && (
+                      <div>
+                        <span className="text-base font-medium text-gray-600 block mb-2">Silhouette:</span>
+                        <img
+                          src={getImageUrl(unitDetails.silhouette_path)}
+                          alt="Silhouette"
+                          className="w-full h-[500px] object-contain bg-white rounded border"
+                        />
+                      </div>
+                    )}
+
+                    {/* Gallery Button */}
+                    {gallery.length > 0 && (
+                      <button
+                        onClick={() => setShowGallery(true)}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-lg font-semibold"
+                      >
+                        <Images className="h-6 w-6" />
+                        Visualizza Galleria ({gallery.length} foto)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Continue Button */}
+              <button
+                onClick={() => onAnswerSubmit(selectedAnswer)}
+                className="w-full max-w-md mx-auto block px-8 py-4 bg-green-600 text-white rounded-lg font-bold text-xl hover:bg-green-700 transition-colors shadow-lg"
+              >
+                Prossima Domanda →
+              </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Gallery Viewer */}
+      {showGallery && gallery.length > 0 && (
+        <GalleryViewer
+          images={gallery}
+          initialIndex={0}
+          onClose={() => setShowGallery(false)}
+        />
       )}
     </div>
   );

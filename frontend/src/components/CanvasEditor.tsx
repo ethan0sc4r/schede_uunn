@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Palette, Save } from 'lucide-react';
+import { Palette, Save, Images } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from './TemplateManager';
+import UnitGalleryModal from './UnitGalleryModal';
 
 import { getImageUrl } from '../utils/imageUtils';
 import { navalUnitsApi, templatesApi } from '../services/api';
@@ -151,6 +152,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   const [showFlagSelector, setShowFlagSelector] = useState(false);
   const [editingTableCell, setEditingTableCell] = useState<{elementId: string, row: number, col: number} | null>(null);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [flagSearchTerm, setFlagSearchTerm] = useState('');
   const [customFlags, setCustomFlags] = useState<Array<{name: string, url: string}>>([]);
   
@@ -1968,7 +1970,18 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             >
               + Aggiungi Tabella
             </button>
-            
+
+            {/* Gallery Button */}
+            {unit?.id && (
+              <button
+                onClick={() => setShowGalleryModal(true)}
+                className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <Images className="h-4 w-4" />
+                Gestisci Galleria
+              </button>
+            )}
+
             <div className="border-t border-gray-200 pt-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Importa Template</h4>
               <input
@@ -2232,6 +2245,16 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             </div>
           </div>
         </div>
+      )}
+
+      {/* Gallery Modal */}
+      {unit?.id && (
+        <UnitGalleryModal
+          unitId={unit.id}
+          unitName={unit.name}
+          isOpen={showGalleryModal}
+          onClose={() => setShowGalleryModal(false)}
+        />
       )}
     </div>
   );

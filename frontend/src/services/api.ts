@@ -11,6 +11,7 @@ import type {
   SearchResponse,
   FileUploadResponse,
   ApiError,
+  GalleryImage,
 } from '../types/index.ts';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -162,6 +163,45 @@ export const navalUnitsApi = {
   // Public endpoint for viewing units (no authentication required)
   getByIdPublic: async (id: number): Promise<NavalUnit> => {
     const response = await axios.get(`${API_BASE_URL}/api/public/units/${id}`);
+    return response.data;
+  },
+
+  // Gallery management
+  uploadGalleryImage: async (id: number, file: File, caption?: string): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/api/units/${id}/gallery/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  getGallery: async (id: number): Promise<{ gallery: GalleryImage[] }> => {
+    const response = await api.get(`/api/units/${id}/gallery`);
+    return response.data;
+  },
+
+  deleteGalleryImage: async (unitId: number, imageId: number): Promise<void> => {
+    await api.delete(`/api/units/${unitId}/gallery/${imageId}`);
+  },
+
+  updateGalleryOrder: async (unitId: number, imageId: number, orderIndex: number): Promise<void> => {
+    await api.put(`/api/units/${unitId}/gallery/${imageId}/order`, { order_index: orderIndex });
+  },
+
+  updateGalleryCaption: async (unitId: number, imageId: number, caption: string): Promise<void> => {
+    await api.put(`/api/units/${unitId}/gallery/${imageId}/caption`, null, {
+      params: { caption }
+    });
+  },
+
+  // Duplicate unit
+  duplicate: async (id: number, newName: string): Promise<{ message: string; unit: NavalUnit }> => {
+    const response = await api.post(`/api/units/${id}/duplicate`, null, {
+      params: { new_name: newName }
+    });
     return response.data;
   },
 };

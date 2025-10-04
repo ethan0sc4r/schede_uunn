@@ -1,9 +1,10 @@
 import { useState, memo } from 'react';
-import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye, FileText } from 'lucide-react';
+import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye, FileText, Images } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import { navalUnitsApi } from '../services/api';
 import { getImageUrl } from '../utils/imageUtils';
 import PowerPointTemplateSelector from './PowerPointTemplateSelector';
+import GalleryViewer from './GalleryViewer';
 import { useToast } from '../contexts/ToastContext';
 
 interface NavalUnitCardProps {
@@ -16,6 +17,7 @@ interface NavalUnitCardProps {
 function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardProps) {
   const [showActions, setShowActions] = useState(false);
   const [showPowerPointSelector, setShowPowerPointSelector] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const { success, error: showError, warning, info } = useToast();
 
   const handlePrint = async () => {
@@ -301,6 +303,18 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
               <FileText className="h-4 w-4" />
             </button>
           )}
+          {unit.gallery && unit.gallery.length > 0 && (
+            <button
+              onClick={() => setShowGallery(true)}
+              className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center relative"
+              title="Galleria"
+            >
+              <Images className="h-4 w-4" />
+              <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                {unit.gallery.length}
+              </span>
+            </button>
+          )}
           <button
             onClick={onDelete}
             className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center"
@@ -310,7 +324,16 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
           </button>
         </div>
       </div>
-      
+
+      {/* Gallery Viewer */}
+      {showGallery && unit.gallery && unit.gallery.length > 0 && (
+        <GalleryViewer
+          images={unit.gallery}
+          initialIndex={0}
+          onClose={() => setShowGallery(false)}
+        />
+      )}
+
       {/* PowerPoint Template Selector */}
       <PowerPointTemplateSelector
         isOpen={showPowerPointSelector}

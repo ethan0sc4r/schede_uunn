@@ -30,6 +30,7 @@ export interface NavalUnit {
   created_at: string;
   updated_at?: string;
   characteristics: UnitCharacteristic[];
+  gallery?: GalleryImage[];
 }
 
 export interface UnitCharacteristic {
@@ -38,6 +39,15 @@ export interface UnitCharacteristic {
   characteristic_name: string;
   characteristic_value: string;
   order_index: number;
+}
+
+export interface GalleryImage {
+  id: number;
+  naval_unit_id: number;
+  image_path: string;
+  caption?: string;
+  order_index: number;
+  created_at: string;
 }
 
 export interface Group {
@@ -74,6 +84,7 @@ export interface CreateNavalUnitRequest {
   nation?: string;
   background_color?: string;
   layout_config?: Record<string, any>;
+  current_template_id?: string;
   silhouette_zoom?: string;
   silhouette_position_x?: string;
   silhouette_position_y?: string;

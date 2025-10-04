@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ship, Search, Grid, List, Eye, Edit3, Trash2, FileText } from 'lucide-react';
+import { Ship, Search, Grid, List, Eye, Edit3, Trash2, FileText, Copy } from 'lucide-react';
 import { navalUnitsApi } from '../services/api';
 import type { NavalUnit } from '../types/index.ts';
 import NavalUnitCard from '../components/NavalUnitCard';
 import CanvasEditor from '../components/CanvasEditor';
 import NotesEditor from '../components/NotesEditor';
+import NavalUnitWizard from '../components/NavalUnitWizard';
 import { getImageUrl, migrateLayoutConfigImages } from '../utils/imageUtils';
 import { useToast } from '../contexts/ToastContext';
 import logger from '../utils/logger';
@@ -13,6 +14,8 @@ import logger from '../utils/logger';
 export default function NavalUnits() {
   const [showEditor, setShowEditor] = useState(false);
   const [showNotesEditor, setShowNotesEditor] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardSourceUnit, setWizardSourceUnit] = useState<NavalUnit | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<NavalUnit | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,8 +60,13 @@ export default function NavalUnits() {
   });
 
   const handleCreate = useCallback(() => {
-    setSelectedUnit(null);
-    setShowEditor(true);
+    setWizardSourceUnit(null);
+    setShowWizard(true);
+  }, []);
+
+  const handleDuplicate = useCallback((unit: NavalUnit) => {
+    setWizardSourceUnit(unit);
+    setShowWizard(true);
   }, []);
 
   const handleEdit = useCallback((unit: NavalUnit) => {
@@ -339,6 +347,13 @@ export default function NavalUnits() {
                             <Edit3 className="h-4 w-4" />
                           </button>
                           <button
+                            onClick={() => handleDuplicate(unit)}
+                            className="text-purple-600 hover:text-purple-900"
+                            title="Duplica"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          <button
                             onClick={() => handleEditNotes(unit)}
                             className="text-green-600 hover:text-green-900"
                             title="Note"
@@ -506,6 +521,22 @@ export default function NavalUnits() {
         onClose={handleNotesEditorClose}
         onSave={handleSaveNotes}
       />
+
+      {/* Wizard for creating/duplicating units */}
+      {showWizard && (
+        <NavalUnitWizard
+          sourceUnit={wizardSourceUnit}
+          onClose={() => {
+            setShowWizard(false);
+            setWizardSourceUnit(null);
+          }}
+          onSave={() => {
+            setShowWizard(false);
+            setWizardSourceUnit(null);
+            queryClient.invalidateQueries({ queryKey: ['navalUnits'] });
+          }}
+        />
+      )}
     </div>
   );
 }

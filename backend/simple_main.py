@@ -450,10 +450,98 @@ async def upload_flag(unit_id: int, file: UploadFile = File(...), user: dict = D
     unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
     if not unit:
         raise HTTPException(status_code=404, detail="Naval unit not found")
-    
+
     file_path = save_uploaded_file(file, "flags")
     SimpleDatabase.update_naval_unit_flag(unit_id, file_path)
     return {"message": "Flag uploaded successfully", "file_path": file_path}
+
+@app.post("/api/units/{unit_id}/gallery/upload")
+async def upload_gallery_image(
+    unit_id: int,
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    """Upload image to unit gallery"""
+    unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+    if not unit:
+        raise HTTPException(status_code=404, detail="Naval unit not found")
+
+    file_path = save_uploaded_file(file, "gallery")
+
+    # Get current gallery count for order_index
+    gallery = SimpleDatabase.get_unit_gallery(unit_id)
+    order_index = len(gallery)
+
+    # Caption will be added separately via update endpoint
+    image_id = SimpleDatabase.add_gallery_image(unit_id, file_path, None, order_index)
+    return {
+        "message": "Gallery image uploaded successfully",
+        "image_id": image_id,
+        "file_path": file_path
+    }
+
+@app.put("/api/units/{unit_id}/gallery/{image_id}/caption")
+async def update_gallery_caption(
+    unit_id: int,
+    image_id: int,
+    caption: str,
+    user: dict = Depends(get_current_user)
+):
+    """Update caption for a gallery image"""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE unit_gallery
+            SET caption = ?
+            WHERE id = ? AND naval_unit_id = ?
+        ''', (caption, image_id, unit_id))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Gallery image not found")
+    return {"message": "Caption updated successfully"}
+
+@app.get("/api/units/{unit_id}/gallery")
+async def get_unit_gallery(unit_id: int):
+    """Get all gallery images for a unit"""
+    unit = SimpleDatabase.get_naval_unit_by_id(unit_id)
+    if not unit:
+        raise HTTPException(status_code=404, detail="Naval unit not found")
+
+    gallery = SimpleDatabase.get_unit_gallery(unit_id)
+    return {"gallery": gallery}
+
+@app.delete("/api/units/{unit_id}/gallery/{image_id}")
+async def delete_gallery_image(unit_id: int, image_id: int, user: dict = Depends(get_current_user)):
+    """Delete a gallery image"""
+    if not SimpleDatabase.delete_gallery_image(image_id):
+        raise HTTPException(status_code=404, detail="Gallery image not found")
+    return {"message": "Gallery image deleted successfully"}
+
+@app.put("/api/units/{unit_id}/gallery/{image_id}/order")
+async def update_gallery_order(
+    unit_id: int,
+    image_id: int,
+    order_index: int,
+    user: dict = Depends(get_current_user)
+):
+    """Update gallery image order"""
+    if not SimpleDatabase.update_gallery_order(image_id, order_index):
+        raise HTTPException(status_code=404, detail="Gallery image not found")
+    return {"message": "Gallery order updated successfully"}
+
+@app.post("/api/units/{unit_id}/duplicate")
+async def duplicate_unit(
+    unit_id: int,
+    new_name: str,
+    user: dict = Depends(get_current_user)
+):
+    """Duplicate an existing naval unit"""
+    new_unit_id = SimpleDatabase.duplicate_naval_unit(unit_id, new_name, user['id'])
+    if not new_unit_id:
+        raise HTTPException(status_code=404, detail="Naval unit not found or duplication failed")
+
+    new_unit = SimpleDatabase.get_naval_unit_by_id(new_unit_id)
+    return {"message": "Unit duplicated successfully", "unit": new_unit}
 
 @app.post("/api/units/{unit_id}/export/powerpoint")
 async def export_unit_powerpoint(unit_id: int, template_config: dict = None):
