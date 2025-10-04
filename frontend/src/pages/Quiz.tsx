@@ -10,7 +10,7 @@ type QuizState = 'configuration' | 'in_progress' | 'completed';
 type QuizConfigType = {
   participantName: string;
   participantSurname: string;
-  quizType: 'name_to_class' | 'nation_to_class' | 'class_to_flag';
+  quizType: 'name_to_class' | 'nation_to_class' | 'class_to_flag' | 'silhouette_to_class';
   totalQuestions: number;
   timePerQuestion: number;
 };

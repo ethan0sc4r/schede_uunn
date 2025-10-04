@@ -3,7 +3,7 @@
  * Main canvas workspace area with drag & drop and resize functionality
  */
 
-import { memo, useRef, useState, useCallback } from 'react';
+import { memo, useRef, useState, useCallback, useEffect } from 'react';
 import type { CanvasElement as CanvasElementType, ResizeHandle } from '../utils/canvasTypes';
 import CanvasElement from './CanvasElement';
 import { calculateResizedDimensions, snapToGrid, constrainToCanvas } from '../utils/elementHelpers';
@@ -221,7 +221,7 @@ function CanvasWorkspace({
   );
 
   // Attach global mouse event listeners
-  React.useEffect(() => {
+  useEffect(() => {
     if (isDragging || isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);

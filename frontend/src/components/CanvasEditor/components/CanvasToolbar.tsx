@@ -5,7 +5,8 @@
 
 import { memo } from 'react';
 import { Save, X, Undo, Redo } from 'lucide-react';
-import TemplateManager, { type Template } from '../../TemplateManager';
+import TemplateSelector from './TemplateSelector';
+import type { Template } from '../../TemplateManager';
 
 interface CanvasToolbarProps {
   // Actions
@@ -102,9 +103,9 @@ function CanvasToolbar({
         </div>
       </div>
 
-      {/* Template Manager Row */}
+      {/* Template Selector Row */}
       <div className="mt-4 pt-4 border-t border-gray-200">
-        <TemplateManager
+        <TemplateSelector
           currentTemplateId={currentTemplateId}
           onTemplateSelect={onTemplateSelect}
         />

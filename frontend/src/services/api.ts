@@ -329,4 +329,19 @@ export const templatesApi = {
     const response = await api.delete(`/api/templates/${id}`);
     return response.data;
   },
+
+  // Template state management for units
+  getTemplateState: async (unitId: number, templateId: string): Promise<any> => {
+    const response = await api.get(`/api/units/${unitId}/template-states/${templateId}`);
+    return response.data;
+  },
+
+  saveTemplateState: async (unitId: number, templateId: string, stateData: any): Promise<void> => {
+    await api.post(`/api/units/${unitId}/template-states/${templateId}`, stateData);
+  },
+
+  getAllTemplateStates: async (unitId: number): Promise<any> => {
+    const response = await api.get(`/api/units/${unitId}/template-states`);
+    return response.data;
+  },
 };

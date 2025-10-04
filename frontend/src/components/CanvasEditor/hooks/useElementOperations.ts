@@ -30,7 +30,7 @@ interface UseElementOperationsReturn {
   bringElementToFront: (id: string) => void;
   sendElementToBack: (id: string) => void;
   toggleElementVisibility: (id: string) => void;
-  getElementBy Id: (id: string) => CanvasElement | undefined;
+  getElementById: (id: string) => CanvasElement | undefined;
 }
 
 export const useElementOperations = ({

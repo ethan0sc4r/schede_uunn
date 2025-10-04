@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Check, Ship, FileText, Image, Palette } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
-import { navalUnitsApi } from '../services/api';
+import { navalUnitsApi, templatesApi } from '../services/api';
 import type { CreateNavalUnitRequest, CreateCharacteristicRequest } from '../types/index.ts';
 import { useToast } from '../contexts/ToastContext';
+import { DEFAULT_TEMPLATES } from './TemplateManager';
 
 interface NavalUnitWizardProps {
   onClose: () => void;
@@ -13,17 +14,11 @@ interface NavalUnitWizardProps {
 
 type Step = 'basic' | 'characteristics' | 'appearance';
 
-const TEMPLATES = [
-  { id: 'naval-card-standard', name: 'Standard' },
-  { id: 'naval-card-minimalist', name: 'Minimalista' },
-  { id: 'naval-card-detailed', name: 'Dettagliato' },
-  { id: 'naval-card-powerpoint', name: 'PowerPoint' },
-];
-
 export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUnitWizardProps) {
   const { success, error: showError } = useToast();
   const [currentStep, setCurrentStep] = useState<Step>('basic');
   const [selectedTemplate, setSelectedTemplate] = useState(sourceUnit?.current_template_id || 'naval-card-standard');
+  const [templates, setTemplates] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     name: sourceUnit?.name ? `${sourceUnit.name} (Copia)` : '',
@@ -43,6 +38,21 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
         }))
       : [{ characteristic_name: '', characteristic_value: '', order_index: 0 }]
   );
+
+  // Load templates on mount
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const apiTemplates = await templatesApi.getAll();
+        const allTemplates = [...DEFAULT_TEMPLATES, ...apiTemplates];
+        setTemplates(allTemplates);
+      } catch (error) {
+        console.error('❌ Errore caricamento template:', error);
+        setTemplates(DEFAULT_TEMPLATES);
+      }
+    };
+    loadTemplates();
+  }, []);
 
   const createMutation = useMutation({
     mutationFn: navalUnitsApi.create,
@@ -116,8 +126,6 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
       case 'basic':
         return formData.name.trim() && formData.unit_class.trim();
       case 'characteristics':
-        return true; // Optional
-      case 'media':
         return true; // Optional
       case 'appearance':
         return true; // Optional
@@ -260,28 +268,37 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Seleziona Template</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {TEMPLATES.map((template) => (
-                    <button
-                      key={template.id}
-                      type="button"
-                      onClick={() => setSelectedTemplate(template.id)}
-                      className={`p-4 border-2 rounded-lg text-left transition-all ${
-                        selectedTemplate === template.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="font-medium text-gray-900">{template.name}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {template.id === 'naval-card-standard' && 'Layout bilanciato per uso generale'}
-                        {template.id === 'naval-card-minimalist' && 'Design pulito ed essenziale'}
-                        {template.id === 'naval-card-detailed' && 'Spazio per molte informazioni'}
-                        {template.id === 'naval-card-powerpoint' && 'Ottimizzato per presentazioni'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                {templates.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                    <p>Caricamento template...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {templates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => setSelectedTemplate(template.id)}
+                        className={`p-4 border-2 rounded-lg text-left transition-all ${
+                          selectedTemplate === template.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-gray-900">{template.name}</div>
+                          {template.isDefault && (
+                            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">Default</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                          {template.description || 'Nessuna descrizione'}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

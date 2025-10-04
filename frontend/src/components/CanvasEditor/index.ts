@@ -12,5 +12,16 @@ export * from './hooks';
 // Components
 export * from './components';
 
-// Utils
-export * from './utils';
+// Utils - export only types to avoid duplication
+export type {
+  CanvasElement,
+  CanvasElementStyle,
+  CanvasConfig,
+  CanvasState,
+  ResizeHandle,
+  DragState,
+  ResizeState,
+  Flag
+} from './utils/canvasTypes';
+export * from './utils/canvasConstants';
+export * from './utils/elementHelpers';
