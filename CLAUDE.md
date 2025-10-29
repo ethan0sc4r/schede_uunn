@@ -10,9 +10,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Backend**: FastAPI (Python) + SQLite with simple_database module
 - **Frontend**: React 19 + TypeScript + Vite + TailwindCSS
 - **Database**: SQLite with custom SimpleDatabase wrapper (not SQLAlchemy in main entry point)
-- **Export**: ReportLab (PDF), Pillow (PNG), python-pptx (PowerPoint)
+- **Export**: ReportLab (PDF), Pillow (PNG), python-pptx (PowerPoint), xlsxwriter (Excel)
+
+## Quick Start (First Time Setup)
+
+```bash
+# 1. Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 2. Install backend dependencies
+cd backend
+pip install -r requirements.txt
+
+# 3. Initialize database and create admin user
+python init_and_create_admin.py  # Creates admin@example.com / admin123
+
+# 4. Install frontend dependencies
+cd ../frontend
+npm install
+
+# 5. Configure frontend environment
+echo "VITE_API_BASE_URL=http://localhost:8001" > .env
+
+# 6. Start development (two terminals)
+# Terminal 1: cd backend && ../venv/bin/python -m uvicorn simple_main:app --reload --port 8001
+# Terminal 2: cd frontend && npm run dev
+
+# Access at: http://localhost:5173
+```
 
 ## Development Commands
+
+### Prerequisites
+
+Before starting, ensure you have:
+- Python 3.8+ (Python 3.13 compatible with simple_main.py)
+- Node.js 16+
+- Virtual environment set up: `python -m venv venv` (venv directory should exist at project root)
 
 ### Start Development Servers
 
@@ -30,7 +65,8 @@ npm run dev
 **Windows:**
 ```cmd
 # Use provided batch scripts
-start_backend.bat        # Backend without auto-reload (stable)
+start_simple_backend.bat # Backend using simple_main.py (recommended, Python 3.13 compatible)
+start_backend.bat        # Legacy backend (uses main.py, may have SQLAlchemy issues)
 start_frontend.bat       # Frontend dev server
 start_servers.bat        # Both servers combined
 ```
@@ -102,10 +138,16 @@ backend/
 ```
 frontend/src/
 ├── components/
-│   ├── CanvasEditor.tsx        # Visual editor for unit cards (drag-drop canvas)
+│   ├── CanvasEditor.tsx        # Main Canvas Editor component (entry point)
+│   ├── CanvasEditor/           # Modular Canvas Editor system (refactored)
+│   │   ├── components/         # Canvas UI components (Toolbar, Workspace, Elements, etc.)
+│   │   ├── hooks/              # Custom hooks (useCanvasState, useElementOperations, etc.)
+│   │   └── utils/              # Canvas utilities (types, constants, helpers)
 │   ├── TemplateManager.tsx     # Template system with predefined layouts
 │   ├── PresentationMode.tsx    # Slideshow mode for groups
 │   ├── GroupModalAdvanced.tsx  # Advanced group management
+│   ├── GalleryManager.tsx      # Gallery management with upload/delete
+│   ├── VersionManager.tsx      # Version control for layouts
 │   └── NotesEditor.tsx         # WYSIWYG editor for notes
 ├── pages/
 │   ├── NavalUnits.tsx          # Main units list/grid
@@ -119,6 +161,8 @@ frontend/src/
 └── types/
     └── index.ts                # TypeScript definitions
 ```
+
+**Note**: The Canvas Editor has both a monolithic component ([CanvasEditor.tsx](frontend/src/components/CanvasEditor.tsx)) and a modular structure ([CanvasEditor/](frontend/src/components/CanvasEditor/)). The modular version is the current implementation with separated concerns.
 
 ### Key Features Implementation
 
@@ -259,3 +303,18 @@ No automated test suite currently exists. Manual testing via:
 - API docs at http://localhost:8001/docs (Swagger UI)
 - Frontend interaction testing
 - `backend/test_template_states.py` for template state verification
+
+## Additional Documentation
+
+- **[FRONTEND_GUIDE.md](FRONTEND_GUIDE.md)**: Comprehensive 1950-line guide covering React architecture, component patterns, Canvas Editor internals, hooks, state management, and troubleshooting
+- **[README.md](README.md)**: General project overview and quick start guide
+- **[CanvasEditor/README.md](frontend/src/components/CanvasEditor/README.md)**: Technical documentation for the modular Canvas Editor system
+
+## Additional Components Not Listed Above
+
+Recent additions include:
+- **VersionManager.tsx**: Track and manage different versions of unit layouts
+- **TemplateEditor.tsx**: Visual editor for creating/modifying templates
+- **QuizConfiguration.tsx**: Configure quiz settings and question pools
+- **GalleryManager.tsx** & **GalleryViewer.tsx**: Enhanced gallery functionality with ordering and zoom
+- **UnitGalleryModal.tsx**: Modal interface for unit gallery management
