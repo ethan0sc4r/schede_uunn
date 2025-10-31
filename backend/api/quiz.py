@@ -12,6 +12,8 @@ class QuizSessionCreate(BaseModel):
     quiz_type: str  # 'name_to_class', 'nation_to_class', 'class_to_flag', 'silhouette_to_class'
     total_questions: int
     time_per_question: int  # in seconds
+    selected_unit_ids: List[int]  # NEW: IDs of selected naval units
+    allow_duplicates: bool = False  # NEW: Allow same unit to appear multiple times
 
 class QuizAnswer(BaseModel):
     session_id: int
@@ -72,33 +74,33 @@ async def get_nations_with_units():
 
 @router.post("/quiz/session")
 async def create_quiz_session(quiz_data: QuizSessionCreate):
-    """Create a new quiz session"""
+    """Create a new quiz session with selected units"""
     # Validate quiz type
     if quiz_data.quiz_type not in ['name_to_class', 'nation_to_class', 'class_to_flag', 'silhouette_to_class']:
         raise HTTPException(status_code=400, detail="Invalid quiz type")
-    
+
     # Validate question count
     if quiz_data.total_questions < 1 or quiz_data.total_questions > 50:
         raise HTTPException(status_code=400, detail="Total questions must be between 1 and 50")
-    
+
     # Validate time per question
     if quiz_data.time_per_question < 10 or quiz_data.time_per_question > 300:
         raise HTTPException(status_code=400, detail="Time per question must be between 10 and 300 seconds")
-    
-    # Check if enough units are available
-    available_units = SimpleDatabase.get_available_naval_units_for_quiz(quiz_data.quiz_type)
-    if len(available_units) < 4:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Not enough units available for quiz type {quiz_data.quiz_type}. Need at least 4, have {len(available_units)}"
-        )
-    
-    if len(available_units) < quiz_data.total_questions:
+
+    # NEW: Validate selected units
+    if not quiz_data.selected_unit_ids or len(quiz_data.selected_unit_ids) < 4:
         raise HTTPException(
             status_code=400,
-            detail=f"Not enough units for {quiz_data.total_questions} questions. Maximum available: {len(available_units)}"
+            detail=f"At least 4 units must be selected. Currently selected: {len(quiz_data.selected_unit_ids)}"
         )
-    
+
+    # NEW: Validate questions vs selected units (if duplicates not allowed)
+    if not quiz_data.allow_duplicates and quiz_data.total_questions > len(quiz_data.selected_unit_ids):
+        raise HTTPException(
+            status_code=400,
+            detail=f"You selected {len(quiz_data.selected_unit_ids)} units but requested {quiz_data.total_questions} questions. Enable duplicates or reduce questions to max {len(quiz_data.selected_unit_ids)}."
+        )
+
     # Create session
     session_id = SimpleDatabase.create_quiz_session(
         quiz_data.participant_name,
@@ -107,14 +109,20 @@ async def create_quiz_session(quiz_data: QuizSessionCreate):
         quiz_data.total_questions,
         quiz_data.time_per_question
     )
-    
+
     if not session_id:
         raise HTTPException(status_code=500, detail="Failed to create quiz session")
-    
-    # Generate questions
-    if not SimpleDatabase.generate_quiz_questions(session_id, quiz_data.quiz_type, quiz_data.total_questions):
+
+    # NEW: Generate questions from selected units only
+    if not SimpleDatabase.generate_quiz_questions_from_selected_units(
+        session_id,
+        quiz_data.quiz_type,
+        quiz_data.total_questions,
+        quiz_data.selected_unit_ids,
+        quiz_data.allow_duplicates
+    ):
         raise HTTPException(status_code=500, detail="Failed to generate quiz questions")
-    
+
     # Return session details
     session = SimpleDatabase.get_quiz_session(session_id)
     return {"session_id": session_id, "session": session}

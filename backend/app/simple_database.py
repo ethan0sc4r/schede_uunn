@@ -1231,6 +1231,118 @@ class SimpleDatabase:
             return False
 
     @staticmethod
+    def generate_quiz_questions_from_selected_units(
+        session_id: int,
+        quiz_type: str,
+        total_questions: int,
+        selected_unit_ids: list,
+        allow_duplicates: bool = False
+    ) -> bool:
+        """Generate questions for a quiz session from selected units only"""
+        import random
+
+        try:
+            # Get only the selected units
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                placeholders = ','.join('?' * len(selected_unit_ids))
+                cursor.execute(f'''
+                    SELECT id, name, unit_class, nation, silhouette_path, flag_path, layout_config
+                    FROM naval_units
+                    WHERE id IN ({placeholders})
+                ''', selected_unit_ids)
+
+                rows = cursor.fetchall()
+                available_units = [dict(row) for row in rows]
+
+            if len(available_units) < 4:
+                print(f"Not enough selected units (need at least 4, have {len(available_units)})")
+                return False
+
+            # Select units for questions
+            if allow_duplicates:
+                # Allow repetitions: random choice with replacement
+                selected_units = random.choices(available_units, k=total_questions)
+            else:
+                # No repetitions: sample without replacement
+                selected_units = random.sample(available_units, min(total_questions, len(available_units)))
+
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+
+                for i, unit in enumerate(selected_units, 1):
+                    # Generate answer options based on quiz type
+                    if quiz_type == 'name_to_class':
+                        correct_answer = unit['unit_class']
+                        # Get other classes as wrong options
+                        cursor.execute('''
+                            SELECT DISTINCT unit_class FROM naval_units
+                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+
+                    elif quiz_type == 'nation_to_class':
+                        correct_answer = unit['unit_class']
+                        # Get other classes from same or different nations
+                        cursor.execute('''
+                            SELECT DISTINCT unit_class FROM naval_units
+                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+
+                    elif quiz_type == 'class_to_flag':
+                        # For flag quiz, the correct answer is the nation
+                        correct_answer = unit['nation'] or 'Unknown'
+                        # Get other nations as wrong options
+                        cursor.execute('''
+                            SELECT DISTINCT nation FROM naval_units
+                            WHERE nation != ? AND nation IS NOT NULL AND nation != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+
+                    elif quiz_type == 'silhouette_to_class':
+                        correct_answer = unit['unit_class']
+                        # Get other classes as wrong options
+                        cursor.execute('''
+                            SELECT DISTINCT unit_class FROM naval_units
+                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                            ORDER BY RANDOM() LIMIT 3
+                        ''', (correct_answer,))
+                        wrong_options = [row[0] for row in cursor.fetchall()]
+
+                    # Ensure we have exactly 3 wrong options
+                    while len(wrong_options) < 3:
+                        wrong_options.append(f"Option {len(wrong_options) + 1}")
+
+                    wrong_options = wrong_options[:3]
+
+                    # Create all 4 options and shuffle them
+                    all_options = [correct_answer] + wrong_options
+                    random.shuffle(all_options)
+
+                    # Insert question
+                    cursor.execute('''
+                        INSERT INTO quiz_questions
+                        (session_id, question_number, question_type, naval_unit_id, correct_answer,
+                         option_a, option_b, option_c, option_d)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (session_id, i, quiz_type, unit['id'], correct_answer,
+                          all_options[0], all_options[1], all_options[2], all_options[3]))
+
+                conn.commit()
+                print(f"✅ Generated {total_questions} quiz questions from {len(available_units)} selected units (duplicates: {allow_duplicates})")
+                return True
+
+        except Exception as e:
+            print(f"Error generating quiz questions from selected units: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    @staticmethod
     def get_quiz_session(session_id: int) -> Optional[Dict]:
         """Get quiz session details"""
         try:

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import QuizNavalUnitSelector from '../components/QuizNavalUnitSelector';
 import QuizConfiguration from '../components/QuizConfiguration';
 import QuizQuestion from '../components/QuizQuestion';
 import QuizResults from '../components/QuizResults';
 
 // Types defined inline to avoid import issues
-type QuizState = 'configuration' | 'in_progress' | 'completed';
+type QuizState = 'unit_selection' | 'configuration' | 'in_progress' | 'completed';
 
 type QuizConfigType = {
   participantName: string;
@@ -13,6 +14,7 @@ type QuizConfigType = {
   quizType: 'name_to_class' | 'nation_to_class' | 'class_to_flag' | 'silhouette_to_class';
   totalQuestions: number;
   timePerQuestion: number;
+  allowDuplicates: boolean;
 };
 
 type QuizSessionType = {
@@ -51,7 +53,8 @@ type QuizQuestionDataType = {
 };
 
 export default function Quiz() {
-  const [quizState, setQuizState] = useState<QuizState>('configuration');
+  const [quizState, setQuizState] = useState<QuizState>('unit_selection');
+  const [selectedUnitIds, setSelectedUnitIds] = useState<number[]>([]);
   const [currentSession, setCurrentSession] = useState<QuizSessionType | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestionDataType | null>(null);
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1);
@@ -63,18 +66,24 @@ export default function Quiz() {
     setError(null);
 
     try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const authToken = localStorage.getItem('auth_token');
+
       // Create quiz session
-      const response = await fetch('/api/quiz/session', {
+      const response = await fetch(`${API_BASE_URL}/api/quiz/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify({
           participant_name: config.participantName,
           participant_surname: config.participantSurname,
           quiz_type: config.quizType,
           total_questions: config.totalQuestions,
-          time_per_question: config.timePerQuestion
+          time_per_question: config.timePerQuestion,
+          selected_unit_ids: selectedUnitIds,
+          allow_duplicates: config.allowDuplicates
         })
       });
 
@@ -101,8 +110,15 @@ export default function Quiz() {
 
   const loadQuestion = async (sessionId: number, questionNumber: number) => {
     try {
-      const response = await fetch(`/api/quiz/session/${sessionId}/question/${questionNumber}`);
-      
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const authToken = localStorage.getItem('auth_token');
+
+      const response = await fetch(`${API_BASE_URL}/api/quiz/session/${sessionId}/question/${questionNumber}`, {
+        headers: {
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        }
+      });
+
       if (!response.ok) {
         throw new Error('Errore nel caricamento della domanda');
       }
@@ -134,10 +150,14 @@ export default function Quiz() {
 
     // Submit empty answer for timeout
     try {
-      await fetch('/api/quiz/answer', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const authToken = localStorage.getItem('auth_token');
+
+      await fetch(`${API_BASE_URL}/api/quiz/answer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify({
           session_id: currentSession.id,
@@ -163,8 +183,14 @@ export default function Quiz() {
     if (!currentSession) return;
 
     try {
-      const response = await fetch(`/api/quiz/session/${currentSession.id}/complete`, {
-        method: 'POST'
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const authToken = localStorage.getItem('auth_token');
+
+      const response = await fetch(`${API_BASE_URL}/api/quiz/session/${currentSession.id}/complete`, {
+        method: 'POST',
+        headers: {
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        }
       });
 
       if (!response.ok) {
@@ -181,7 +207,8 @@ export default function Quiz() {
   };
 
   const handleNewQuiz = () => {
-    setQuizState('configuration');
+    setQuizState('unit_selection');
+    setSelectedUnitIds([]);
     setCurrentSession(null);
     setCurrentQuestion(null);
     setCurrentQuestionNumber(1);
@@ -272,10 +299,22 @@ export default function Quiz() {
 
       {/* Main Content */}
       <div className="py-8">
+        {quizState === 'unit_selection' && (
+          <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
+            <QuizNavalUnitSelector
+              selectedUnitIds={selectedUnitIds}
+              onSelectionChange={setSelectedUnitIds}
+              onNext={() => setQuizState('configuration')}
+            />
+          </div>
+        )}
+
         {quizState === 'configuration' && (
           <QuizConfiguration
+            selectedUnitsCount={selectedUnitIds.length}
             onStartQuiz={handleStartQuiz}
             onCancel={handleBackToHome}
+            onBack={() => setQuizState('unit_selection')}
           />
         )}
 

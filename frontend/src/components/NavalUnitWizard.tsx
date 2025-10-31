@@ -87,9 +87,28 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
       char => char.characteristic_name.trim() && char.characteristic_value.trim()
     );
 
+    // Find selected template and apply its layout
+    const selectedTemplateObj = templates.find(t => t.id === selectedTemplate);
+    let layout_config = null;
+
+    if (selectedTemplateObj) {
+      // Apply template layout configuration
+      layout_config = {
+        elements: selectedTemplateObj.elements || [],
+        canvasWidth: selectedTemplateObj.canvasWidth,
+        canvasHeight: selectedTemplateObj.canvasHeight,
+        canvasBackground: selectedTemplateObj.canvasBackground,
+        canvasBorderWidth: selectedTemplateObj.canvasBorderWidth,
+        canvasBorderColor: selectedTemplateObj.canvasBorderColor
+      };
+
+      console.log('✅ Applying template to new unit:', selectedTemplate, layout_config);
+    }
+
     const requestData: CreateNavalUnitRequest = {
       ...formData,
       current_template_id: selectedTemplate,
+      layout_config: layout_config,
       characteristics: validCharacteristics.map((char, index) => ({
         ...char,
         order_index: index,

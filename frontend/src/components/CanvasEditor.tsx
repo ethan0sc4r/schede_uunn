@@ -1074,16 +1074,29 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         )}
 
         {(element.type === 'logo' || element.type === 'silhouette') && (
-          <div 
+          <div
             className="w-full h-full flex items-center justify-center cursor-move"
             onMouseDown={(e) => handleMouseDown(element.id, e)}
+            style={{ overflow: element.type === 'silhouette' ? 'hidden' : 'visible' }}
           >
             {element.image ? (
               <img
                 src={getImageUrl(element.image)}
                 alt={element.type}
                 className="max-w-full max-h-full object-contain"
-                style={{ borderRadius: element.style?.borderRadius || 0 }}
+                style={{
+                  borderRadius: element.style?.borderRadius || 0,
+                  // Apply transformations only for silhouette
+                  ...(element.type === 'silhouette' ? {
+                    transform: `
+                      scale(${(element.style?.imageZoom || 100) / 100})
+                      translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
+                      rotate(${element.style?.imageRotation || 0}deg)
+                    `,
+                    transformOrigin: 'center center',
+                    transition: 'transform 0.1s ease-out'
+                  } : {})
+                }}
                 onError={(e) => {
                   console.error(`❌ Failed to load image for ${element.type}:`, {
                     originalPath: element.image,
@@ -1103,15 +1116,6 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 {element.type === 'logo' && 'LOGO'}
                 {element.type === 'silhouette' && 'SILHOUETTE NAVE'}
               </div>
-            )}
-            {isSelected && (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files?.[0] && handleImageUpload(element.id, e.target.files[0])}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                onClick={(e) => e.stopPropagation()}
-              />
             )}
           </div>
         )}
@@ -1763,6 +1767,151 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                         onChange={(e) => e.target.files?.[0] && handleImageUpload(element.id, e.target.files[0])}
                         className="w-full text-sm"
                       />
+                    </div>
+                  )}
+
+                  {/* Image Transformation Controls - Only for silhouette with image */}
+                  {element.type === 'silhouette' && element.image && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Trasformazione Immagine</h4>
+
+                      {/* Zoom Control */}
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Zoom: {element.style?.imageZoom || 100}%
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="50"
+                            max="200"
+                            step="5"
+                            value={element.style?.imageZoom || 100}
+                            onChange={(e) => setElements(prev => prev.map(el =>
+                              el.id === selectedElement
+                                ? { ...el, style: { ...el.style, imageZoom: parseInt(e.target.value) } }
+                                : el
+                            ))}
+                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <input
+                            type="number"
+                            min="50"
+                            max="200"
+                            step="5"
+                            value={element.style?.imageZoom || 100}
+                            onChange={(e) => setElements(prev => prev.map(el =>
+                              el.id === selectedElement
+                                ? { ...el, style: { ...el.style, imageZoom: parseInt(e.target.value) || 100 } }
+                                : el
+                            ))}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center"
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>50%</span>
+                          <span>200%</span>
+                        </div>
+                      </div>
+
+                      {/* Rotation Control */}
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Rotazione: {element.style?.imageRotation || 0}°
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            step="5"
+                            value={element.style?.imageRotation || 0}
+                            onChange={(e) => setElements(prev => prev.map(el =>
+                              el.id === selectedElement
+                                ? { ...el, style: { ...el.style, imageRotation: parseInt(e.target.value) } }
+                                : el
+                            ))}
+                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            max="360"
+                            step="5"
+                            value={element.style?.imageRotation || 0}
+                            onChange={(e) => setElements(prev => prev.map(el =>
+                              el.id === selectedElement
+                                ? { ...el, style: { ...el.style, imageRotation: parseInt(e.target.value) || 0 } }
+                                : el
+                            ))}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center"
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>0°</span>
+                          <span>360°</span>
+                        </div>
+                      </div>
+
+                      {/* Position Controls */}
+                      <div className="mb-4">
+                        <label className="block text-xs font-medium text-gray-700 mb-2">Posizione</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Offset X (px)</label>
+                            <input
+                              type="number"
+                              min="-500"
+                              max="500"
+                              step="10"
+                              value={element.style?.imageOffsetX || 0}
+                              onChange={(e) => setElements(prev => prev.map(el =>
+                                el.id === selectedElement
+                                  ? { ...el, style: { ...el.style, imageOffsetX: parseInt(e.target.value) || 0 } }
+                                  : el
+                              ))}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-center"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Offset Y (px)</label>
+                            <input
+                              type="number"
+                              min="-500"
+                              max="500"
+                              step="10"
+                              value={element.style?.imageOffsetY || 0}
+                              onChange={(e) => setElements(prev => prev.map(el =>
+                                el.id === selectedElement
+                                  ? { ...el, style: { ...el.style, imageOffsetY: parseInt(e.target.value) || 0 } }
+                                  : el
+                              ))}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-xs text-center"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Reset Button */}
+                      <button
+                        onClick={() => setElements(prev => prev.map(el =>
+                          el.id === selectedElement
+                            ? {
+                                ...el,
+                                style: {
+                                  ...el.style,
+                                  imageZoom: 100,
+                                  imageRotation: 0,
+                                  imageOffsetX: 0,
+                                  imageOffsetY: 0
+                                }
+                              }
+                            : el
+                        ))}
+                        className="w-full px-3 py-2 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition-colors"
+                      >
+                        Reset Trasformazioni
+                      </button>
                     </div>
                   )}
 

@@ -8,11 +8,14 @@ type QuizConfigType = {
   quizType: 'name_to_class' | 'nation_to_class' | 'class_to_flag' | 'silhouette_to_class';
   totalQuestions: number;
   timePerQuestion: number;
+  allowDuplicates: boolean;
 };
 
 interface QuizConfigurationProps {
+  selectedUnitsCount: number;
   onStartQuiz: (config: QuizConfigType) => void;
   onCancel: () => void;
+  onBack: () => void;
 }
 
 const QUIZ_TYPES = [
@@ -38,119 +41,75 @@ const QUIZ_TYPES = [
   }
 ];
 
-export default function QuizConfiguration({ onStartQuiz, onCancel }: QuizConfigurationProps) {
+export default function QuizConfiguration({ selectedUnitsCount, onStartQuiz, onCancel, onBack }: QuizConfigurationProps) {
   const [participantName, setParticipantName] = useState('');
   const [participantSurname, setParticipantSurname] = useState('');
   const [selectedQuizType, setSelectedQuizType] = useState<QuizConfigType['quizType']>('name_to_class');
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [timePerQuestion, setTimePerQuestion] = useState(30);
+  const [allowDuplicates, setAllowDuplicates] = useState(false);
   const [availableUnits, setAvailableUnits] = useState<{[key: string]: number}>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
-  // Check available units for each quiz type
-  useEffect(() => {
-    const checkAvailableUnits = async () => {
-      setIsLoading(true);
-      const units: {[key: string]: number} = {};
-      
-      for (const quizType of QUIZ_TYPES) {
-        try {
-          const response = await fetch(`/api/quiz/available-units/${quizType.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            units[quizType.id] = data.available_units;
-          } else {
-            units[quizType.id] = 0;
-          }
-        } catch (error) {
-          console.error(`Error checking units for ${quizType.id}:`, error);
-          units[quizType.id] = 0;
-        }
-      }
-      
-      setAvailableUnits(units);
-      setIsLoading(false);
-    };
-
-    checkAvailableUnits();
-  }, []);
+  // No need to check available units - we already have selected units
 
   const validateConfiguration = (): string[] => {
     const errors: string[] = [];
-    
+
     if (!participantName.trim()) {
       errors.push('Il nome è obbligatorio');
     }
-    
+
     if (!participantSurname.trim()) {
       errors.push('Il cognome è obbligatorio');
     }
-    
+
     if (totalQuestions < 1) {
       errors.push('Deve esserci almeno 1 domanda');
     }
-    
+
     if (totalQuestions > 50) {
       errors.push('Non puoi avere più di 50 domande');
     }
-    
+
     if (timePerQuestion < 10) {
       errors.push('Il tempo per domanda deve essere almeno 10 secondi');
     }
-    
+
     if (timePerQuestion > 300) {
       errors.push('Il tempo per domanda non può superare 5 minuti');
     }
-    
-    const availableForType = availableUnits[selectedQuizType] || 0;
-    if (availableForType < 4) {
-      errors.push(`Non ci sono abbastanza unità navali per il tipo di quiz selezionato (minimo 4, disponibili ${availableForType})`);
+
+    // NEW: Validate against selected units
+    if (selectedUnitsCount < 4) {
+      errors.push(`Hai selezionato solo ${selectedUnitsCount} navi. Minimo richiesto: 4`);
     }
-    
-    if (totalQuestions > availableForType) {
-      errors.push(`Troppe domande per il tipo di quiz selezionato. Massimo disponibili: ${availableForType}`);
+
+    // NEW: If duplicates are NOT allowed, questions can't exceed selected units
+    if (!allowDuplicates && totalQuestions > selectedUnitsCount) {
+      errors.push(`Hai selezionato ${selectedUnitsCount} navi ma chiedi ${totalQuestions} domande. Abilita le ripetizioni o riduci a max ${selectedUnitsCount} domande.`);
     }
-    
+
     return errors;
   };
 
   const handleStartQuiz = () => {
     const validationErrors = validateConfiguration();
     setErrors(validationErrors);
-    
+
     if (validationErrors.length === 0) {
       onStartQuiz({
         participantName: participantName.trim(),
         participantSurname: participantSurname.trim(),
         quizType: selectedQuizType,
         totalQuestions,
-        timePerQuestion
+        timePerQuestion,
+        allowDuplicates
       });
     }
   };
 
-  const getQuizTypeStatus = (quizType: string) => {
-    const available = availableUnits[quizType] || 0;
-    if (available >= 4) {
-      return { status: 'available', message: `${available} unità disponibili`, color: 'text-green-600' };
-    } else {
-      return { status: 'unavailable', message: `Solo ${available} unità disponibili (minimo 4)`, color: 'text-red-600' };
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <span className="ml-3 text-gray-600">Caricamento configurazione quiz...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -200,52 +159,32 @@ export default function QuizConfiguration({ onStartQuiz, onCancel }: QuizConfigu
           {/* Quiz Type Selection */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900">Tipo di Quiz</h3>
-            
+
             <div className="space-y-3">
-              {QUIZ_TYPES.map((type) => {
-                const status = getQuizTypeStatus(type.id);
-                const isDisabled = status.status === 'unavailable';
-                
-                return (
-                  <div
-                    key={type.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                      selectedQuizType === type.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : isDisabled
-                        ? 'border-gray-200 bg-gray-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    } ${isDisabled ? 'opacity-60' : ''}`}
-                    onClick={() => !isDisabled && setSelectedQuizType(type.id)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start">
-                        <input
-                          type="radio"
-                          checked={selectedQuizType === type.id}
-                          onChange={() => !isDisabled && setSelectedQuizType(type.id)}
-                          disabled={isDisabled}
-                          className="mt-1 mr-3"
-                        />
-                        <div>
-                          <h4 className="font-medium text-gray-900">{type.title}</h4>
-                          <p className="text-sm text-gray-600 mt-1">{type.description}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        {status.status === 'available' ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-5 w-5 text-red-500" />
-                        )}
-                      </div>
-                    </div>
-                    <div className={`text-xs mt-2 ${status.color}`}>
-                      {status.message}
+              {QUIZ_TYPES.map((type) => (
+                <div
+                  key={type.id}
+                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                    selectedQuizType === type.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setSelectedQuizType(type.id)}
+                >
+                  <div className="flex items-start">
+                    <input
+                      type="radio"
+                      checked={selectedQuizType === type.id}
+                      onChange={() => setSelectedQuizType(type.id)}
+                      className="mt-1 mr-3"
+                    />
+                    <div>
+                      <h4 className="font-medium text-gray-900">{type.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{type.description}</p>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -270,10 +209,12 @@ export default function QuizConfiguration({ onStartQuiz, onCancel }: QuizConfigu
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Massimo: {availableUnits[selectedQuizType] || 0} (unità disponibili)
+                  {allowDuplicates
+                    ? `Nessun limite (ripetizioni abilitate)`
+                    : `Massimo: ${selectedUnitsCount} (navi selezionate)`}
                 </p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tempo per Domanda (secondi)
@@ -290,6 +231,24 @@ export default function QuizConfiguration({ onStartQuiz, onCancel }: QuizConfigu
                   Minimo: 10 secondi, Massimo: 5 minuti
                 </p>
               </div>
+            </div>
+
+            {/* Allow Duplicates Toggle */}
+            <div className="pt-4 border-t border-gray-200">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowDuplicates}
+                  onChange={(e) => setAllowDuplicates(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-3">
+                  <span className="text-sm font-medium text-gray-900">Consenti domande ripetute</span>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    La stessa nave può apparire più volte durante il quiz
+                  </p>
+                </span>
+              </label>
             </div>
           </div>
 
@@ -322,20 +281,28 @@ export default function QuizConfiguration({ onStartQuiz, onCancel }: QuizConfigu
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
           <button
-            onClick={onCancel}
+            onClick={onBack}
             className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
           >
-            Annulla
+            ← Indietro
           </button>
-          <button
-            onClick={handleStartQuiz}
-            disabled={errors.length > 0}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Avvia Quiz
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Annulla
+            </button>
+            <button
+              onClick={handleStartQuiz}
+              disabled={errors.length > 0}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Avvia Quiz
+            </button>
+          </div>
         </div>
       </div>
     </div>

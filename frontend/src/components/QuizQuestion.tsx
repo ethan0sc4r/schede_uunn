@@ -106,10 +106,14 @@ export default function QuizQuestion({
     }
 
     try {
-      const response = await fetch('/api/quiz/answer', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+      const authToken = localStorage.getItem('auth_token');
+
+      const response = await fetch(`${API_BASE_URL}/api/quiz/answer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         },
         body: JSON.stringify({
           session_id: question.session_id,

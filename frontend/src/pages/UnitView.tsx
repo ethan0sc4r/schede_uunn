@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Share2, FileImage, Printer, Presentation, X } from 'lucide-react';
+import { Share2, FileImage, Printer, Presentation, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { navalUnitsApi, templatesApi } from '../services/api';
 import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
@@ -15,6 +15,7 @@ export default function UnitView() {
   const [error, setError] = useState<string | null>(null);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
+  const [currentGalleryIndex, setCurrentGalleryIndex] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -379,14 +380,14 @@ export default function UnitView() {
                 </div>
               )}
 
-              {(element.type === 'logo' || element.type === 'silhouette') && (
+              {element.type === 'logo' && (
                 <div className="w-full h-full flex items-center justify-center">
                   {element.image ? (
                     <img
                       src={getImageUrl(element.image)}
                       alt={element.type}
                       className="max-w-full max-h-full object-contain"
-                      style={{ 
+                      style={{
                         display: 'block',
                         borderRadius: element.style?.borderRadius || 0
                       }}
@@ -399,13 +400,104 @@ export default function UnitView() {
                       }}
                     />
                   ) : (
-                    <div className="text-gray-600 text-center text-sm font-bold">
-                      {element.type === 'logo' && 'LOGO'}
-                      {element.type === 'silhouette' && 'SILHOUETTE NAVE'}
-                    </div>
+                    <div className="text-gray-600 text-center text-sm font-bold">LOGO</div>
                   )}
                 </div>
               )}
+
+              {element.type === 'silhouette' && (() => {
+                // Collect all available images: silhouette + gallery
+                const allImages: string[] = [];
+                if (element.image) {
+                  allImages.push(element.image);
+                }
+                if (unit?.gallery && unit.gallery.length > 0) {
+                  unit.gallery.forEach(img => {
+                    if (img.image_path) {
+                      allImages.push(img.image_path);
+                    }
+                  });
+                }
+
+                const hasMultipleImages = allImages.length > 1;
+
+                return (
+                  <>
+                    <div className="w-full h-full flex items-center justify-center relative" style={{ overflow: 'hidden' }}>
+                      {allImages.length > 0 ? (
+                        <>
+                          <img
+                            src={getImageUrl(allImages[currentGalleryIndex])}
+                            alt="Naval Unit"
+                            className="max-w-full max-h-full object-contain"
+                            style={{
+                              display: 'block',
+                              borderRadius: element.style?.borderRadius || 0,
+                              // Apply transformations from element style
+                              transform: `
+                                scale(${(element.style?.imageZoom || 100) / 100})
+                                translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
+                                rotate(${element.style?.imageRotation || 0}deg)
+                              `,
+                              transformOrigin: 'center center'
+                            }}
+                            onError={(e) => {
+                              console.error('Error loading gallery image:', allImages[currentGalleryIndex]);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+
+                          {/* Image Counter - Inside at bottom */}
+                          {hasMultipleImages && (
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm">
+                              {currentGalleryIndex + 1} / {allImages.length}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-gray-600 text-center text-sm font-bold">SILHOUETTE NAVE</div>
+                      )}
+                    </div>
+
+                    {/* Carousel Controls - Fixed at window edges */}
+                    {hasMultipleImages && (
+                      <>
+                        {/* Previous Button - Fixed Left Edge of Window */}
+                        <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentGalleryIndex((prev) =>
+                                prev === 0 ? allImages.length - 1 : prev - 1
+                              );
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 transition-all shadow-2xl hover:scale-110"
+                            title="Foto precedente"
+                          >
+                            <ChevronLeft className="h-8 w-8" />
+                          </button>
+                        </div>
+
+                        {/* Next Button - Fixed Right Edge of Window */}
+                        <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentGalleryIndex((prev) =>
+                                prev === allImages.length - 1 ? 0 : prev + 1
+                              );
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 transition-all shadow-2xl hover:scale-110"
+                            title="Foto successiva"
+                          >
+                            <ChevronRight className="h-8 w-8" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
 
               {element.type === 'flag' && (
                 <div className="w-full h-full flex items-center justify-center">

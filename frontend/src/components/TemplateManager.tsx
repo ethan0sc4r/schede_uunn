@@ -242,19 +242,10 @@ export const DEFAULT_TEMPLATES: Template[] = [
     canvasWidth: CANVAS_SIZES.PRESENTATION.width,
     canvasHeight: CANVAS_SIZES.PRESENTATION.height,
     canvasBackground: '#ffffff',
-    canvasBorderWidth: 2,
-    canvasBorderColor: '#1e40af',
+    canvasBorderWidth: 0,
+    canvasBorderColor: '#000000',
     createdAt: new Date().toISOString(),
     elements: [
-      {
-        id: 'logo',
-        type: 'logo',
-        x: 50,
-        y: 30,
-        width: 100,
-        height: 100,
-        style: { backgroundColor: '#1e40af', borderRadius: 8 }
-      },
       {
         id: 'flag',
         type: 'flag',
@@ -262,53 +253,38 @@ export const DEFAULT_TEMPLATES: Template[] = [
         y: 30,
         width: 100,
         height: 67,
-        style: { backgroundColor: '#1e40af', borderRadius: 8 }
+        style: { backgroundColor: 'transparent', borderRadius: 0 }
       },
       {
         id: 'unit_name',
         type: 'unit_name',
-        x: 170,
+        x: 50,
         y: 30,
-        width: 500,
+        width: 600,
         height: 40,
         content: '[NOME UNITÀ]',
         isFixed: true,
-        style: { fontSize: 28, fontWeight: 'bold', color: '#1e40af' }
+        style: { fontSize: 32, fontWeight: 'bold', color: '#000000', textAlign: 'left' }
       },
       {
         id: 'unit_class',
         type: 'unit_class',
-        x: 170,
+        x: 50,
         y: 80,
-        width: 500,
+        width: 600,
         height: 30,
         content: '[CLASSE]',
         isFixed: true,
-        style: { fontSize: 20, fontWeight: 'normal', color: '#374151' }
+        style: { fontSize: 24, fontWeight: 'normal', color: '#374151', textAlign: 'left' }
       },
       {
         id: 'silhouette',
         type: 'silhouette',
         x: 50,
-        y: 150,
+        y: 140,
         width: 1180,
-        height: 300,
-        style: { backgroundColor: '#3b82f6', borderRadius: 8 }
-      },
-      {
-        id: 'characteristics-table',
-        type: 'table',
-        x: 50,
-        y: 480,
-        width: 1180,
-        height: 200,
-        tableData: [
-          ['CARATTERISTICA', 'VALORE', 'CARATTERISTICA', 'VALORE'],
-          ['LUNGHEZZA', 'XXX m', 'LARGHEZZA', 'XXX m'],
-          ['DISLOCAMENTO', 'XXX t', 'VELOCITÀ', 'XXX kn'],
-          ['EQUIPAGGIO', 'XXX', 'ARMA', 'XXX']
-        ],
-        style: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' }
+        height: 540,
+        style: { backgroundColor: 'transparent', borderRadius: 0 }
       }
     ]
   }
