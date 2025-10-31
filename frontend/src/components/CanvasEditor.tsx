@@ -36,6 +36,11 @@ interface CanvasElement {
     borderStyle?: string;
     headerBackgroundColor?: string;
     columnWidths?: number[];
+    // Image transformation properties (for silhouette)
+    imageZoom?: number;
+    imageOffsetX?: number;
+    imageOffsetY?: number;
+    imageRotation?: number;
   };
 }
 
