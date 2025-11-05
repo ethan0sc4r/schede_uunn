@@ -64,10 +64,10 @@ export default function Admin() {
     onSuccess: () => {
       setShowPasswordModal(null);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      success('Password cambiata con successo!');
+      success('Password changed successfully!');
     },
     onError: (error: any) => {
-      showError(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
+      showError(`Error changing password: ${error.response?.data?.detail || error.message}`);
     }
   });
 
@@ -77,55 +77,55 @@ export default function Admin() {
     onSuccess: () => {
       setShowPasswordModal(null);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      success('Password amministratore cambiata con successo!');
+      success('Administrator password changed successfully!');
     },
     onError: (error: any) => {
-      showError(`Errore nel cambio password: ${error.response?.data?.detail || error.message}`);
+      showError(`Error changing password: ${error.response?.data?.detail || error.message}`);
     }
   });
 
   const handleActivate = async (userId: number) => {
     try {
       await activateMutation.mutateAsync(userId);
-      success('Utente attivato con successo');
+      success('User activated successfully');
     } catch (error) {
-      console.error('Errore:', error);
-      showError('Errore durante l\'attivazione dell\'utente');
+      console.error('Error:', error);
+      showError('Error activating user');
     }
   };
 
   const handleDeactivate = async (userId: number) => {
-    if (window.confirm('Sei sicuro di voler disattivare questo utente?')) {
+    if (window.confirm('Are you sure you want to deactivate this user?')) {
       try {
         await deactivateMutation.mutateAsync(userId);
-        success('Utente disattivato con successo');
+        success('User deactivated successfully');
       } catch (error) {
-        console.error('Errore:', error);
-        showError('Errore durante la disattivazione dell\'utente');
+        console.error('Error:', error);
+        showError('Error deactivating user');
       }
     }
   };
 
   const handleMakeAdmin = async (userId: number) => {
-    if (window.confirm('Sei sicuro di voler rendere questo utente amministratore?')) {
+    if (window.confirm('Are you sure you want to make this user an administrator?')) {
       try {
         await makeAdminMutation.mutateAsync(userId);
-        success('Utente promosso ad amministratore');
+        success('User promoted to administrator');
       } catch (error) {
-        console.error('Errore:', error);
-        showError('Errore durante la promozione dell\'utente');
+        console.error('Error:', error);
+        showError('Error promoting user');
       }
     }
   };
 
   const handleRemoveAdmin = async (userId: number) => {
-    if (window.confirm('Sei sicuro di voler rimuovere i privilegi di amministratore?')) {
+    if (window.confirm('Are you sure you want to remove administrator privileges?')) {
       try {
         await removeAdminMutation.mutateAsync(userId);
-        success('Privilegi di amministratore rimossi');
+        success('Administrator privileges removed');
       } catch (error) {
-        console.error('Errore:', error);
-        showError('Errore durante la rimozione dei privilegi');
+        console.error('Error:', error);
+        showError('Error removing privileges');
       }
     }
   };
@@ -142,12 +142,12 @@ export default function Admin() {
     e.preventDefault();
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      warning('Le password non coincidono!');
+      warning('Passwords do not match!');
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      warning('La password deve essere di almeno 6 caratteri!');
+      warning('Password must be at least 6 characters!');
       return;
     }
     
@@ -169,7 +169,7 @@ export default function Admin() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Pannello Amministrazione</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-6">Administration Panel</h1>
 
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
         <div className="border-b border-gray-200">
@@ -182,7 +182,7 @@ export default function Admin() {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Utenti in Attesa ({pendingUsers?.length || 0})
+              Pending Users ({pendingUsers?.length || 0})
             </button>
             <button
               onClick={() => setActiveTab('all')}
@@ -192,7 +192,7 @@ export default function Admin() {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Tutti gli Utenti
+              All Users
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -203,7 +203,7 @@ export default function Admin() {
               }`}
             >
               <Settings className="h-4 w-4 mr-2" />
-              Impostazioni
+              Settings
             </button>
           </nav>
         </div>
@@ -214,42 +214,42 @@ export default function Admin() {
               <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
                 <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
                   <Shield className="h-5 w-5 mr-2" />
-                  Impostazioni Amministratore
+                  Administrator Settings
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-medium text-gray-900">Cambia Password Amministratore</h4>
-                      <p className="text-sm text-gray-600">Modifica la tua password di amministratore</p>
+                      <h4 className="font-medium text-gray-900">Change Administrator Password</h4>
+                      <p className="text-sm text-gray-600">Modify your administrator password</p>
                     </div>
                     <button
                       onClick={handleChangeOwnPassword}
                       className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <Key className="h-4 w-4 mr-2" />
-                      Cambia Password
+                      Change Password
                     </button>
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informazioni Sistema</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">System Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="font-medium text-gray-700">Utenti totali:</span>
+                    <span className="font-medium text-gray-700">Total users:</span>
                     <span className="ml-2 text-gray-900">{allUsers?.length || 0}</span>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700">Utenti attivi:</span>
+                    <span className="font-medium text-gray-700">Active users:</span>
                     <span className="ml-2 text-gray-900">{allUsers?.filter(u => u.is_active).length || 0}</span>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700">Utenti in attesa:</span>
+                    <span className="font-medium text-gray-700">Pending users:</span>
                     <span className="ml-2 text-gray-900">{pendingUsers?.length || 0}</span>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700">Amministratori:</span>
+                    <span className="font-medium text-gray-700">Administrators:</span>
                     <span className="ml-2 text-gray-900">{allUsers?.filter(u => u.is_admin).length || 0}</span>
                   </div>
                 </div>
@@ -261,9 +261,9 @@ export default function Admin() {
             </div>
           ) : !currentUsers || currentUsers.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              {activeTab === 'pending' 
-                ? 'Nessun utente in attesa di approvazione'
-                : 'Nessun utente trovato'
+              {activeTab === 'pending'
+                ? 'No users pending approval'
+                : 'No users found'
               }
             </div>
           ) : (
@@ -290,14 +290,14 @@ export default function Admin() {
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
               <Key className="h-5 w-5 mr-2" />
-              {showPasswordModal.isOwnPassword ? 'Cambia Password Amministratore' : `Cambia Password - ${showPasswordModal.user?.first_name} ${showPasswordModal.user?.last_name}`}
+              {showPasswordModal.isOwnPassword ? 'Change Administrator Password' : `Change Password - ${showPasswordModal.user?.first_name} ${showPasswordModal.user?.last_name}`}
             </h2>
-            
+
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               {showPasswordModal.isOwnPassword && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Password Attuale
+                    Current Password
                   </label>
                   <input
                     type="password"
@@ -308,10 +308,10 @@ export default function Admin() {
                   />
                 </div>
               )}
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nuova Password
+                  New Password
                 </label>
                 <input
                   type="password"
@@ -321,12 +321,12 @@ export default function Admin() {
                   minLength={6}
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Minimo 6 caratteri</p>
+                <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Conferma Nuova Password
+                  Confirm New Password
                 </label>
                 <input
                   type="password"
@@ -336,7 +336,7 @@ export default function Admin() {
                   required
                 />
               </div>
-              
+
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"
@@ -346,14 +346,14 @@ export default function Admin() {
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
                 >
-                  Annulla
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={changePasswordMutation.isPending || changeOwnPasswordMutation.isPending}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {(changePasswordMutation.isPending || changeOwnPasswordMutation.isPending) ? 'Aggiornamento...' : 'Cambia Password'}
+                  {(changePasswordMutation.isPending || changeOwnPasswordMutation.isPending) ? 'Updating...' : 'Change Password'}
                 </button>
               </div>
             </form>
@@ -396,12 +396,12 @@ function UserCard({ user, onActivate, onDeactivate, onMakeAdmin, onRemoveAdmin, 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-red-100 text-red-800'
               }`}>
-                {user.is_active ? 'Attivo' : 'Inattivo'}
+                {user.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Registrato il {new Date(user.created_at).toLocaleDateString('it-IT')}
+            Registered on {new Date(user.created_at).toLocaleDateString('en-US')}
           </p>
         </div>
 
@@ -411,14 +411,14 @@ function UserCard({ user, onActivate, onDeactivate, onMakeAdmin, onRemoveAdmin, 
               onClick={onActivate}
               className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
             >
-              Attiva
+              Activate
             </button>
           ) : (
             <button
               onClick={onDeactivate}
               className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
             >
-              Disattiva
+              Deactivate
             </button>
           )}
 
@@ -427,25 +427,25 @@ function UserCard({ user, onActivate, onDeactivate, onMakeAdmin, onRemoveAdmin, 
               <button
                 onClick={onChangePassword}
                 className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center"
-                title="Cambia password"
+                title="Change password"
               >
                 <Key className="h-3 w-3 mr-1" />
                 Password
               </button>
-              
+
               {!user.is_admin ? (
                 <button
                   onClick={onMakeAdmin}
                   className="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600"
                 >
-                  Rendi Admin
+                  Make Admin
                 </button>
               ) : (
                 <button
                   onClick={onRemoveAdmin}
                   className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600"
                 >
-                  Rimuovi Admin
+                  Remove Admin
                 </button>
               )}
             </>

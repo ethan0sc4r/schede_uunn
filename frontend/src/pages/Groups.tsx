@@ -57,13 +57,13 @@ export default function Groups() {
   }, []);
 
   const handleDelete = useCallback(async (id: number) => {
-    if (window.confirm('Sei sicuro di voler eliminare questo gruppo?')) {
+    if (window.confirm('Are you sure you want to delete this group?')) {
       try {
         await deleteMutation.mutateAsync(id);
-        success('Gruppo eliminato con successo');
+        success('Group deleted successfully');
       } catch (error) {
-        console.error('Errore durante l\'eliminazione:', error);
-        showError('Errore durante l\'eliminazione del gruppo');
+        console.error('Error during deletion:', error);
+        showError('Error deleting group');
       }
     }
   }, [deleteMutation, success, showError]);
@@ -80,11 +80,11 @@ export default function Groups() {
       } else {
         await createMutation.mutateAsync(groupData);
       }
-      success('Gruppo salvato con successo');
+      success('Group saved successfully');
       handleModalClose();
     } catch (error) {
-      console.error('Errore durante il salvataggio:', error);
-      showError('Errore durante il salvataggio del gruppo');
+      console.error('Error during save:', error);
+      showError('Error saving group');
     }
   }, [selectedGroup, updateMutation, createMutation, success, showError, handleModalClose]);
 
@@ -120,11 +120,11 @@ export default function Groups() {
       
       // Clean up
       window.URL.revokeObjectURL(url);
-      success('PowerPoint esportato con successo');
+      success('PowerPoint exported successfully');
     } catch (error) {
-      console.error('Errore durante l\'export PowerPoint:', error);
+      console.error('Error during PowerPoint export:', error);
       console.error('Error details:', (error as any).response?.data || (error as any).message);
-      showError(`Errore durante l'export PowerPoint: ${(error as any).response?.data?.detail || (error as any).message}`);
+      showError(`Error exporting PowerPoint: ${(error as any).response?.data?.detail || (error as any).message}`);
     }
   };
 
@@ -140,7 +140,7 @@ export default function Groups() {
     return (
       <div className="p-6">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          Errore nel caricamento dei gruppi
+          Error loading groups
         </div>
       </div>
     );
@@ -149,25 +149,25 @@ export default function Groups() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Gruppi</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Groups</h1>
         <button
           onClick={handleCreate}
           className="btn-primary"
         >
-          + Nuovo Gruppo
+          + New Group
         </button>
       </div>
 
       {!groups || groups.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-gray-500 text-lg mb-4">
-            Nessun gruppo trovato
+            No groups found
           </div>
           <button
             onClick={handleCreate}
             className="btn-primary"
           >
-            Crea il primo gruppo
+            Create first group
           </button>
         </div>
       ) : (

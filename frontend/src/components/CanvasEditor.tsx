@@ -835,16 +835,60 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       const data = await response.json();
       // Store only the relative path, getImageUrl will convert it to absolute URL
       const imagePath = data.file_path;
-      
-      setElements(prev => prev.map(el => 
-        el.id === elementId ? { ...el, image: imagePath } : el
-      ));
-      
+
+      // Calculate optimal zoom for silhouette images
+      if (element?.type === 'silhouette') {
+        const img = new Image();
+        img.onload = () => {
+          const imageWidth = img.naturalWidth;
+          const imageHeight = img.naturalHeight;
+          const containerWidth = element.width;
+          const containerHeight = element.height;
+
+          // Calculate optimal scale to fit image in container while showing all content
+          const scaleX = containerWidth / imageWidth;
+          const scaleY = containerHeight / imageHeight;
+          const optimalScale = Math.min(scaleX, scaleY); // Use min to ensure all image is visible
+
+          // Convert to zoom percentage
+          let optimalZoom = Math.round(optimalScale * 100);
+
+          // Apply max limit of 300%
+          const MAX_AUTO_ZOOM = 300;
+          optimalZoom = Math.min(optimalZoom, MAX_AUTO_ZOOM);
+
+          console.log(`🔍 Auto-zoom calculated: ${optimalZoom}% (image: ${imageWidth}x${imageHeight}, container: ${containerWidth}x${containerHeight})`);
+
+          // Update element with image and optimal zoom
+          setElements(prev => prev.map(el =>
+            el.id === elementId
+              ? {
+                  ...el,
+                  image: imagePath,
+                  style: {
+                    ...el.style,
+                    imageZoom: optimalZoom,
+                    imageOffsetX: 0,
+                    imageOffsetY: 0,
+                    imageRotation: 0
+                  }
+                }
+              : el
+          ));
+        };
+        img.src = getImageUrl(imagePath);
+      } else {
+        // For non-silhouette images, just update the image path
+        setElements(prev => prev.map(el =>
+          el.id === elementId ? { ...el, image: imagePath } : el
+        ));
+      }
+
       // Force re-render of nation detection if it's a flag
       if (element?.type === 'flag') {
         setNationUpdateKey(prev => prev + 1);
       }
-      
+
       console.log('✅ Image uploaded successfully:', imagePath);
       
     } catch (error) {

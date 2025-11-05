@@ -62,9 +62,9 @@ export default function QuizNavalUnitSelector({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Seleziona le Navi per il Quiz</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Select Ships for Quiz</h3>
         <p className="text-sm text-gray-600">
-          Scegli quali unità navali utilizzare per generare le domande del quiz
+          Choose which naval units to use for generating quiz questions
         </p>
       </div>
 
@@ -73,7 +73,7 @@ export default function QuizNavalUnitSelector({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
           type="text"
-          placeholder="Cerca per nome o classe..."
+          placeholder="Search by name or class..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -91,10 +91,10 @@ export default function QuizNavalUnitSelector({
           ) : (
             <Square className="h-5 w-5" />
           )}
-          {isAllSelected ? 'Deseleziona tutte' : 'Seleziona tutte'}
+          {isAllSelected ? 'Deselect all' : 'Select all'}
         </button>
         <span className="text-sm text-gray-600">
-          {selectedUnitIds.length} / {filteredUnits.length} selezionate
+          {selectedUnitIds.length} / {filteredUnits.length} selected
         </span>
       </div>
 
@@ -102,13 +102,13 @@ export default function QuizNavalUnitSelector({
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span className="ml-3 text-gray-600">Caricamento unità navali...</span>
+          <span className="ml-3 text-gray-600">Loading naval units...</span>
         </div>
       ) : filteredUnits.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
-          <p>Nessuna unità navale trovata</p>
+          <p>No naval units found</p>
           {searchTerm && (
-            <p className="text-sm mt-1">Prova a modificare il termine di ricerca</p>
+            <p className="text-sm mt-1">Try modifying your search term</p>
           )}
         </div>
       ) : (
@@ -144,9 +144,9 @@ export default function QuizNavalUnitSelector({
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
         <div className="text-sm text-gray-600">
           {selectedUnitIds.length === 0 ? (
-            <span className="text-red-600 font-medium">⚠️ Seleziona almeno una nave per continuare</span>
+            <span className="text-red-600 font-medium">⚠️ Select at least one ship to continue</span>
           ) : (
-            <span className="text-green-600 font-medium">✓ {selectedUnitIds.length} navi selezionate</span>
+            <span className="text-green-600 font-medium">✓ {selectedUnitIds.length} ships selected</span>
           )}
         </div>
         <button
@@ -154,7 +154,7 @@ export default function QuizNavalUnitSelector({
           disabled={selectedUnitIds.length === 0}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          Avanti →
+          Next →
         </button>
       </div>
     </div>

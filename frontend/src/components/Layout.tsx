@@ -41,7 +41,7 @@ const Layout: React.FC = () => {
       <div className="w-64 bg-white shadow-lg flex-shrink-0">
         <div className="flex items-center justify-center h-16 px-6 border-b border-gray-200">
           <h1 className="text-xl font-bold text-gray-900">
-            Naval Units
+            Naval Recce
           </h1>
         </div>
 
@@ -75,7 +75,7 @@ const Layout: React.FC = () => {
                 className="group flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-green-50 hover:text-green-600 transition-all duration-200"
               >
                 <Brain className="mr-3 h-5 w-5" />
-                Quiz Navali
+                Naval Quiz
               </a>
             </div>
           </div>

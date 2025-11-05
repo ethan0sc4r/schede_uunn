@@ -75,13 +75,13 @@ export default function NavalUnits() {
   }, []);
 
   const handleDelete = useCallback(async (id: number) => {
-    if (window.confirm('Sei sicuro di voler eliminare questa unità navale?')) {
+    if (window.confirm('Are you sure you want to delete this naval unit?')) {
       try {
         await deleteMutation.mutateAsync(id);
-        success('Unità navale eliminata con successo');
+        success('Naval unit deleted successfully');
       } catch (error) {
-        logger.error('Errore durante l\'eliminazione:', error);
-        showError('Errore durante l\'eliminazione dell\'unità navale');
+        logger.error('Error during deletion:', error);
+        showError('Error deleting naval unit');
       }
     }
   }, [deleteMutation, success, showError]);
@@ -109,10 +109,10 @@ export default function NavalUnits() {
         id: selectedUnit.id,
         data: { notes }
       });
-      success('Note salvate con successo');
+      success('Notes saved successfully');
     } catch (error) {
-      logger.error('Errore salvando le note:', error);
-      showError('Errore durante il salvataggio delle note');
+      logger.error('Error saving notes:', error);
+      showError('Error saving notes');
     }
   }, [selectedUnit, updateMutation, success, showError]);
 
@@ -128,7 +128,7 @@ export default function NavalUnits() {
     return (
       <div className="p-6">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          Errore nel caricamento delle unità navali
+          Error loading naval units
         </div>
       </div>
     );
@@ -140,14 +140,14 @@ export default function NavalUnits() {
       <div className="bg-white border-b border-gray-200 px-8 py-6">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-light text-gray-900">Unità Navali</h1>
-            <p className="text-gray-600 mt-1">Gestisci le tue schede unità navali</p>
+            <h1 className="text-3xl font-light text-gray-900">Naval Units</h1>
+            <p className="text-gray-600 mt-1">Manage your naval unit cards</p>
           </div>
           <button
             onClick={handleCreate}
             className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-sm"
           >
-            + Nuova Unità
+            + New Unit
           </button>
         </div>
         
@@ -157,15 +157,15 @@ export default function NavalUnits() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
-              placeholder="Cerca per nome, classe o nazione..."
+              placeholder="Search by name, class or nation..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-80"
             />
           </div>
-          
+
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Vista:</span>
+            <span className="text-sm text-gray-600">View:</span>
             <div className="flex border border-gray-300 rounded-lg overflow-hidden">
               <button
                 onClick={() => setViewMode('grid')}
@@ -200,16 +200,16 @@ export default function NavalUnits() {
               <div className="text-center">
                 <Ship className="h-24 w-24 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-medium text-gray-900 mb-2">
-                  Nessuna unità navale
+                  No naval units
                 </h3>
                 <p className="text-gray-500 mb-6 max-w-sm">
-                  Inizia creando la tua prima scheda unità navale utilizzando il nostro editor visuale.
+                  Start by creating your first naval unit card using our visual editor.
                 </p>
                 <button
                   onClick={handleCreate}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200"
                 >
-                  Crea la prima unità navale
+                  Create first naval unit
                 </button>
               </div>
             </div>
@@ -218,16 +218,16 @@ export default function NavalUnits() {
               <div className="text-center">
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-medium text-gray-900 mb-2">
-                  Nessun risultato trovato
+                  No results found
                 </h3>
                 <p className="text-gray-500 mb-6 max-w-sm">
-                  Prova a modificare i termini di ricerca o rimuovi i filtri.
+                  Try modifying your search terms or remove filters.
                 </p>
                 <button
                   onClick={() => setSearchTerm('')}
                   className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200"
                 >
-                  Cancella ricerca
+                  Clear search
                 </button>
               </div>
             </div>
@@ -249,22 +249,22 @@ export default function NavalUnits() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unità
+                      Unit
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Classe
+                      Class
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nazione
+                      Nation
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Creato da
+                      Created by
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Template
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Azioni
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -315,7 +315,7 @@ export default function NavalUnits() {
                         {unit.unit_class}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {unit.nation || 'Non specificata'}
+                        {unit.nation || 'Not specified'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {unit.creator 
@@ -335,35 +335,35 @@ export default function NavalUnits() {
                           <button
                             onClick={() => window.open(`/units/${unit.id}/view`, '_blank')}
                             className="text-gray-600 hover:text-gray-900"
-                            title="Visualizza"
+                            title="View"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleEdit(unit)}
                             className="text-blue-600 hover:text-blue-900"
-                            title="Modifica"
+                            title="Edit"
                           >
                             <Edit3 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDuplicate(unit)}
                             className="text-purple-600 hover:text-purple-900"
-                            title="Duplica"
+                            title="Duplicate"
                           >
                             <Copy className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleEditNotes(unit)}
                             className="text-green-600 hover:text-green-900"
-                            title="Note"
+                            title="Notes"
                           >
                             <FileText className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(unit.id)}
                             className="text-red-600 hover:text-red-900"
-                            title="Elimina"
+                            title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -502,11 +502,11 @@ export default function NavalUnits() {
                   }
                 }
                 
-                success('Scheda salvata con successo');
+                success('Card saved successfully');
                 handleEditorClose();
               } catch (error) {
-                console.error('Errore durante il salvataggio:', error);
-                showError('Errore durante il salvataggio della scheda');
+                console.error('Error during save:', error);
+                showError('Error saving card');
               }
             }}
             onCancel={handleEditorClose}

@@ -21,23 +21,23 @@ interface QuizConfigurationProps {
 const QUIZ_TYPES = [
   {
     id: 'name_to_class' as const,
-    title: 'Nome → Classe',
-    description: 'Visualizzi la silhouette e il nome, devi indovinare la classe'
+    title: 'Name → Class',
+    description: 'View the silhouette and name, guess the class'
   },
   {
     id: 'nation_to_class' as const,
-    title: 'Nazione → Classe',
-    description: 'Visualizzi la silhouette e la nazione, devi riconoscere la classe'
+    title: 'Nation → Class',
+    description: 'View the silhouette and nation, recognize the class'
   },
   {
     id: 'class_to_flag' as const,
-    title: 'Classe → Bandiera',
-    description: 'Visualizzi la silhouette e la classe, devi riconoscere la bandiera'
+    title: 'Class → Flag',
+    description: 'View the silhouette and class, recognize the flag'
   },
   {
     id: 'silhouette_to_class' as const,
-    title: 'Silhouette → Classe',
-    description: 'Visualizzi solo la silhouette, devi indovinare la classe'
+    title: 'Silhouette → Class',
+    description: 'View only the silhouette, guess the class'
   }
 ];
 
@@ -58,37 +58,37 @@ export default function QuizConfiguration({ selectedUnitsCount, onStartQuiz, onC
     const errors: string[] = [];
 
     if (!participantName.trim()) {
-      errors.push('Il nome è obbligatorio');
+      errors.push('Name is required');
     }
 
     if (!participantSurname.trim()) {
-      errors.push('Il cognome è obbligatorio');
+      errors.push('Surname is required');
     }
 
     if (totalQuestions < 1) {
-      errors.push('Deve esserci almeno 1 domanda');
+      errors.push('There must be at least 1 question');
     }
 
     if (totalQuestions > 50) {
-      errors.push('Non puoi avere più di 50 domande');
+      errors.push('Cannot have more than 50 questions');
     }
 
     if (timePerQuestion < 10) {
-      errors.push('Il tempo per domanda deve essere almeno 10 secondi');
+      errors.push('Time per question must be at least 10 seconds');
     }
 
     if (timePerQuestion > 300) {
-      errors.push('Il tempo per domanda non può superare 5 minuti');
+      errors.push('Time per question cannot exceed 5 minutes');
     }
 
     // NEW: Validate against selected units
     if (selectedUnitsCount < 4) {
-      errors.push(`Hai selezionato solo ${selectedUnitsCount} navi. Minimo richiesto: 4`);
+      errors.push(`You selected only ${selectedUnitsCount} ships. Minimum required: 4`);
     }
 
     // NEW: If duplicates are NOT allowed, questions can't exceed selected units
     if (!allowDuplicates && totalQuestions > selectedUnitsCount) {
-      errors.push(`Hai selezionato ${selectedUnitsCount} navi ma chiedi ${totalQuestions} domande. Abilita le ripetizioni o riduci a max ${selectedUnitsCount} domande.`);
+      errors.push(`You selected ${selectedUnitsCount} ships but requesting ${totalQuestions} questions. Enable duplicates or reduce to max ${selectedUnitsCount} questions.`);
     }
 
     return errors;
