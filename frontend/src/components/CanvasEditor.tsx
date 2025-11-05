@@ -1126,27 +1126,61 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <div
             className="w-full h-full flex items-center justify-center cursor-move"
             onMouseDown={(e) => handleMouseDown(element.id, e)}
-            style={{ overflow: element.type === 'silhouette' ? 'hidden' : 'visible' }}
+            style={{ overflow: 'hidden' }}
           >
             {element.image ? (
-              <img
-                src={getImageUrl(element.image)}
-                alt={element.type}
-                className="max-w-full max-h-full object-contain"
-                style={{
-                  borderRadius: element.style?.borderRadius || 0,
-                  // Apply transformations only for silhouette
-                  ...(element.type === 'silhouette' ? {
-                    transform: `
-                      scale(${(element.style?.imageZoom || 100) / 100})
-                      translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
-                      rotate(${element.style?.imageRotation || 0}deg)
-                    `,
-                    transformOrigin: 'center center',
-                    transition: 'transform 0.1s ease-out'
-                  } : {})
-                }}
-                onError={(e) => {
+              element.type === 'silhouette' ? (
+                // Silhouette with transformations - scale width/height instead of transform
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative'
+                  }}
+                >
+                  <img
+                    src={getImageUrl(element.image)}
+                    alt={element.type}
+                    style={{
+                      width: `${(element.style?.imageZoom || 100)}%`,
+                      height: `${(element.style?.imageZoom || 100)}%`,
+                      objectFit: 'contain',
+                      borderRadius: element.style?.borderRadius || 0,
+                      transform: `
+                        translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
+                        rotate(${element.style?.imageRotation || 0}deg)
+                      `,
+                      transformOrigin: 'center center',
+                      transition: 'all 0.1s ease-out'
+                    }}
+                    onError={(e) => {
+                      console.error(`❌ Failed to load image for ${element.type}:`, {
+                        originalPath: element.image,
+                        fullUrl: getImageUrl(element.image),
+                        element: element
+                      });
+                    }}
+                    onLoad={() => {
+                      console.log(`✅ Successfully loaded image for ${element.type}:`, {
+                        originalPath: element.image,
+                        fullUrl: getImageUrl(element.image)
+                      });
+                    }}
+                  />
+                </div>
+              ) : (
+                // Other image types - no transformations
+                <img
+                  src={getImageUrl(element.image)}
+                  alt={element.type}
+                  className="max-w-full max-h-full object-contain"
+                  style={{
+                    borderRadius: element.style?.borderRadius || 0
+                  }}
+                  onError={(e) => {
                   console.error(`❌ Failed to load image for ${element.type}:`, {
                     originalPath: element.image,
                     fullUrl: getImageUrl(element.image),
@@ -1160,6 +1194,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   });
                 }}
               />
+              )
             ) : (
               <div className="text-white text-center text-sm font-bold">
                 {element.type === 'logo' && 'LOGO'}
