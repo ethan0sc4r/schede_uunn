@@ -1337,7 +1337,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Colore Bordo</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Border Color</label>
                   <input
                     type="color"
                     value={canvasBorderColor}
@@ -1352,9 +1352,9 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
           {/* Auto-detected Nation */}
           <div key={nationUpdateKey} className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Nazione Rilevata</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Detected Nation</h3>
             <div className="text-sm text-gray-600">
-              {getNationFromFlag() || 'Aggiungi una bandiera per rilevare automaticamente la nazione'}
+              {getNationFromFlag() || 'Add a flag to automatically detect the nation'}
             </div>
           </div>
 
@@ -1364,14 +1364,14 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               className="w-full flex items-center justify-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
             >
               <Palette className="h-4 w-4 mr-2" />
-              Gestisci Template
+              Manage Templates
             </button>
             <div className="flex space-x-2">
               <button
                 onClick={onCancel}
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
               >
-                Annulla
+                Cancel
               </button>
               <button
                 onClick={async () => {
@@ -1413,7 +1413,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
                 <Save className="h-4 w-4 mr-2" />
-                Salva
+                Save
               </button>
             </div>
           </div>
@@ -1421,7 +1421,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
         {selectedElement && (
           <div className="mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Proprietà Elemento</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Element Properties</h3>
             {(() => {
               const element = elements.find(el => el.id === selectedElement);
               if (!element) return null;
@@ -1486,7 +1486,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   {element.type === 'text' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Testo</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Text</label>
                         <textarea
                           value={element.content || ''}
                           onChange={(e) => handleTextEdit(element.id, e.target.value)}
@@ -1538,7 +1538,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
                         {/* Text Color */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Color</label>
                           <input
                             type="color"
                             value={element.style?.color || '#000000'}
@@ -1621,7 +1621,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
                       {/* Text Alignment */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Allineamento</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Alignment</label>
                         <div className="flex space-x-2">
                           <button
                             onClick={() => setElements(prev => prev.map(el => 
@@ -1725,7 +1725,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Colore</label>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Color</label>
                           <input
                             type="color"
                             value={element.style?.color || '#000000'}
@@ -1809,7 +1809,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
                   {(element.type === 'logo' || element.type === 'flag' || element.type === 'silhouette') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Carica Immagine</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Upload Image</label>
                       <input
                         type="file"
                         accept="image/*"
@@ -1822,7 +1822,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   {/* Image Transformation Controls - Only for silhouette with image */}
                   {element.type === 'silhouette' && element.image && (
                     <div className="pt-3 border-t border-gray-200">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Trasformazione Immagine</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">Image Transformation</h4>
 
                       {/* Zoom Control */}
                       <div className="mb-4">
@@ -1966,11 +1966,11 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
 
                   {element.type === 'table' && (
                     <div className="pt-3 border-t border-gray-200">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Personalizzazione Tabella</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Table Customization</h4>
                       
                       {/* Header Background Color */}
                       <div className="mb-3">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Colore Intestazioni</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Header Color</label>
                         <input
                           type="color"
                           value={element.style?.headerBackgroundColor || '#f3f4f6'}
@@ -2082,7 +2082,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                         onClick={() => deleteElement(element.id)}
                         className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
                       >
-                        🗑️ Elimina Elemento
+                        🗑️ Delete Element
                       </button>
                     </div>
                   )}
@@ -2093,7 +2093,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         )}
 
         <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-3">Aggiungi Elementi</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Add Elements</h3>
           <div className="space-y-2">
             <button
               onClick={() => {
@@ -2111,7 +2111,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               }}
               className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
             >
-              + Aggiungi Testo
+              + Add Text
             </button>
             <button
               onClick={() => {
@@ -2128,7 +2128,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               }}
               className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
             >
-              + Aggiungi Logo
+              + Add Logo
             </button>
             <button
               onClick={() => {
@@ -2145,7 +2145,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               }}
               className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
             >
-              + Aggiungi Bandiera
+              + Add Flag
             </button>
             <button
               onClick={() => {
@@ -2166,7 +2166,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
               }}
               className="w-full px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm"
             >
-              + Aggiungi Tabella
+              + Add Table
             </button>
 
             {/* Gallery Button */}
@@ -2283,7 +2283,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   }}
                   className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                 >
-                  Annulla
+                  Cancel
                 </button>
               </div>
             </div>
@@ -2392,7 +2392,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Seleziona Bandiera</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Select Flag</h2>
               <button
                 onClick={() => setShowFlagSelector(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
