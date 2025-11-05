@@ -1145,12 +1145,13 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                     src={getImageUrl(element.image)}
                     alt={element.type}
                     style={{
-                      width: `${(element.style?.imageZoom || 100)}%`,
-                      height: `${(element.style?.imageZoom || 100)}%`,
+                      width: '100%',
+                      height: '100%',
                       objectFit: 'contain',
                       borderRadius: element.style?.borderRadius || 0,
                       transform: `
-                        translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
+                        scale(${(element.style?.imageZoom || 100) / 100})
+                        translate(${(element.style?.imageOffsetX || 0) / ((element.style?.imageZoom || 100) / 100)}px, ${(element.style?.imageOffsetY || 0) / ((element.style?.imageZoom || 100) / 100)}px)
                         rotate(${element.style?.imageRotation || 0}deg)
                       `,
                       transformOrigin: 'center center',

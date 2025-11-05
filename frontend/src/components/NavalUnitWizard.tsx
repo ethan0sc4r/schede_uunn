@@ -63,9 +63,9 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
   });
 
   const steps: { id: Step; label: string; icon: any }[] = [
-    { id: 'basic', label: 'Info Base', icon: Ship },
-    { id: 'characteristics', label: 'Caratteristiche', icon: FileText },
-    { id: 'appearance', label: 'Template & Aspetto', icon: Palette },
+    { id: 'basic', label: 'Basic Info', icon: Ship },
+    { id: 'characteristics', label: 'Characteristics', icon: FileText },
+    { id: 'appearance', label: 'Template & Appearance', icon: Palette },
   ];
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
@@ -159,7 +159,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
         {/* Header with Steps */}
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {sourceUnit ? 'Duplica Unità Navale' : 'Crea Nuova Unità Navale'}
+            {sourceUnit ? 'Duplicate Naval Unit' : 'Create New Naval Unit'}
           </h2>
 
           <div className="flex items-center justify-between">
@@ -197,11 +197,11 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
         <div className="flex-1 overflow-y-auto p-6">
           {currentStep === 'basic' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Informazioni di Base</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nome *
+                    Name *
                   </label>
                   <input
                     type="text"
@@ -215,7 +215,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Classe *
+                    Class *
                   </label>
                   <input
                     type="text"
@@ -228,7 +228,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                 </div>
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                La nazione verrà rilevata automaticamente quando carichi la bandiera nella sezione Immagini
+                The nation will be automatically detected when you upload the flag in the Images section
               </p>
             </div>
           )}
@@ -236,13 +236,13 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
           {currentStep === 'characteristics' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Caratteristiche Tecniche</h3>
+                <h3 className="text-lg font-medium text-gray-900">Technical Characteristics</h3>
                 <button
                   type="button"
                   onClick={addCharacteristic}
                   className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-600"
                 >
-                  + Aggiungi
+                  + Add
                 </button>
               </div>
 
@@ -251,14 +251,14 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                   <div key={index} className="flex gap-3 items-center">
                     <input
                       type="text"
-                      placeholder="Nome caratteristica (es: Lunghezza)"
+                      placeholder="Characteristic name (e.g.: Length)"
                       className="input-field flex-1"
                       value={char.characteristic_name}
                       onChange={(e) => updateCharacteristic(index, 'characteristic_name', e.target.value)}
                     />
                     <input
                       type="text"
-                      placeholder="Valore (es: 333 m)"
+                      placeholder="Value (e.g.: 333 m)"
                       className="input-field flex-1"
                       value={char.characteristic_value}
                       onChange={(e) => updateCharacteristic(index, 'characteristic_value', e.target.value)}
@@ -276,8 +276,8 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
 
               {characteristics.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <p>Nessuna caratteristica aggiunta</p>
-                  <p className="text-sm mt-1">Clicca "+ Aggiungi" per inserire le caratteristiche tecniche</p>
+                  <p>No characteristics added</p>
+                  <p className="text-sm mt-1">Click "+ Add" to insert technical characteristics</p>
                 </div>
               )}
             </div>
@@ -286,11 +286,11 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
           {currentStep === 'appearance' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Seleziona Template</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Select Template</h3>
                 {templates.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <p>Caricamento template...</p>
+                    <p>Loading templates...</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
@@ -312,7 +312,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                           )}
                         </div>
                         <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                          {template.description || 'Nessuna descrizione'}
+                          {template.description || 'No description'}
                         </div>
                       </button>
                     ))}
@@ -321,7 +321,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Colore di Sfondo</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Background Color</h3>
                 <div className="flex items-center gap-4">
                   <input
                     type="color"
@@ -341,8 +341,8 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  <strong>💡 Suggerimento:</strong> Dopo aver creato l'unità, potrai personalizzare ulteriormente il layout
-                  nell'editor visuale e aggiungere logo, silhouette, bandiera e galleria di immagini.
+                  <strong>💡 Tip:</strong> After creating the unit, you can further customize the layout
+                  in the visual editor and add logo, silhouette, flag and image gallery.
                 </p>
               </div>
             </div>
@@ -356,7 +356,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
             onClick={onClose}
             className="btn-secondary"
           >
-            Annulla
+            Cancel
           </button>
 
           <div className="flex gap-3">
@@ -367,7 +367,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                 className="btn-secondary flex items-center gap-2"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Indietro
+                Back
               </button>
             )}
 
@@ -378,7 +378,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                 disabled={!isStepValid()}
                 className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Avanti
+                Next
                 <ChevronRight className="h-4 w-4" />
               </button>
             ) : (
@@ -388,7 +388,7 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                 disabled={!isStepValid() || createMutation.isPending}
                 className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {createMutation.isPending ? 'Creazione...' : 'Crea Unità'}
+                {createMutation.isPending ? 'Creating...' : 'Create Unit'}
                 <Check className="h-4 w-4" />
               </button>
             )}
