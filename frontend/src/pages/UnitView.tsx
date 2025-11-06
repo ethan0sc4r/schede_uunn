@@ -423,7 +423,7 @@ export default function UnitView() {
 
                 return (
                   <>
-                    <div className="w-full h-full flex items-center justify-center relative" style={{ overflow: 'visible' }}>
+                    <div className="w-full h-full flex items-center justify-center relative" style={{ overflow: 'hidden' }}>
                       {allImages.length > 0 ? (
                         <>
                           <img

@@ -1095,7 +1095,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <div
             className="w-full h-full flex items-center justify-center cursor-move"
             onMouseDown={(e) => handleMouseDown(element.id, e)}
-            style={{ overflow: 'visible', position: 'relative' }}
+            style={{ overflow: 'hidden', position: 'relative' }}
           >
             {element.image ? (
               <img
