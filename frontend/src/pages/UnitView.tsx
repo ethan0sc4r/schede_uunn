@@ -16,6 +16,7 @@ export default function UnitView() {
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [viewZoom, setViewZoom] = useState(100);
   const [viewOffsetX, setViewOffsetX] = useState(0);
   const [viewOffsetY, setViewOffsetY] = useState(0);
@@ -64,6 +65,21 @@ export default function UnitView() {
     };
     loadTemplates();
   }, []);
+
+  // Handle ESC key to close fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && fullscreenImage) {
+        setFullscreenImage(null);
+        setViewZoom(100);
+        setViewOffsetX(0);
+        setViewOffsetY(0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fullscreenImage]);
 
   const handlePrint = async () => {
     if (!unit || !canvasRef.current) {
@@ -511,7 +527,13 @@ export default function UnitView() {
                           {currentSlide.images.map((imgPath, imgIndex) => (
                             <div
                               key={imgIndex}
-                              className="w-full h-full flex items-center justify-center bg-gray-50 rounded overflow-hidden"
+                              className="w-full h-full flex items-center justify-center bg-gray-50 rounded overflow-hidden cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => {
+                                setFullscreenImage(imgPath);
+                                setViewZoom(100);
+                                setViewOffsetX(0);
+                                setViewOffsetY(0);
+                              }}
                             >
                               <img
                                 src={getImageUrl(imgPath)}
@@ -842,6 +864,98 @@ export default function UnitView() {
                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors"
               >
                 Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Image Viewer */}
+      {fullscreenImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-95 z-[100] flex items-center justify-center">
+          <div
+            className="w-full h-full flex items-center justify-center cursor-move relative"
+            onMouseDown={(e) => {
+              setIsPanning(true);
+              setPanStart({ x: e.clientX - viewOffsetX, y: e.clientY - viewOffsetY });
+            }}
+            onMouseMove={(e) => {
+              if (isPanning) {
+                setViewOffsetX(e.clientX - panStart.x);
+                setViewOffsetY(e.clientY - panStart.y);
+              }
+            }}
+            onMouseUp={() => setIsPanning(false)}
+            onMouseLeave={() => setIsPanning(false)}
+          >
+            <img
+              src={getImageUrl(fullscreenImage)}
+              alt="Fullscreen"
+              className="max-w-full max-h-full object-contain"
+              style={{
+                transform: `
+                  scale(${viewZoom / 100})
+                  translate(${viewOffsetX}px, ${viewOffsetY}px)
+                `,
+                transformOrigin: 'center center',
+                pointerEvents: 'none'
+              }}
+              onError={(e) => {
+                console.error('Error loading fullscreen image:', fullscreenImage);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setFullscreenImage(null);
+                setViewZoom(100);
+                setViewOffsetX(0);
+                setViewOffsetY(0);
+              }}
+              className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-3 transition-all shadow-2xl hover:scale-110"
+              title="Chiudi (ESC)"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {/* Zoom Controls */}
+            <div className="absolute top-4 left-4 bg-white bg-opacity-90 rounded-lg shadow-lg p-2 flex flex-col gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewZoom(prev => Math.min(prev + 25, 300));
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white rounded p-2 transition-all"
+                title="Zoom In"
+              >
+                <ZoomIn className="h-5 w-5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewZoom(prev => Math.max(prev - 25, 50));
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white rounded p-2 transition-all"
+                title="Zoom Out"
+              >
+                <ZoomOut className="h-5 w-5" />
+              </button>
+              <div className="text-center text-xs font-bold text-gray-700 px-1">
+                {viewZoom}%
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewZoom(100);
+                  setViewOffsetX(0);
+                  setViewOffsetY(0);
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white rounded p-2 transition-all"
+                title="Reset View"
+              >
+                <Maximize2 className="h-5 w-5" />
               </button>
             </div>
           </div>
