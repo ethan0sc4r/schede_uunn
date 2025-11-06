@@ -2,20 +2,20 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Share2, FileImage, Printer, Presentation, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { navalUnitsApi, templatesApi } from '../services/api';
-import { exportCanvasToPNG, printCanvas } from '../utils/exportUtils';
+import { printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
 import { useToast } from '../contexts/ToastContext';
 
 export default function UnitView() {
   const { id } = useParams<{ id: string }>();
-  const { success, error: showError, warning, info } = useToast();
+  const { success, error: showError } = useToast();
   const [unit, setUnit] = useState<NavalUnit | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
-  const [currentGalleryIndex, setCurrentGalleryIndex] = useState(0);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [viewZoom, setViewZoom] = useState(100);
   const [viewOffsetX, setViewOffsetX] = useState(0);
   const [viewOffsetY, setViewOffsetY] = useState(0);
@@ -411,44 +411,76 @@ export default function UnitView() {
               )}
 
               {element.type === 'silhouette' && (() => {
-                // Collect all available images: silhouette + gallery
-                const allImages: string[] = [];
-                if (element.image) {
-                  allImages.push(element.image);
-                }
+                // Main image (silhouette)
+                const mainImage = element.image;
+
+                // Gallery images
+                const galleryImages: string[] = [];
                 if (unit?.gallery && unit.gallery.length > 0) {
                   unit.gallery.forEach(img => {
                     if (img.image_path) {
-                      allImages.push(img.image_path);
+                      galleryImages.push(img.image_path);
                     }
                   });
                 }
 
-                const hasMultipleImages = allImages.length > 1;
+                // Create slides: [main image slide, ...gallery group slides]
+                const slides: Array<{ type: 'main' | 'group', images: string[] }> = [];
+
+                // Slide 0: Main image
+                if (mainImage) {
+                  slides.push({ type: 'main', images: [mainImage] });
+                }
+
+                // Group gallery images into slides: groups of 4, then 2, then singles
+                let remainingImages = [...galleryImages];
+
+                // First, make groups of 4
+                while (remainingImages.length >= 4) {
+                  slides.push({ type: 'group', images: remainingImages.slice(0, 4) });
+                  remainingImages = remainingImages.slice(4);
+                }
+
+                // Then groups of 2
+                while (remainingImages.length >= 2) {
+                  slides.push({ type: 'group', images: remainingImages.slice(0, 2) });
+                  remainingImages = remainingImages.slice(2);
+                }
+
+                // Finally singles
+                while (remainingImages.length > 0) {
+                  slides.push({ type: 'group', images: [remainingImages[0]] });
+                  remainingImages = remainingImages.slice(1);
+                }
+
+                const totalSlides = slides.length;
+                const hasMultipleSlides = totalSlides > 1;
+                const currentSlide = slides[currentSlideIndex] || slides[0];
 
                 return (
                   <>
-                    <div
-                      className="w-full h-full flex items-center justify-center relative cursor-move"
-                      style={{ overflow: 'hidden' }}
-                      onMouseDown={(e) => {
-                        setIsPanning(true);
-                        setPanStart({ x: e.clientX - viewOffsetX, y: e.clientY - viewOffsetY });
-                      }}
-                      onMouseMove={(e) => {
-                        if (isPanning) {
-                          setViewOffsetX(e.clientX - panStart.x);
-                          setViewOffsetY(e.clientY - panStart.y);
-                        }
-                      }}
-                      onMouseUp={() => setIsPanning(false)}
-                      onMouseLeave={() => setIsPanning(false)}
-                    >
-                      {allImages.length > 0 ? (
-                        <>
+                    <div className="w-full h-full flex items-center justify-center relative">
+                      {currentSlide.type === 'main' ? (
+                        // Main image slide - full size with zoom/pan
+                        <div
+                          className="w-full h-full flex items-center justify-center cursor-move bg-gray-50 rounded"
+                          style={{ overflow: 'hidden' }}
+                          onMouseDown={(e) => {
+                            setIsPanning(true);
+                            setPanStart({ x: e.clientX - viewOffsetX, y: e.clientY - viewOffsetY });
+                          }}
+                          onMouseMove={(e) => {
+                            if (isPanning) {
+                              setViewOffsetX(e.clientX - panStart.x);
+                              setViewOffsetY(e.clientY - panStart.y);
+                            }
+                          }}
+                          onMouseUp={() => setIsPanning(false)}
+                          onMouseLeave={() => setIsPanning(false)}
+                        >
                           <img
-                            src={getImageUrl(allImages[currentGalleryIndex])}
-                            alt="Naval Unit"
+                            src={getImageUrl(currentSlide.images[0])}
+                            alt="Naval Unit Main"
                             className="max-w-full max-h-full object-contain"
                             style={{
                               display: 'block',
@@ -462,100 +494,135 @@ export default function UnitView() {
                               pointerEvents: 'none'
                             }}
                             onError={(e) => {
-                              console.error('Error loading gallery image:', allImages[currentGalleryIndex]);
+                              console.error('Error loading main image:', currentSlide.images[0]);
                               e.currentTarget.style.display = 'none';
                             }}
                           />
-
-                          {/* Image Counter - Inside at bottom */}
-                          {hasMultipleImages && (
-                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm">
-                              {currentGalleryIndex + 1} / {allImages.length}
-                            </div>
-                          )}
-                        </>
+                        </div>
                       ) : (
-                        <div className="text-gray-600 text-center text-sm font-bold">SILHOUETTE NAVE</div>
+                        // Gallery group slide - 2x2, 1x2, or single layout
+                        <div
+                          className={`w-full h-full grid gap-2 p-4 ${
+                            currentSlide.images.length === 4 ? 'grid-cols-2 grid-rows-2' :
+                            currentSlide.images.length === 2 ? 'grid-cols-2 grid-rows-1' :
+                            'grid-cols-1'
+                          }`}
+                        >
+                          {currentSlide.images.map((imgPath, imgIndex) => (
+                            <div
+                              key={imgIndex}
+                              className="w-full h-full flex items-center justify-center bg-gray-50 rounded overflow-hidden"
+                            >
+                              <img
+                                src={getImageUrl(imgPath)}
+                                alt={`Gallery ${imgIndex}`}
+                                className="w-full h-full object-contain"
+                                style={{
+                                  borderRadius: element.style?.borderRadius || 0
+                                }}
+                                onError={(e) => {
+                                  console.error('Error loading gallery image:', imgPath);
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Zoom Controls - Only visible on main image slide */}
+                      {currentSlide.type === 'main' && (
+                        <div className="absolute top-2 right-2 z-50 bg-white bg-opacity-90 rounded-lg shadow-lg p-2 flex flex-col gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewZoom(prev => Math.min(prev + 25, 300));
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white rounded p-2 transition-all"
+                            title="Zoom In"
+                          >
+                            <ZoomIn className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewZoom(prev => Math.max(prev - 25, 50));
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white rounded p-2 transition-all"
+                            title="Zoom Out"
+                          >
+                            <ZoomOut className="h-5 w-5" />
+                          </button>
+                          <div className="text-center text-xs font-bold text-gray-700 px-1">
+                            {viewZoom}%
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewZoom(100);
+                              setViewOffsetX(0);
+                              setViewOffsetY(0);
+                            }}
+                            className="bg-gray-500 hover:bg-gray-600 text-white rounded p-2 transition-all"
+                            title="Reset View"
+                          >
+                            <Maximize2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Slide Counter */}
+                      {hasMultipleSlides && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm">
+                          {currentSlideIndex + 1} / {totalSlides}
+                        </div>
+                      )}
+
+                      {!mainImage && galleryImages.length === 0 && (
+                        <div className="w-full h-full flex items-center justify-center text-gray-600 text-center text-sm font-bold">
+                          SILHOUETTE NAVE
+                        </div>
                       )}
                     </div>
 
-                    {/* Zoom Controls - Fixed at top right of silhouette */}
-                    <div className="absolute top-2 right-2 z-50 bg-white bg-opacity-90 rounded-lg shadow-lg p-2 flex flex-col gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewZoom(prev => Math.min(prev + 25, 300));
-                        }}
-                        className="bg-blue-500 hover:bg-blue-600 text-white rounded p-2 transition-all"
-                        title="Zoom In"
-                      >
-                        <ZoomIn className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewZoom(prev => Math.max(prev - 25, 50));
-                        }}
-                        className="bg-blue-500 hover:bg-blue-600 text-white rounded p-2 transition-all"
-                        title="Zoom Out"
-                      >
-                        <ZoomOut className="h-5 w-5" />
-                      </button>
-                      <div className="text-center text-xs font-bold text-gray-700 px-1">
-                        {viewZoom}%
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewZoom(100);
-                          setViewOffsetX(0);
-                          setViewOffsetY(0);
-                        }}
-                        className="bg-gray-500 hover:bg-gray-600 text-white rounded p-2 transition-all"
-                        title="Reset View"
-                      >
-                        <Maximize2 className="h-5 w-5" />
-                      </button>
-                    </div>
-
-                    {/* Carousel Controls - Fixed at window edges */}
-                    {hasMultipleImages && (
+                    {/* Navigation Buttons - Fixed at window edges */}
+                    {hasMultipleSlides && (
                       <>
-                        {/* Previous Button - Fixed Left Edge of Window */}
+                        {/* Previous Button */}
                         <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setCurrentGalleryIndex((prev) =>
-                                prev === 0 ? allImages.length - 1 : prev - 1
+                              setCurrentSlideIndex((prev) =>
+                                prev === 0 ? totalSlides - 1 : prev - 1
                               );
-                              // Reset view when changing images
+                              // Reset zoom/pan when changing slides
                               setViewZoom(100);
                               setViewOffsetX(0);
                               setViewOffsetY(0);
                             }}
                             className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 transition-all shadow-2xl hover:scale-110"
-                            title="Foto precedente"
+                            title="Diapositiva precedente"
                           >
                             <ChevronLeft className="h-8 w-8" />
                           </button>
                         </div>
 
-                        {/* Next Button - Fixed Right Edge of Window */}
+                        {/* Next Button */}
                         <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setCurrentGalleryIndex((prev) =>
-                                prev === allImages.length - 1 ? 0 : prev + 1
+                              setCurrentSlideIndex((prev) =>
+                                prev === totalSlides - 1 ? 0 : prev + 1
                               );
-                              // Reset view when changing images
+                              // Reset zoom/pan when changing slides
                               setViewZoom(100);
                               setViewOffsetX(0);
                               setViewOffsetY(0);
                             }}
                             className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 transition-all shadow-2xl hover:scale-110"
-                            title="Foto successiva"
+                            title="Diapositiva successiva"
                           >
                             <ChevronRight className="h-8 w-8" />
                           </button>
