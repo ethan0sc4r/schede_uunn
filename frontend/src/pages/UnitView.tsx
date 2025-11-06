@@ -423,22 +423,19 @@ export default function UnitView() {
 
                 return (
                   <>
-                    <div className="w-full h-full flex items-center justify-center relative" style={{ overflow: 'hidden' }}>
+                    <div className="w-full h-full flex items-center justify-center relative" style={{ overflow: 'visible' }}>
                       {allImages.length > 0 ? (
                         <>
                           <img
                             src={getImageUrl(allImages[currentGalleryIndex])}
                             alt="Naval Unit"
+                            className="max-w-full max-h-full object-contain"
                             style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'contain',
                               display: 'block',
                               borderRadius: element.style?.borderRadius || 0,
-                              // Apply transformations from element style - compensate translate for zoom
                               transform: `
                                 scale(${(element.style?.imageZoom || 100) / 100})
-                                translate(${(element.style?.imageOffsetX || 0) / ((element.style?.imageZoom || 100) / 100)}px, ${(element.style?.imageOffsetY || 0) / ((element.style?.imageZoom || 100) / 100)}px)
+                                translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
                                 rotate(${element.style?.imageRotation || 0}deg)
                               `,
                               transformOrigin: 'center center'

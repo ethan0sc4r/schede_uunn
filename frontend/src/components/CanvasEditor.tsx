@@ -836,53 +836,22 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
       // Store only the relative path, getImageUrl will convert it to absolute URL
       const imagePath = data.file_path;
 
-      // Calculate optimal zoom for silhouette images
-      if (element?.type === 'silhouette') {
-        const img = new Image();
-        img.onload = () => {
-          const imageWidth = img.naturalWidth;
-          const imageHeight = img.naturalHeight;
-          const containerWidth = element.width;
-          const containerHeight = element.height;
-
-          // Calculate optimal scale to fit image in container while showing all content
-          const scaleX = containerWidth / imageWidth;
-          const scaleY = containerHeight / imageHeight;
-          const optimalScale = Math.min(scaleX, scaleY); // Use min to ensure all image is visible
-
-          // Convert to zoom percentage
-          let optimalZoom = Math.round(optimalScale * 100);
-
-          // Apply max limit of 300%
-          const MAX_AUTO_ZOOM = 300;
-          optimalZoom = Math.min(optimalZoom, MAX_AUTO_ZOOM);
-
-          console.log(`🔍 Auto-zoom calculated: ${optimalZoom}% (image: ${imageWidth}x${imageHeight}, container: ${containerWidth}x${containerHeight})`);
-
-          // Update element with image and optimal zoom
-          setElements(prev => prev.map(el =>
-            el.id === elementId
-              ? {
-                  ...el,
-                  image: imagePath,
-                  style: {
-                    ...el.style,
-                    imageZoom: optimalZoom,
-                    imageOffsetX: 0,
-                    imageOffsetY: 0,
-                    imageRotation: 0
-                  }
-                }
-              : el
-          ));
-        };
-        img.src = getImageUrl(imagePath);
-      } else {
-        // For non-silhouette images, just update the image path
-        setElements(prev => prev.map(el =>
-          el.id === elementId ? { ...el, image: imagePath } : el
-        ));
-      }
+      // Update element with image - default zoom 100%
+      setElements(prev => prev.map(el =>
+        el.id === elementId
+          ? {
+              ...el,
+              image: imagePath,
+              style: {
+                ...el.style,
+                imageZoom: el.style?.imageZoom || 100,
+                imageOffsetX: 0,
+                imageOffsetY: 0,
+                imageRotation: 0
+              }
+            }
+          : el
+      ));
 
       // Force re-render of nation detection if it's a flag
       if (element?.type === 'flag') {
@@ -1126,37 +1095,25 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <div
             className="w-full h-full flex items-center justify-center cursor-move"
             onMouseDown={(e) => handleMouseDown(element.id, e)}
-            style={{ overflow: 'hidden' }}
+            style={{ overflow: 'visible', position: 'relative' }}
           >
             {element.image ? (
-              element.type === 'silhouette' ? (
-                // Silhouette with transformations - scale width/height instead of transform
-                <div
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative'
-                  }}
-                >
-                  <img
-                    src={getImageUrl(element.image)}
-                    alt={element.type}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      borderRadius: element.style?.borderRadius || 0,
-                      transform: `
-                        scale(${(element.style?.imageZoom || 100) / 100})
-                        translate(${(element.style?.imageOffsetX || 0) / ((element.style?.imageZoom || 100) / 100)}px, ${(element.style?.imageOffsetY || 0) / ((element.style?.imageZoom || 100) / 100)}px)
-                        rotate(${element.style?.imageRotation || 0}deg)
-                      `,
-                      transformOrigin: 'center center',
-                      transition: 'all 0.1s ease-out'
-                    }}
+              <img
+                src={getImageUrl(element.image)}
+                alt={element.type}
+                className="max-w-full max-h-full object-contain"
+                style={{
+                  borderRadius: element.style?.borderRadius || 0,
+                  ...(element.type === 'silhouette' ? {
+                    transform: `
+                      scale(${(element.style?.imageZoom || 100) / 100})
+                      translate(${element.style?.imageOffsetX || 0}px, ${element.style?.imageOffsetY || 0}px)
+                      rotate(${element.style?.imageRotation || 0}deg)
+                    `,
+                    transformOrigin: 'center center',
+                    transition: 'all 0.2s ease-out'
+                  } : {})
+                }}
                     onError={(e) => {
                       console.error(`❌ Failed to load image for ${element.type}:`, {
                         originalPath: element.image,
@@ -1171,31 +1128,6 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                       });
                     }}
                   />
-                </div>
-              ) : (
-                // Other image types - no transformations
-                <img
-                  src={getImageUrl(element.image)}
-                  alt={element.type}
-                  className="max-w-full max-h-full object-contain"
-                  style={{
-                    borderRadius: element.style?.borderRadius || 0
-                  }}
-                  onError={(e) => {
-                  console.error(`❌ Failed to load image for ${element.type}:`, {
-                    originalPath: element.image,
-                    fullUrl: getImageUrl(element.image),
-                    element: element
-                  });
-                }}
-                onLoad={() => {
-                  console.log(`✅ Successfully loaded image for ${element.type}:`, {
-                    originalPath: element.image,
-                    fullUrl: getImageUrl(element.image)
-                  });
-                }}
-              />
-              )
             ) : (
               <div className="text-white text-center text-sm font-bold">
                 {element.type === 'logo' && 'LOGO'}
