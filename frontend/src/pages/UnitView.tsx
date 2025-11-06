@@ -573,9 +573,11 @@ export default function UnitView() {
                       src={getImageUrl(element.image)}
                       alt="Flag"
                       className="max-w-full max-h-full object-cover"
-                      style={{ 
+                      style={{
                         display: 'block',
-                        borderRadius: element.style?.borderRadius || 0
+                        borderRadius: element.style?.borderRadius || 0,
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3), 0 6px 12px rgba(0, 0, 0, 0.2)',
+                        filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25))'
                       }}
                       onError={(e) => {
                         console.error('Error loading flag image:', element.image);

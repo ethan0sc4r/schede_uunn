@@ -1138,7 +1138,7 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
         )}
 
         {element.type === 'flag' && (
-          <div 
+          <div
             className="w-full h-full flex items-center justify-center cursor-move"
             onMouseDown={(e) => handleMouseDown(element.id, e)}
           >
@@ -1147,7 +1147,11 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                 src={getImageUrl(element.image)}
                 alt="Flag"
                 className="max-w-full max-h-full object-cover"
-                style={{ borderRadius: element.style?.borderRadius || 0 }}
+                style={{
+                  borderRadius: element.style?.borderRadius || 0,
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3), 0 6px 12px rgba(0, 0, 0, 0.2)',
+                  filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25))'
+                }}
                 onError={(e) => {
                   console.error(`❌ Failed to load flag image:`, {
                     originalPath: element.image,

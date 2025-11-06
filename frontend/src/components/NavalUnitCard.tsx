@@ -159,6 +159,7 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
                   src={getImageUrl(unit.silhouette_path)}
                   alt={`${unit.name} silhouette`}
                   className="max-h-full max-w-full object-contain"
+                  style={{ transform: 'scale(0.8)' }}
                 />
               </div>
             );
@@ -166,7 +167,7 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
             // Find silhouette element in layout_config as fallback
             const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
             const silhouetteImage = silhouetteElement?.image;
-            
+
             if (silhouetteImage) {
               return (
                 <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
@@ -174,6 +175,7 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
                     src={getImageUrl(silhouetteImage)}
                     alt={`${unit.name} silhouette`}
                     className="max-h-full max-w-full object-contain"
+                    style={{ transform: 'scale(0.8)' }}
                   />
                 </div>
               );
