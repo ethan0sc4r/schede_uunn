@@ -479,7 +479,7 @@ export default function UnitView() {
                       {currentSlide.type === 'main' ? (
                         // Main image slide - full size with zoom/pan
                         <div
-                          className="w-full h-full flex items-center justify-center cursor-move bg-gray-50 rounded"
+                          className="w-full h-full flex items-center justify-center cursor-move bg-white rounded"
                           style={{ overflow: 'hidden' }}
                           onMouseDown={(e) => {
                             setIsPanning(true);
@@ -527,7 +527,7 @@ export default function UnitView() {
                           {currentSlide.images.map((imgPath, imgIndex) => (
                             <div
                               key={imgIndex}
-                              className="w-full h-full flex items-center justify-center bg-gray-50 rounded overflow-hidden cursor-pointer hover:bg-gray-100 transition-colors"
+                              className="w-full h-full flex items-center justify-center bg-white rounded overflow-hidden cursor-pointer hover:bg-gray-50 transition-colors"
                               onClick={() => {
                                 setFullscreenImage(imgPath);
                                 setViewZoom(100);
