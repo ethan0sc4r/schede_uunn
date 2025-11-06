@@ -249,10 +249,10 @@ export default function NavalUnits() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Unit
+                      Class
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Class
+                      Unit Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Nation
@@ -287,7 +287,7 @@ export default function NavalUnits() {
                               } else {
                                 const silhouetteElement = unit.layout_config?.elements?.find((el: any) => el.type === 'silhouette');
                                 const silhouetteImage = silhouetteElement?.image;
-                                
+
                                 if (silhouetteImage) {
                                   return (
                                     <img
@@ -298,7 +298,7 @@ export default function NavalUnits() {
                                   );
                                 }
                               }
-                              
+
                               return (
                                 <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
                                   <Ship className="h-6 w-6 text-gray-400" />
@@ -307,12 +307,12 @@ export default function NavalUnits() {
                             })()}
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{unit.name}</div>
+                            <div className="text-sm font-bold text-gray-900">{unit.unit_class}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {unit.unit_class}
+                        {unit.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {unit.nation || 'Not specified'}

@@ -248,16 +248,14 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
       
       <div className="p-4">
         <h3 className="text-lg font-semibold text-gray-900 mb-1">
-          {unit.name}
+          {unit.unit_class}
         </h3>
         <p className="text-sm text-gray-600 mb-2">
-          Classe: {unit.unit_class}
+          {unit.name}
         </p>
-        {unit.nation && (
-          <p className="text-sm text-gray-600 mb-3">
-            Nazione: {unit.nation}
-          </p>
-        )}
+        <p className="text-sm text-gray-600 mb-3">
+          {unit.nation || 'Not specified'}
+        </p>
         
         {unit.characteristics && unit.characteristics.length > 0 && (
           <div className="mb-4">
