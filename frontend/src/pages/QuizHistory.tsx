@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Calendar, Clock, User, Target, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Trophy, Calendar, Clock, User, Target, TrendingUp } from 'lucide-react';
 
 // Types defined inline to avoid import issues
 type QuizSessionType = {
@@ -67,10 +68,6 @@ export default function QuizHistory() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleBackToQuiz = () => {
-    window.location.href = '/quiz';
   };
 
   const handleBackToHome = () => {
@@ -165,18 +162,9 @@ export default function QuizHistory() {
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <button
-                onClick={handleBackToQuiz}
-                className="mr-4 p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                title="Torna al quiz"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Storico Quiz</h1>
-                <p className="text-gray-600 text-sm">Cronologia e statistiche dei quiz completati</p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Storico Quiz</h1>
+              <p className="text-gray-600 text-sm">Cronologia e statistiche dei quiz completati</p>
             </div>
           </div>
         </div>
@@ -309,12 +297,12 @@ export default function QuizHistory() {
             <Trophy className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun quiz completato</h3>
             <p className="text-gray-600 mb-6">Completa il tuo primo quiz per vedere i risultati qui.</p>
-            <button
-              onClick={handleBackToQuiz}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            <Link
+              to="/quiz"
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               Inizia Primo Quiz
-            </button>
+            </Link>
           </div>
         ) : (
           <div className="space-y-4">
@@ -369,12 +357,12 @@ export default function QuizHistory() {
 
         {/* Back to Quiz Button */}
         <div className="mt-8 text-center">
-          <button
-            onClick={handleBackToQuiz}
-            className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          <Link
+            to="/quiz"
+            className="inline-block px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
           >
             Nuovo Quiz
-          </button>
+          </Link>
         </div>
       </div>
     </div>

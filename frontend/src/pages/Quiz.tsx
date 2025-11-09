@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import QuizNavalUnitSelector from '../components/QuizNavalUnitSelector';
 import QuizConfiguration from '../components/QuizConfiguration';
@@ -53,6 +54,7 @@ type QuizQuestionDataType = {
 };
 
 export default function Quiz() {
+  const location = useLocation();
   const [quizState, setQuizState] = useState<QuizState>('unit_selection');
   const [selectedUnitIds, setSelectedUnitIds] = useState<number[]>([]);
   const [currentSession, setCurrentSession] = useState<QuizSessionType | null>(null);
@@ -60,6 +62,37 @@ export default function Quiz() {
   const [currentQuestionNumber, setCurrentQuestionNumber] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Handle public quiz template
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.fromPublicTemplate && state?.sessionId) {
+      loadPublicQuizSession(state.sessionId);
+    }
+  }, [location.state]);
+
+  const loadPublicQuizSession = async (sessionId: number) => {
+    setIsLoading(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+
+      // Get session details
+      const sessionResponse = await fetch(`${API_BASE_URL}/api/quiz/session/${sessionId}`);
+      if (!sessionResponse.ok) throw new Error('Session not found');
+
+      const sessionData = await sessionResponse.json();
+      setCurrentSession(sessionData);
+
+      // Load first question
+      await loadQuestion(sessionId, 1);
+      setQuizState('in_progress');
+    } catch (err: any) {
+      console.error('Error loading public quiz:', err);
+      setError('Errore nel caricamento del quiz');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleStartQuiz = async (config: QuizConfigType) => {
     setIsLoading(true);

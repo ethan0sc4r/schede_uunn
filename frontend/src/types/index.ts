@@ -8,6 +8,8 @@ export interface User {
   created_at: string;
 }
 
+export type UnitType = 'ship' | 'submarine' | 'aircraft';
+
 export interface NavalUnit {
   id: number;
   name: string;

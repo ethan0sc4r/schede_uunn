@@ -14,6 +14,7 @@ import datetime as dt
 import hashlib
 import tempfile
 import io
+import json
 
 from app.simple_database import SimpleDatabase, init_database, get_db_connection
 from utils.powerpoint_export import create_group_powerpoint, create_unit_powerpoint, create_unit_powerpoint_to_buffer
@@ -1087,18 +1088,18 @@ async def manual_cleanup_temp_files(user: dict = Depends(get_current_user)):
     """Manually trigger temp files cleanup (admin only)"""
     if not user.get('is_admin'):
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     try:
         # Count files before cleanup
         temp_dir = "./data/temp"
         files_before = len([f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]) if os.path.exists(temp_dir) else 0
-        
+
         # Run cleanup
         cleanup_temp_files(max_age_hours=2)
-        
+
         # Count files after cleanup
         files_after = len([f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]) if os.path.exists(temp_dir) else 0
-        
+
         return {
             "message": "Temp files cleanup completed",
             "files_before": files_before,
@@ -1107,6 +1108,371 @@ async def manual_cleanup_temp_files(user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error during cleanup: {str(e)}")
+
+@app.get("/api/admin/database/download")
+async def download_database_backup(user: dict = Depends(get_current_user)):
+    """Download complete database backup with images as ZIP (admin only)"""
+    if not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    try:
+        import zipfile
+        import shutil
+
+        db_path = "./data/naval_units.db"
+        uploads_path = "./data/uploads"
+
+        if not os.path.exists(db_path):
+            raise HTTPException(status_code=404, detail="Database file not found")
+
+        # Generate timestamp for filenames
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"naval_units_backup_{timestamp}.zip"
+        temp_zip_path = f"./data/temp/{zip_filename}"
+
+        # Ensure temp directory exists
+        os.makedirs("./data/temp", exist_ok=True)
+
+        # Create ZIP file
+        with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add database file
+            zipf.write(db_path, "naval_units.db")
+
+            # Add uploads folder if it exists
+            if os.path.exists(uploads_path):
+                for root, dirs, files in os.walk(uploads_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # Add file to zip maintaining folder structure
+                        arcname = os.path.relpath(file_path, "./data")
+                        zipf.write(file_path, arcname)
+
+        # Return the ZIP file
+        return FileResponse(
+            path=temp_zip_path,
+            media_type="application/zip",
+            filename=zip_filename,
+            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating backup: {str(e)}")
+
+@app.post("/api/admin/database/upload")
+async def upload_database_restore(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    """Upload and restore database backup with images from ZIP (admin only)"""
+    if not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    try:
+        import zipfile
+        import shutil
+
+        # Validate file extension (support both .db and .zip)
+        if not (file.filename.endswith('.db') or file.filename.endswith('.zip')):
+            raise HTTPException(status_code=400, detail="File must be a .db or .zip file")
+
+        db_path = "./data/naval_units.db"
+        backup_path = f"./data/naval_units_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        uploads_backup_path = f"./data/uploads_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        # Create backup of current database
+        if os.path.exists(db_path):
+            shutil.copy2(db_path, backup_path)
+            print(f"✅ Created database backup: {backup_path}")
+
+        # Create backup of current uploads folder
+        if os.path.exists("./data/uploads"):
+            shutil.copytree("./data/uploads", uploads_backup_path)
+            print(f"✅ Created uploads backup: {uploads_backup_path}")
+
+        content = await file.read()
+
+        if file.filename.endswith('.zip'):
+            # Handle ZIP file (database + images)
+            temp_zip_path = f"./data/temp/restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+            os.makedirs("./data/temp", exist_ok=True)
+
+            # Save ZIP temporarily
+            with open(temp_zip_path, "wb") as f:
+                f.write(content)
+
+            # Extract ZIP
+            with zipfile.ZipFile(temp_zip_path, 'r') as zipf:
+                # Extract database
+                if 'naval_units.db' in zipf.namelist():
+                    zipf.extract('naval_units.db', './data/temp')
+                    shutil.move('./data/temp/naval_units.db', db_path)
+                    print(f"✅ Database restored from ZIP")
+
+                # Extract uploads folder
+                uploads_files = [f for f in zipf.namelist() if f.startswith('uploads/')]
+                if uploads_files:
+                    # Remove old uploads folder
+                    if os.path.exists('./data/uploads'):
+                        shutil.rmtree('./data/uploads')
+                    # Extract new uploads
+                    for file_path in uploads_files:
+                        zipf.extract(file_path, './data')
+                    print(f"✅ Uploaded {len(uploads_files)} image files")
+
+            # Clean up temp ZIP
+            os.remove(temp_zip_path)
+
+            return {
+                "message": "Database and images restored successfully from ZIP",
+                "backup_created": backup_path,
+                "uploads_backup_created": uploads_backup_path if os.path.exists(uploads_backup_path) else None,
+                "uploaded_file": file.filename,
+                "size_bytes": len(content),
+                "images_restored": len(uploads_files)
+            }
+        else:
+            # Handle plain .db file (legacy support)
+            with open(db_path, "wb") as f:
+                f.write(content)
+
+            print(f"✅ Database restored from: {file.filename}")
+
+            return {
+                "message": "Database restored successfully (no images)",
+                "backup_created": backup_path,
+                "uploaded_file": file.filename,
+                "size_bytes": len(content)
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If restore fails, try to restore from backup
+        if os.path.exists(backup_path):
+            shutil.copy2(backup_path, db_path)
+            print(f"⚠️ Restored database from backup due to error")
+        if os.path.exists(uploads_backup_path):
+            if os.path.exists('./data/uploads'):
+                shutil.rmtree('./data/uploads')
+            shutil.copytree(uploads_backup_path, './data/uploads')
+            print(f"⚠️ Restored uploads from backup due to error")
+        raise HTTPException(status_code=500, detail=f"Error restoring database: {str(e)}")
+
+# ===== QUIZ TEMPLATES ENDPOINTS =====
+
+class QuizTemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    quiz_type: str
+    selected_unit_ids: List[int]
+    total_questions: int
+    time_per_question: int
+    allow_duplicates: bool = False
+
+@app.post("/api/quiz-templates")
+async def create_quiz_template(template: QuizTemplateCreate, user: dict = Depends(get_current_user)):
+    """Create a new quiz template with public link"""
+    try:
+        import secrets
+        public_token = secrets.token_urlsafe(32)
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO quiz_templates
+                (name, description, quiz_type, selected_unit_ids, total_questions,
+                 time_per_question, allow_duplicates, public_token, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                template.name,
+                template.description,
+                template.quiz_type,
+                json.dumps(template.selected_unit_ids),
+                template.total_questions,
+                template.time_per_question,
+                template.allow_duplicates,
+                public_token,
+                user['id']
+            ))
+            conn.commit()
+            template_id = cursor.lastrowid
+
+        return {
+            "id": template_id,
+            "public_token": public_token,
+            "public_url": f"/public/quiz/{public_token}",
+            "message": "Quiz template created successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating quiz template: {str(e)}")
+
+@app.get("/api/quiz-templates")
+async def get_quiz_templates(user: dict = Depends(get_current_user)):
+    """Get all quiz templates created by the user"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, name, description, quiz_type, selected_unit_ids,
+                       total_questions, time_per_question, allow_duplicates,
+                       public_token, created_at
+                FROM quiz_templates
+                WHERE created_by = ?
+                ORDER BY created_at DESC
+            ''', (user['id'],))
+
+            templates = []
+            for row in cursor.fetchall():
+                template = dict(row)
+                template['selected_unit_ids'] = json.loads(template['selected_unit_ids'])
+                template['public_url'] = f"/public/quiz/{template['public_token']}"
+                templates.append(template)
+
+            return {"templates": templates}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching quiz templates: {str(e)}")
+
+@app.get("/api/quiz-templates/{template_id}")
+async def get_quiz_template(template_id: int, user: dict = Depends(get_current_user)):
+    """Get a specific quiz template"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM quiz_templates
+                WHERE id = ? AND created_by = ?
+            ''', (template_id, user['id']))
+
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Quiz template not found")
+
+            template = dict(row)
+            template['selected_unit_ids'] = json.loads(template['selected_unit_ids'])
+            template['public_url'] = f"/public/quiz/{template['public_token']}"
+
+            return template
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching quiz template: {str(e)}")
+
+@app.delete("/api/quiz-templates/{template_id}")
+async def delete_quiz_template(template_id: int, user: dict = Depends(get_current_user)):
+    """Delete a quiz template"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM quiz_templates
+                WHERE id = ? AND created_by = ?
+            ''', (template_id, user['id']))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Quiz template not found")
+
+            return {"message": "Quiz template deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting quiz template: {str(e)}")
+
+# Public quiz endpoint (no authentication required)
+@app.get("/api/public/quiz/{public_token}")
+async def get_public_quiz_template(public_token: str):
+    """Get quiz template by public token (no auth required)"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id, name, description, quiz_type, selected_unit_ids,
+                       total_questions, time_per_question, allow_duplicates
+                FROM quiz_templates
+                WHERE public_token = ?
+            ''', (public_token,))
+
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Quiz template not found")
+
+            template = dict(row)
+            template['selected_unit_ids'] = json.loads(template['selected_unit_ids'])
+
+            return template
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching quiz template: {str(e)}")
+
+@app.post("/api/public/quiz/{public_token}/start")
+async def start_public_quiz(
+    public_token: str,
+    participant_name: str = Form(...),
+    participant_surname: str = Form(...)
+):
+    """Start a quiz session from a public template (no auth required)"""
+    try:
+        # Get template
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT quiz_type, selected_unit_ids, total_questions,
+                       time_per_question, allow_duplicates
+                FROM quiz_templates
+                WHERE public_token = ?
+            ''', (public_token,))
+
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Quiz template not found")
+
+            template = dict(row)
+            selected_unit_ids = json.loads(template['selected_unit_ids'])
+
+        # Create session
+        session_id = SimpleDatabase.create_quiz_session(
+            participant_name,
+            participant_surname,
+            template['quiz_type'],
+            template['total_questions'],
+            template['time_per_question']
+        )
+
+        if not session_id:
+            raise HTTPException(status_code=500, detail="Failed to create quiz session")
+
+        # Generate questions
+        if not SimpleDatabase.generate_quiz_questions_from_selected_units(
+            session_id,
+            template['quiz_type'],
+            template['total_questions'],
+            selected_unit_ids,
+            template['allow_duplicates']
+        ):
+            raise HTTPException(status_code=500, detail="Failed to generate quiz questions")
+
+        # Return session details
+        session = SimpleDatabase.get_quiz_session(session_id)
+        return {"session_id": session_id, "session": session}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting quiz: {str(e)}")
+
+@app.get("/api/quiz/session/{session_id}")
+async def get_quiz_session(session_id: int):
+    """Get quiz session details (no auth required for public quizzes)"""
+    try:
+        session = SimpleDatabase.get_quiz_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Quiz session not found")
+        return session
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching quiz session: {str(e)}")
 
 # Function to clean temporary files
 def cleanup_temp_files(max_age_hours=2):

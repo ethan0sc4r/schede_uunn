@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Check, Ship, FileText, Image, Palette } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Ship, FileText, Image, Palette, Plane } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { navalUnitsApi, templatesApi } from '../services/api';
-import type { CreateNavalUnitRequest, CreateCharacteristicRequest } from '../types/index.ts';
+import type { CreateNavalUnitRequest, UnitType } from '../types/index.ts';
 import { useToast } from '../contexts/ToastContext';
 import { DEFAULT_TEMPLATES } from './TemplateManager';
 
 interface NavalUnitWizardProps {
   onClose: () => void;
-  onSave: () => void;
+  onSave: (createdUnit?: any) => void;
   sourceUnit?: any; // For duplication
 }
 
-type Step = 'basic' | 'characteristics' | 'appearance';
+type Step = 'basic' | 'appearance';
 
 export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUnitWizardProps) {
   const { success, error: showError } = useToast();
@@ -29,14 +29,8 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
     silhouette_position_y: sourceUnit?.silhouette_position_y || '50',
   });
 
-  const [characteristics, setCharacteristics] = useState<CreateCharacteristicRequest[]>(
-    sourceUnit?.characteristics?.length > 0
-      ? sourceUnit.characteristics.map((char: any) => ({
-          characteristic_name: char.characteristic_name,
-          characteristic_value: char.characteristic_value,
-          order_index: char.order_index,
-        }))
-      : [{ characteristic_name: '', characteristic_value: '', order_index: 0 }]
+  const [unitType, setUnitType] = useState<UnitType>(
+    sourceUnit?.layout_config?.unitType || 'ship'
   );
 
   // Load templates on mount
@@ -56,15 +50,14 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
 
   const createMutation = useMutation({
     mutationFn: navalUnitsApi.create,
-    onSuccess: () => {
+    onSuccess: (createdUnit) => {
       success('Unità navale creata con successo!');
-      onSave();
+      onSave(createdUnit);
     },
   });
 
   const steps: { id: Step; label: string; icon: any }[] = [
     { id: 'basic', label: 'Basic Info', icon: Ship },
-    { id: 'characteristics', label: 'Characteristics', icon: FileText },
     { id: 'appearance', label: 'Template & Appearance', icon: Palette },
   ];
 
@@ -83,10 +76,6 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
   };
 
   const handleSubmit = async () => {
-    const validCharacteristics = characteristics.filter(
-      char => char.characteristic_name.trim() && char.characteristic_value.trim()
-    );
-
     // Find selected template and apply its layout
     const selectedTemplateObj = templates.find(t => t.id === selectedTemplate);
     let layout_config = null;
@@ -99,20 +88,21 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
         canvasHeight: selectedTemplateObj.canvasHeight,
         canvasBackground: selectedTemplateObj.canvasBackground,
         canvasBorderWidth: selectedTemplateObj.canvasBorderWidth,
-        canvasBorderColor: selectedTemplateObj.canvasBorderColor
+        canvasBorderColor: selectedTemplateObj.canvasBorderColor,
+        unitType: unitType // Add unit type to layout config
       };
 
       console.log('✅ Applying template to new unit:', selectedTemplate, layout_config);
+    } else if (unitType) {
+      // If no template selected, still save unitType
+      layout_config = { unitType };
     }
 
     const requestData: CreateNavalUnitRequest = {
       ...formData,
       current_template_id: selectedTemplate,
       layout_config: layout_config,
-      characteristics: validCharacteristics.map((char, index) => ({
-        ...char,
-        order_index: index,
-      })),
+      characteristics: [],
     };
 
     try {
@@ -123,29 +113,10 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
     }
   };
 
-  const addCharacteristic = () => {
-    setCharacteristics([
-      ...characteristics,
-      { characteristic_name: '', characteristic_value: '', order_index: characteristics.length }
-    ]);
-  };
-
-  const removeCharacteristic = (index: number) => {
-    setCharacteristics(characteristics.filter((_, i) => i !== index));
-  };
-
-  const updateCharacteristic = (index: number, field: string, value: string) => {
-    const updated = [...characteristics];
-    updated[index] = { ...updated[index], [field]: value };
-    setCharacteristics(updated);
-  };
-
   const isStepValid = () => {
     switch (currentStep) {
       case 'basic':
         return formData.name.trim() && formData.unit_class.trim();
-      case 'characteristics':
-        return true; // Optional
       case 'appearance':
         return true; // Optional
       default:
@@ -227,59 +198,60 @@ export default function NavalUnitWizard({ onClose, onSave, sourceUnit }: NavalUn
                   />
                 </div>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type *
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUnitType('ship')}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      unitType === 'ship'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <Ship className="h-7 w-7 mx-auto mb-2" />
+                    <div className="text-xs font-medium">Ship</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnitType('submarine')}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      unitType === 'submarine'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <svg className="h-7 w-7 mx-auto mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <ellipse cx="12" cy="12" rx="9" ry="4" />
+                      <path d="M3 12v3c0 1.5 4 3 9 3s9-1.5 9-3v-3" />
+                      <circle cx="12" cy="9" r="1.5" />
+                      <line x1="12" y1="7.5" x2="12" y2="4" />
+                      <line x1="10" y1="4" x2="14" y2="4" />
+                    </svg>
+                    <div className="text-xs font-medium">Submarine</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnitType('aircraft')}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      unitType === 'aircraft'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <Plane className="h-7 w-7 mx-auto mb-2" />
+                    <div className="text-xs font-medium">Airplane</div>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-500 mt-4">
                 The nation will be automatically detected when you upload the flag in the Images section
               </p>
-            </div>
-          )}
-
-          {currentStep === 'characteristics' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Technical Characteristics</h3>
-                <button
-                  type="button"
-                  onClick={addCharacteristic}
-                  className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-600"
-                >
-                  + Add
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {characteristics.map((char, index) => (
-                  <div key={index} className="flex gap-3 items-center">
-                    <input
-                      type="text"
-                      placeholder="Characteristic name (e.g.: Length)"
-                      className="input-field flex-1"
-                      value={char.characteristic_name}
-                      onChange={(e) => updateCharacteristic(index, 'characteristic_name', e.target.value)}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Value (e.g.: 333 m)"
-                      className="input-field flex-1"
-                      value={char.characteristic_value}
-                      onChange={(e) => updateCharacteristic(index, 'characteristic_value', e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeCharacteristic(index)}
-                      className="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {characteristics.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No characteristics added</p>
-                  <p className="text-sm mt-1">Click "+ Add" to insert technical characteristics</p>
-                </div>
-              )}
             </div>
           )}
 

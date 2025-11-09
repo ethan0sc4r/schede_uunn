@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { 
-  Ship, 
-  Users, 
-  Search, 
-  LogOut, 
+import {
+  Ship,
+  Users,
+  Search,
+  LogOut,
   User,
   Shield,
   Menu,
   X,
   Palette,
-  Brain
+  Brain,
+  History,
+  FileText
 } from 'lucide-react';
 
 const Layout: React.FC = () => {
@@ -76,6 +78,20 @@ const Layout: React.FC = () => {
               >
                 <Brain className="mr-3 h-5 w-5" />
                 Naval Quiz
+              </a>
+              <a
+                href="/quiz/history"
+                className="group flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-green-50 hover:text-green-600 transition-all duration-200"
+              >
+                <History className="mr-3 h-5 w-5" />
+                Quiz History
+              </a>
+              <a
+                href="/quiz/templates"
+                className="group flex items-center px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-green-50 hover:text-green-600 transition-all duration-200"
+              >
+                <FileText className="mr-3 h-5 w-5" />
+                Quiz Templates
               </a>
             </div>
           </div>

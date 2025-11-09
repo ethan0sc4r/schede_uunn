@@ -15,6 +15,8 @@ import Admin from './pages/Admin';
 import UnitView from './pages/UnitView';
 import Quiz from './pages/Quiz';
 import QuizHistory from './pages/QuizHistory';
+import QuizTemplates from './pages/QuizTemplates';
+import PublicQuiz from './pages/PublicQuiz';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,8 +38,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/units/:id/view" element={<UnitView />} />
-              <Route path="/quiz" element={<Quiz />} />
-              <Route path="/quiz/history" element={<QuizHistory />} />
+              <Route path="/public/quiz/:token" element={<PublicQuiz />} />
 
               {/* Protected routes */}
               <Route
@@ -52,6 +53,9 @@ function App() {
                 <Route path="groups" element={<Groups />} />
                 <Route path="templates" element={<Templates />} />
                 <Route path="search" element={<Search />} />
+                <Route path="quiz" element={<Quiz />} />
+                <Route path="quiz/history" element={<QuizHistory />} />
+                <Route path="quiz/templates" element={<QuizTemplates />} />
                 <Route
                   path="admin"
                   element={

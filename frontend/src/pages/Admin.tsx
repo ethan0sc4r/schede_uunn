@@ -5,6 +5,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
 import type { User } from '../types/index.ts';
 import { Key, Shield, UserCheck, UserX, UserPlus, Settings } from 'lucide-react';
+import DatabaseBackup from '../components/DatabaseBackup';
+import QuizTemplatesManager from '../components/QuizTemplatesManager';
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'settings'>('pending');
@@ -254,6 +256,12 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
+
+              {/* Database Backup Section */}
+              <DatabaseBackup />
+
+              {/* Quiz Templates Section */}
+              <QuizTemplatesManager />
             </div>
           ) : isLoading ? (
             <div className="flex items-center justify-center h-32">

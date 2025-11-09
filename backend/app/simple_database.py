@@ -212,7 +212,26 @@ def init_database():
                 FOREIGN KEY (naval_unit_id) REFERENCES naval_units (id)
             )
         ''')
-        
+
+        # Quiz templates table (stores pre-configured quiz templates with public links)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS quiz_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                quiz_type TEXT NOT NULL,
+                selected_unit_ids TEXT NOT NULL,  -- JSON array of unit IDs
+                total_questions INTEGER NOT NULL,
+                time_per_question INTEGER NOT NULL,
+                allow_duplicates BOOLEAN DEFAULT 0,
+                public_token TEXT UNIQUE NOT NULL,  -- Token for public access
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users (id)
+            )
+        ''')
+
         conn.commit()
 
 class SimpleDatabase:
@@ -1271,46 +1290,87 @@ class SimpleDatabase:
                 cursor = conn.cursor()
 
                 for i, unit in enumerate(selected_units, 1):
+                    # Extract unitType from layout_config for filtering
+                    unit_type = None
+                    if unit.get('layout_config'):
+                        try:
+                            layout_config = json.loads(unit['layout_config']) if isinstance(unit['layout_config'], str) else unit['layout_config']
+                            unit_type = layout_config.get('unitType')
+                        except:
+                            pass
+
                     # Generate answer options based on quiz type
                     if quiz_type == 'name_to_class':
                         correct_answer = unit['unit_class']
-                        # Get other classes as wrong options
-                        cursor.execute('''
-                            SELECT DISTINCT unit_class FROM naval_units
-                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
-                            ORDER BY RANDOM() LIMIT 3
-                        ''', (correct_answer,))
+                        # Get other classes as wrong options, filtered by unitType
+                        if unit_type:
+                            cursor.execute('''
+                                SELECT DISTINCT unit_class FROM naval_units
+                                WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                                AND json_extract(layout_config, '$.unitType') = ?
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer, unit_type))
+                        else:
+                            cursor.execute('''
+                                SELECT DISTINCT unit_class FROM naval_units
+                                WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer,))
                         wrong_options = [row[0] for row in cursor.fetchall()]
 
                     elif quiz_type == 'nation_to_class':
                         correct_answer = unit['unit_class']
-                        # Get other classes from same or different nations
-                        cursor.execute('''
-                            SELECT DISTINCT unit_class FROM naval_units
-                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
-                            ORDER BY RANDOM() LIMIT 3
-                        ''', (correct_answer,))
+                        # Get other classes from same or different nations, filtered by unitType
+                        if unit_type:
+                            cursor.execute('''
+                                SELECT DISTINCT unit_class FROM naval_units
+                                WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                                AND json_extract(layout_config, '$.unitType') = ?
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer, unit_type))
+                        else:
+                            cursor.execute('''
+                                SELECT DISTINCT unit_class FROM naval_units
+                                WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer,))
                         wrong_options = [row[0] for row in cursor.fetchall()]
 
                     elif quiz_type == 'class_to_flag':
                         # For flag quiz, the correct answer is the nation
                         correct_answer = unit['nation'] or 'Unknown'
-                        # Get other nations as wrong options
-                        cursor.execute('''
-                            SELECT DISTINCT nation FROM naval_units
-                            WHERE nation != ? AND nation IS NOT NULL AND nation != ''
-                            ORDER BY RANDOM() LIMIT 3
-                        ''', (correct_answer,))
+                        # Get other nations as wrong options, filtered by unitType
+                        if unit_type:
+                            cursor.execute('''
+                                SELECT DISTINCT nation FROM naval_units
+                                WHERE nation != ? AND nation IS NOT NULL AND nation != ''
+                                AND json_extract(layout_config, '$.unitType') = ?
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer, unit_type))
+                        else:
+                            cursor.execute('''
+                                SELECT DISTINCT nation FROM naval_units
+                                WHERE nation != ? AND nation IS NOT NULL AND nation != ''
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer,))
                         wrong_options = [row[0] for row in cursor.fetchall()]
 
                     elif quiz_type == 'silhouette_to_class':
                         correct_answer = unit['unit_class']
-                        # Get other classes as wrong options
-                        cursor.execute('''
-                            SELECT DISTINCT unit_class FROM naval_units
-                            WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
-                            ORDER BY RANDOM() LIMIT 3
-                        ''', (correct_answer,))
+                        # Get other classes as wrong options, filtered by unitType
+                        if unit_type:
+                            cursor.execute('''
+                                SELECT DISTINCT unit_class FROM naval_units
+                                WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                                AND json_extract(layout_config, '$.unitType') = ?
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer, unit_type))
+                        else:
+                            cursor.execute('''
+                                SELECT DISTINCT unit_class FROM naval_units
+                                WHERE unit_class != ? AND unit_class IS NOT NULL AND unit_class != ''
+                                ORDER BY RANDOM() LIMIT 3
+                            ''', (correct_answer,))
                         wrong_options = [row[0] for row in cursor.fetchall()]
 
                     # Ensure we have exactly 3 wrong options

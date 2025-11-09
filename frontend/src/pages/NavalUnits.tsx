@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ship, Search, Grid, List, Eye, Edit3, Trash2, FileText, Copy } from 'lucide-react';
+import { Ship, Search, Grid, List, Eye, Edit3, Trash2, FileText, Copy, ChevronDown, ChevronRight } from 'lucide-react';
 import { navalUnitsApi } from '../services/api';
 import type { NavalUnit } from '../types/index.ts';
 import NavalUnitCard from '../components/NavalUnitCard';
@@ -19,6 +19,7 @@ export default function NavalUnits() {
   const [selectedUnit, setSelectedUnit] = useState<NavalUnit | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedNations, setExpandedNations] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const { success, error: showError } = useToast();
 
@@ -30,13 +31,63 @@ export default function NavalUnits() {
   // Filter units based on search term
   const filteredUnits = useMemo(() => {
     if (!navalUnits || !searchTerm) return navalUnits || [];
-    
+
     return navalUnits.filter((unit) =>
       unit.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       unit.unit_class.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (unit.nation && unit.nation.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [navalUnits, searchTerm]);
+
+  // Group units by nation
+  const groupedByNation = useMemo(() => {
+    const units = filteredUnits;
+    const grouped = new Map<string, NavalUnit[]>();
+
+    units.forEach(unit => {
+      const nation = unit.nation || 'Unknown';
+      if (!grouped.has(nation)) {
+        grouped.set(nation, []);
+      }
+      grouped.get(nation)!.push(unit);
+    });
+
+    // Sort nations alphabetically, but put "Unknown" at the end
+    const sortedEntries = Array.from(grouped.entries()).sort((a, b) => {
+      if (a[0] === 'Unknown') return 1;
+      if (b[0] === 'Unknown') return -1;
+      return a[0].localeCompare(b[0]);
+    });
+
+    return sortedEntries;
+  }, [filteredUnits]);
+
+  // Initialize first nation as expanded
+  useMemo(() => {
+    if (groupedByNation.length > 0 && expandedNations.size === 0) {
+      setExpandedNations(new Set([groupedByNation[0][0]]));
+    }
+  }, [groupedByNation]);
+
+  const toggleNation = useCallback((nation: string) => {
+    setExpandedNations(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nation)) {
+        newSet.delete(nation);
+      } else {
+        newSet.add(nation);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const expandAll = useCallback(() => {
+    setExpandedNations(new Set(groupedByNation.map(([nation]) => nation)));
+  }, [groupedByNation]);
+
+  const collapseAll = useCallback(() => {
+    setExpandedNations(new Set());
+  }, []);
 
   const deleteMutation = useMutation({
     mutationFn: navalUnitsApi.delete,
@@ -232,16 +283,75 @@ export default function NavalUnits() {
               </div>
             </div>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredUnits.map((unit) => (
-                <NavalUnitCard
-                  key={unit.id}
-                  unit={unit}
-                  onEdit={() => handleEdit(unit)}
-                  onDelete={() => handleDelete(unit.id)}
-                  onEditNotes={() => handleEditNotes(unit)}
-                />
-              ))}
+            <div className="space-y-4">
+              {/* Expand/Collapse All buttons */}
+              <div className="flex justify-end gap-2 mb-4">
+                <button
+                  onClick={expandAll}
+                  className="text-sm px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Expand All
+                </button>
+                <button
+                  onClick={collapseAll}
+                  className="text-sm px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Collapse All
+                </button>
+              </div>
+
+              {/* Nation Accordions */}
+              {groupedByNation.map(([nation, units]) => {
+                const isExpanded = expandedNations.has(nation);
+
+                return (
+                  <div key={nation} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    {/* Accordion Header */}
+                    <button
+                      onClick={() => toggleNation(nation)}
+                      className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="h-5 w-5 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                        )}
+                        <div className="flex items-center gap-3">
+                          {units[0]?.flag_path && (
+                            <img
+                              src={getImageUrl(units[0].flag_path)}
+                              alt={nation}
+                              className="h-6 w-9 object-cover rounded shadow-sm"
+                            />
+                          )}
+                          <h3 className="text-lg font-semibold text-gray-900">{nation}</h3>
+                        </div>
+                        <span className="ml-2 px-2.5 py-0.5 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                          {units.length}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Accordion Content */}
+                    {isExpanded && (
+                      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                          {units.map((unit) => (
+                            <NavalUnitCard
+                              key={unit.id}
+                              unit={unit}
+                              onEdit={() => handleEdit(unit)}
+                              onDelete={() => handleDelete(unit.id)}
+                              onEditNotes={() => handleEditNotes(unit)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -391,31 +501,13 @@ export default function NavalUnits() {
                   canvasHeight: canvasData.canvasHeight,
                   canvasBackground: canvasData.canvasBackground,
                   canvasBorderWidth: canvasData.canvasBorderWidth,
-                  canvasBorderColor: canvasData.canvasBorderColor
+                  canvasBorderColor: canvasData.canvasBorderColor,
+                  unitType: canvasData.unitType
                 });
                 
                 // Extract unit name and class from canvas elements
                 const unitNameElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'unit_name');
                 const unitClassElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'unit_class');
-                
-                console.log('💾 Saving unit data:');
-                console.log('   unitNameElement:', unitNameElement);
-                console.log('   unitClassElement:', unitClassElement);
-                console.log('   selectedUnit:', selectedUnit ? { id: selectedUnit.id, name: selectedUnit.name, unit_class: selectedUnit.unit_class } : 'NEW UNIT');
-                console.log('   migratedLayoutConfig:', migratedLayoutConfig);
-                console.log('   canvasData received:', canvasData);
-                console.log('🔍 DEBUG: Elements before migration:', canvasData.elements.map((el: any) => ({ 
-                  id: el.id, 
-                  type: el.type, 
-                  hasImage: !!el.image,
-                  imageStart: el.image ? el.image.substring(0, 50) + '...' : 'NO IMAGE'
-                })));
-                console.log('🔍 DEBUG: Elements after migration:', migratedLayoutConfig.elements.map((el: any) => ({ 
-                  id: el.id, 
-                  type: el.type, 
-                  hasImage: !!el.image,
-                  imageStart: el.image ? el.image.substring(0, 50) + '...' : 'NO IMAGE'
-                })));
                 
                 // Extract values from content - preserve user input even if it looks like template defaults
                 const unitName = unitNameElement?.content && 
@@ -433,23 +525,14 @@ export default function NavalUnits() {
                                  unitClassElement.content !== '[Inserire classe]' &&
                                  unitClassElement.content !== 'CLASSE UNITA\'' &&
                                  unitClassElement.content !== '[CLASSE]'
-                                 ? unitClassElement.content 
+                                 ? unitClassElement.content
                                  : (selectedUnit?.unit_class || 'Nuova Classe');
-                
-                console.log('💾 Final values to save:', { unitName, unitClass });
-                console.log('💾 IsNewUnit?', !selectedUnit, 'selectedUnit:', selectedUnit?.id);
-                console.log('🚨 DEBUG: layout_config content:', JSON.stringify(migratedLayoutConfig, null, 2));
-                
+
                 // Extract images from migrated elements to save in dedicated fields
                 const logoElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'logo');
                 const flagElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'flag');
                 const silhouetteElement = migratedLayoutConfig.elements?.find((el: any) => el.type === 'silhouette');
-                
-                console.log('🖼️ Extracting images from elements:');
-                console.log('   logoElement:', logoElement ? { id: logoElement.id, hasImage: !!logoElement.image } : 'NOT FOUND');
-                console.log('   flagElement:', flagElement ? { id: flagElement.id, hasImage: !!flagElement.image } : 'NOT FOUND');
-                console.log('   silhouetteElement:', silhouetteElement ? { id: silhouetteElement.id, hasImage: !!silhouetteElement.image } : 'NOT FOUND');
-                
+
                 const unitData = {
                   name: unitName,
                   unit_class: unitClass,
@@ -473,12 +556,7 @@ export default function NavalUnits() {
                   savedUnit = selectedUnit;
                 } else {
                   // Create new unit
-                  console.log('🆕 Creating new unit with data:', unitData);
-                  console.log('🚨 DEBUG: Sending to API - layout_config size:', JSON.stringify(unitData.layout_config).length, 'characters');
-                  console.log('🚨 DEBUG: Sending to API - elements count:', unitData.layout_config?.elements?.length || 0);
                   const newUnit = await createMutation.mutateAsync(unitData);
-                  console.log('✅ New unit created:', newUnit);
-                  console.log('🔍 New unit layout_config saved?', !!newUnit.layout_config, 'elements:', newUnit.layout_config?.elements?.length || 0);
                   savedUnit = newUnit;
                 }
                 
@@ -488,14 +566,7 @@ export default function NavalUnits() {
                 // Fetch the updated unit data from database to ensure we have the latest
                 if (savedUnit?.id) {
                   try {
-                    console.log('🔄 Fetching updated unit data for:', savedUnit.id);
                     const updatedUnit = await navalUnitsApi.getById(savedUnit.id);
-                    console.log('📋 Updated unit data:', { 
-                      id: updatedUnit.id, 
-                      name: updatedUnit.name, 
-                      unit_class: updatedUnit.unit_class,
-                      hasLayoutConfig: !!updatedUnit.layout_config 
-                    });
                     setSelectedUnit(updatedUnit);
                   } catch (error) {
                     console.error('Error fetching updated unit data:', error);
@@ -504,9 +575,9 @@ export default function NavalUnits() {
                 
                 success('Card saved successfully');
                 handleEditorClose();
-              } catch (error) {
+              } catch (error: any) {
                 console.error('Error during save:', error);
-                showError('Error saving card');
+                showError(`Errore durante il salvataggio: ${error.response?.data?.detail || error.message}`);
               }
             }}
             onCancel={handleEditorClose}
@@ -530,10 +601,30 @@ export default function NavalUnits() {
             setShowWizard(false);
             setWizardSourceUnit(null);
           }}
-          onSave={() => {
+          onSave={async (createdUnit) => {
             setShowWizard(false);
             setWizardSourceUnit(null);
-            queryClient.invalidateQueries({ queryKey: ['navalUnits'] });
+
+            // Auto-open editor for the newly created unit
+            if (createdUnit) {
+              try {
+                // Fetch the complete unit data from the backend to ensure all fields are populated
+                const completeUnit = await navalUnitsApi.getById(createdUnit.id);
+                setSelectedUnit(completeUnit);
+                setShowEditor(true);
+
+                // Refresh the list in background
+                queryClient.invalidateQueries({ queryKey: ['navalUnits'] });
+              } catch (error) {
+                console.error('Error fetching created unit:', error);
+                showError('Error loading unit editor');
+                // Still refresh the list
+                queryClient.invalidateQueries({ queryKey: ['navalUnits'] });
+              }
+            } else {
+              // No unit created, just refresh
+              queryClient.invalidateQueries({ queryKey: ['navalUnits'] });
+            }
           }}
         />
       )}

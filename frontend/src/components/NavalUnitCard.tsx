@@ -154,12 +154,12 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
           // Use silhouette_path from database first, then check layout_config as fallback
           if (unit.silhouette_path) {
             return (
-              <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
+              <div className="w-full bg-white flex items-center justify-center border-b border-gray-200 p-4" style={{ minHeight: '120px', maxHeight: '160px' }}>
                 <img
                   src={getImageUrl(unit.silhouette_path)}
                   alt={`${unit.name} silhouette`}
-                  className="max-h-full max-w-full object-contain"
-                  style={{ transform: 'scale(0.8)' }}
+                  className="w-full h-auto object-contain"
+                  style={{ maxHeight: '140px' }}
                 />
               </div>
             );
@@ -170,12 +170,12 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
 
             if (silhouetteImage) {
               return (
-                <div className="h-32 bg-white flex items-center justify-center border-b border-gray-200">
+                <div className="w-full bg-white flex items-center justify-center border-b border-gray-200 p-4" style={{ minHeight: '120px', maxHeight: '160px' }}>
                   <img
                     src={getImageUrl(silhouetteImage)}
                     alt={`${unit.name} silhouette`}
-                    className="max-h-full max-w-full object-contain"
-                    style={{ transform: 'scale(0.8)' }}
+                    className="w-full h-auto object-contain"
+                    style={{ maxHeight: '140px' }}
                   />
                 </div>
               );
@@ -194,8 +194,27 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
             </div>
           );
         })()}
-        {/* Template indicator */}
-        {unit.template_name && (
+        {/* Unit Type indicator */}
+        {unit.layout_config?.unitType && (
+          <div className="absolute top-2 right-2 flex flex-col gap-1">
+            <div className={`text-white text-xs px-2 py-1 rounded font-medium ${
+              unit.layout_config.unitType === 'ship' ? 'bg-blue-500' :
+              unit.layout_config.unitType === 'submarine' ? 'bg-indigo-600' :
+              'bg-sky-500'
+            }`}>
+              {unit.layout_config.unitType === 'ship' ? '⚓ Ship' :
+               unit.layout_config.unitType === 'submarine' ? '🔱 Submarine' :
+               '✈️ Airplane'}
+            </div>
+            {unit.template_name && (
+              <div className="bg-purple-500 text-white text-xs px-2 py-1 rounded">
+                {unit.template_name}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Template indicator (fallback if no unit type) */}
+        {!unit.layout_config?.unitType && unit.template_name && (
           <div className="absolute top-2 right-2 bg-purple-500 text-white text-xs px-2 py-1 rounded">
             {unit.template_name}
           </div>

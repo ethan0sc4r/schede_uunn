@@ -117,6 +117,10 @@ export const migrateLayoutConfigImages = async (layoutConfig: any): Promise<any>
       return element;
     })
   );
-  
-  return { ...layoutConfig, elements: migratedElements };
+
+  // Preserve all properties from original layoutConfig, including unitType
+  return {
+    ...layoutConfig,
+    elements: migratedElements
+  };
 };

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Palette, Save, Images } from 'lucide-react';
+import { Palette, Save, Images, Ship, Anchor, Plane } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from './TemplateManager';
 import UnitGalleryModal from './UnitGalleryModal';
@@ -144,6 +144,9 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   );
   const [canvasBorderColor, setCanvasBorderColor] = useState(
     unit?.layout_config?.canvasBorderColor || '#000000'
+  );
+  const [unitType, setUnitType] = useState<'ship' | 'submarine' | 'aircraft'>(
+    unit?.layout_config?.unitType || 'ship'
   );
   const [zoomLevel, setZoomLevel] = useState(1);
   const [nationUpdateKey, setNationUpdateKey] = useState(0);
@@ -1321,6 +1324,54 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
             </div>
           </div>
 
+          {/* Unit Type Selector */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Type</h3>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setUnitType('ship')}
+                className={`p-2 rounded-lg border-2 transition-all ${
+                  unitType === 'ship'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-blue-300'
+                }`}
+              >
+                <Ship className="h-6 w-6 mx-auto mb-1" />
+                <div className="text-xs font-medium">Ship</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnitType('submarine')}
+                className={`p-2 rounded-lg border-2 transition-all ${
+                  unitType === 'submarine'
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-300 hover:border-indigo-300'
+                }`}
+              >
+                <svg className="h-6 w-6 mx-auto mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <ellipse cx="12" cy="12" rx="9" ry="4" />
+                  <path d="M3 12v3c0 1.5 4 3 9 3s9-1.5 9-3v-3" />
+                  <circle cx="12" cy="9" r="1.5" />
+                  <line x1="12" y1="7.5" x2="12" y2="4" />
+                  <line x1="10" y1="4" x2="14" y2="4" />
+                </svg>
+                <div className="text-xs font-medium">Submarine</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnitType('aircraft')}
+                className={`p-2 rounded-lg border-2 transition-all ${
+                  unitType === 'aircraft'
+                    ? 'border-sky-500 bg-sky-50'
+                    : 'border-gray-300 hover:border-sky-300'
+                }`}
+              >
+                <Plane className="h-6 w-6 mx-auto mb-1" />
+                <div className="text-xs font-medium">Airplane</div>
+              </button>
+            </div>
+          </div>
 
           {/* Auto-detected Nation */}
           <div key={nationUpdateKey} className="mb-4 p-3 bg-blue-50 rounded-lg">
@@ -1366,13 +1417,14 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
                   
                   await saveCurrentTemplateState();
                   
-                  const saveData = { 
-                    elements, 
-                    canvasWidth, 
-                    canvasHeight, 
-                    canvasBackground, 
-                    canvasBorderWidth, 
-                    canvasBorderColor, 
+                  const saveData = {
+                    elements,
+                    canvasWidth,
+                    canvasHeight,
+                    canvasBackground,
+                    canvasBorderWidth,
+                    canvasBorderColor,
+                    unitType,
                     nation: getNationFromFlag(),
                     current_template_id: currentTemplateId
                   };

@@ -345,3 +345,92 @@ export const templatesApi = {
     return response.data;
   },
 };
+
+// Database backup API
+export const databaseApi = {
+  downloadBackup: async (): Promise<void> => {
+    const response = await api.get('/api/admin/database/download', {
+      responseType: 'blob',
+    });
+
+    // Extract filename from Content-Disposition header
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = 'naval_units_backup.zip';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  uploadRestore: async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/admin/database/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+};
+
+// Quiz templates API
+export interface QuizTemplate {
+  id?: number;
+  name: string;
+  description?: string;
+  quiz_type: string;
+  selected_unit_ids: number[];
+  total_questions: number;
+  time_per_question: number;
+  allow_duplicates: boolean;
+  public_token?: string;
+  public_url?: string;
+  created_at?: string;
+}
+
+export const quizTemplatesApi = {
+  create: async (template: QuizTemplate): Promise<any> => {
+    const response = await api.post('/api/quiz-templates', template);
+    return response.data;
+  },
+
+  getAll: async (): Promise<{ templates: QuizTemplate[] }> => {
+    const response = await api.get('/api/quiz-templates');
+    return response.data;
+  },
+
+  getById: async (templateId: number): Promise<QuizTemplate> => {
+    const response = await api.get(`/api/quiz-templates/${templateId}`);
+    return response.data;
+  },
+
+  delete: async (templateId: number): Promise<void> => {
+    await api.delete(`/api/quiz-templates/${templateId}`);
+  },
+
+  // Public endpoints (no auth required)
+  getPublic: async (publicToken: string): Promise<QuizTemplate> => {
+    const response = await axios.get(`${API_BASE_URL}/api/public/quiz/${publicToken}`);
+    return response.data;
+  },
+
+  startPublic: async (publicToken: string, participantName: string, participantSurname: string): Promise<any> => {
+    const formData = new FormData();
+    formData.append('participant_name', participantName);
+    formData.append('participant_surname', participantSurname);
+    const response = await axios.post(`${API_BASE_URL}/api/public/quiz/${publicToken}/start`, formData);
+    return response.data;
+  },
+};
