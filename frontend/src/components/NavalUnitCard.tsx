@@ -1,5 +1,5 @@
 import { useState, memo } from 'react';
-import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye, FileText, Images } from 'lucide-react';
+import { Download, Share2, FileImage, Printer, ExternalLink, Edit3, Trash2, Eye, FileText, Images, Search } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import { navalUnitsApi } from '../services/api';
 import { getImageUrl } from '../utils/imageUtils';
@@ -12,9 +12,10 @@ interface NavalUnitCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onEditNotes?: () => void;
+  onEditIdentification?: () => void;
 }
 
-function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardProps) {
+function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes, onEditIdentification }: NavalUnitCardProps) {
   const [showActions, setShowActions] = useState(false);
   const [showPowerPointSelector, setShowPowerPointSelector] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
@@ -313,11 +314,20 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
           >
             <Edit3 className="h-4 w-4" />
           </button>
+          {onEditIdentification && (
+            <button
+              onClick={onEditIdentification}
+              className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center"
+              title="Identification"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          )}
           {onEditNotes && (
             <button
               onClick={onEditNotes}
               className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center"
-              title="Note"
+              title="Notes"
             >
               <FileText className="h-4 w-4" />
             </button>
@@ -325,11 +335,11 @@ function NavalUnitCard({ unit, onEdit, onDelete, onEditNotes }: NavalUnitCardPro
           {unit.gallery && unit.gallery.length > 0 && (
             <button
               onClick={() => setShowGallery(true)}
-              className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center relative"
+              className="p-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors flex items-center justify-center relative"
               title="Galleria"
             >
               <Images className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 bg-white text-amber-600 text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
                 {unit.gallery.length}
               </span>
             </button>

@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Share2, FileImage, Printer, Presentation, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Share2, FileImage, Printer, Presentation, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Search, FileText } from 'lucide-react';
 import { navalUnitsApi, templatesApi } from '../services/api';
 import { printCanvas } from '../utils/exportUtils';
 import { getImageUrl } from '../utils/imageUtils';
 import type { NavalUnit } from '../types/index.ts';
 import { useToast } from '../contexts/ToastContext';
+import { parseNotesField } from '../utils/identificationStorage';
 
 export default function UnitView() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,8 @@ export default function UnitView() {
   const [viewOffsetY, setViewOffsetY] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [showIdentification, setShowIdentification] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -759,6 +762,20 @@ export default function UnitView() {
           
           <div className="flex space-x-2">
             <button
+              onClick={() => setShowIdentification(true)}
+              className="flex items-center px-3 py-1.5 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition-colors"
+            >
+              <Search className="h-3 w-3 mr-1" />
+              Identification
+            </button>
+            <button
+              onClick={() => setShowNotes(true)}
+              className="flex items-center px-3 py-1.5 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Notes
+            </button>
+            <button
               onClick={handleShare}
               className="flex items-center px-3 py-1.5 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
             >
@@ -767,7 +784,7 @@ export default function UnitView() {
             </button>
             <button
               onClick={handleExportPNG}
-              className="flex items-center px-3 py-1.5 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors"
+              className="flex items-center px-3 py-1.5 bg-amber-500 text-white rounded text-sm hover:bg-amber-600 transition-colors"
             >
               <FileImage className="h-3 w-3 mr-1" />
               PNG
@@ -781,7 +798,7 @@ export default function UnitView() {
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center px-3 py-1.5 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition-colors"
+              className="flex items-center px-3 py-1.5 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600 transition-colors"
             >
               <Printer className="h-3 w-3 mr-1" />
               Stampa
@@ -961,6 +978,127 @@ export default function UnitView() {
           </div>
         </div>
       )}
+
+      {/* Identification Modal */}
+      {showIdentification && (() => {
+        const navalData = parseNotesField(unit.notes);
+        const identification = navalData.identification || [];
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+              {/* Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Ship Identification - {unit.name}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    From Bow to Stern (Prora → Poppa)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowIdentification(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 p-6 overflow-auto">
+                {identification.length > 0 ? (
+                  <div className="space-y-2">
+                    {identification.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200"
+                      >
+                        <div className="flex-shrink-0 w-8 text-sm font-medium text-purple-700">
+                          {index + 1}.
+                        </div>
+                        <div className="flex-1 text-gray-900 font-medium">{item.element}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <Search className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium">No identification elements</p>
+                    <p className="text-sm mt-2">This ship has no identification data yet.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end p-6 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => setShowIdentification(false)}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Notes Modal */}
+      {showNotes && (() => {
+        const navalData = parseNotesField(unit.notes);
+        const freeNotes = navalData.freeNotes || '';
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+              {/* Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-200">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Notes - {unit.name}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Class: {unit.unit_class}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowNotes(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 p-6 overflow-auto">
+                {freeNotes ? (
+                  <div
+                    className="prose max-w-none"
+                    dangerouslySetInnerHTML={{ __html: freeNotes }}
+                  />
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium">No notes available</p>
+                    <p className="text-sm mt-2">This ship has no notes yet.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end p-6 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => setShowNotes(false)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

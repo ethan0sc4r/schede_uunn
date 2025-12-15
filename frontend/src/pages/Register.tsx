@@ -74,7 +74,7 @@ const Register: React.FC = () => {
           <div className="flex items-center space-x-3">
             <Ship className="h-10 w-10 text-blue-500" />
             <h1 className="text-2xl font-bold text-gray-900">
-              Naval Recce
+              Naval ID
             </h1>
           </div>
         </div>

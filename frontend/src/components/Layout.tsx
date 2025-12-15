@@ -43,7 +43,7 @@ const Layout: React.FC = () => {
       <div className="w-64 bg-white shadow-lg flex-shrink-0">
         <div className="flex items-center justify-center h-16 px-6 border-b border-gray-200">
           <h1 className="text-xl font-bold text-gray-900">
-            Naval Recce
+            Naval ID
           </h1>
         </div>
 

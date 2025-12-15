@@ -10,6 +10,18 @@ export interface User {
 
 export type UnitType = 'ship' | 'submarine' | 'aircraft';
 
+export interface IdentificationElement {
+  id: string;
+  element: string;
+}
+
+export interface NavalData {
+  type: 'naval_data';
+  version: string;
+  freeNotes?: string;
+  identification?: IdentificationElement[];
+}
+
 export interface NavalUnit {
   id: number;
   name: string;
@@ -26,7 +38,7 @@ export interface NavalUnit {
   template_name?: string;
   template_id?: string;
   current_template_id?: string;
-  notes?: string; // Rich text notes field
+  notes?: string; // JSON field containing NavalData (identification + free notes)
   created_by: number;
   creator?: User; // User who created this unit
   created_at: string;

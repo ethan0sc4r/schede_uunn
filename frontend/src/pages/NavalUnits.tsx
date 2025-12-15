@@ -6,6 +6,7 @@ import type { NavalUnit } from '../types/index.ts';
 import NavalUnitCard from '../components/NavalUnitCard';
 import CanvasEditor from '../components/CanvasEditor';
 import NotesEditor from '../components/NotesEditor';
+import ShipIdentificationEditor from '../components/ShipIdentificationEditor';
 import NavalUnitWizard from '../components/NavalUnitWizard';
 import { getImageUrl, migrateLayoutConfigImages } from '../utils/imageUtils';
 import { useToast } from '../contexts/ToastContext';
@@ -14,6 +15,7 @@ import logger from '../utils/logger';
 export default function NavalUnits() {
   const [showEditor, setShowEditor] = useState(false);
   const [showNotesEditor, setShowNotesEditor] = useState(false);
+  const [showIdentificationEditor, setShowIdentificationEditor] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [wizardSourceUnit, setWizardSourceUnit] = useState<NavalUnit | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<NavalUnit | null>(null);
@@ -164,6 +166,31 @@ export default function NavalUnits() {
     } catch (error) {
       logger.error('Error saving notes:', error);
       showError('Error saving notes');
+    }
+  }, [selectedUnit, updateMutation, success, showError]);
+
+  const handleEditIdentification = useCallback((unit: NavalUnit) => {
+    setSelectedUnit(unit);
+    setShowIdentificationEditor(true);
+  }, []);
+
+  const handleIdentificationEditorClose = useCallback(() => {
+    setShowIdentificationEditor(false);
+    setSelectedUnit(null);
+  }, []);
+
+  const handleSaveIdentification = useCallback(async (notes: string) => {
+    if (!selectedUnit) return;
+
+    try {
+      await updateMutation.mutateAsync({
+        id: selectedUnit.id,
+        data: { notes }
+      });
+      success('Identification saved successfully');
+    } catch (error) {
+      logger.error('Error saving identification:', error);
+      showError('Error saving identification');
     }
   }, [selectedUnit, updateMutation, success, showError]);
 
@@ -343,6 +370,7 @@ export default function NavalUnits() {
                               unit={unit}
                               onEdit={() => handleEdit(unit)}
                               onDelete={() => handleDelete(unit.id)}
+                              onEditIdentification={() => handleEditIdentification(unit)}
                               onEditNotes={() => handleEditNotes(unit)}
                             />
                           ))}
@@ -584,6 +612,14 @@ export default function NavalUnits() {
           />
         </div>
       )}
+
+      {/* Identification Editor */}
+      <ShipIdentificationEditor
+        unit={selectedUnit}
+        isOpen={showIdentificationEditor}
+        onClose={handleIdentificationEditorClose}
+        onSave={handleSaveIdentification}
+      />
 
       {/* Notes Editor */}
       <NotesEditor

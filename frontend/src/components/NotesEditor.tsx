@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bold, Italic, Underline, List, AlignLeft, AlignCenter, AlignRight, Type, Save, X } from 'lucide-react';
+import { parseNotesField, serializeNavalData, type NavalData } from '../utils/identificationStorage';
 
 interface NotesEditorProps {
   unit: any;
@@ -9,13 +10,19 @@ interface NotesEditorProps {
 }
 
 export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEditorProps) {
-  const [content, setContent] = useState(unit?.notes || '');
+  const [content, setContent] = useState('');
+  const [navalData, setNavalData] = useState<NavalData | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isOpen && editorRef.current && unit?.notes !== undefined) {
-      editorRef.current.innerHTML = unit.notes || '';
-      setContent(unit.notes || '');
+    if (isOpen && unit?.notes !== undefined) {
+      const parsed = parseNotesField(unit.notes);
+      setNavalData(parsed);
+      const htmlContent = parsed.freeNotes || '';
+      if (editorRef.current) {
+        editorRef.current.innerHTML = htmlContent;
+      }
+      setContent(htmlContent);
     }
   }, [isOpen, unit?.notes]);
 
@@ -54,7 +61,15 @@ export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEdit
 
   const handleSave = () => {
     const htmlContent = editorRef.current?.innerHTML || '';
-    onSave(htmlContent);
+
+    // Preserve identification data when saving notes
+    const updatedData: NavalData = {
+      ...(navalData || { type: 'naval_data', version: '1.0' }),
+      freeNotes: htmlContent
+    };
+
+    const serialized = serializeNavalData(updatedData);
+    onSave(serialized);
     onClose();
   };
 
@@ -80,10 +95,10 @@ export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEdit
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">
-              Note per {unit?.name}
+              Notes - {unit?.name}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Classe: {unit?.unit_class}
+              Class: {unit?.unit_class}
             </p>
           </div>
           <button
@@ -102,21 +117,21 @@ export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEdit
               <button
                 onClick={() => handleCommand('bold')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Grassetto"
+                title="Bold"
               >
                 <Bold className="h-4 w-4" />
               </button>
               <button
                 onClick={() => handleCommand('italic')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Corsivo"
+                title="Italic"
               >
                 <Italic className="h-4 w-4" />
               </button>
               <button
                 onClick={() => handleCommand('underline')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Sottolineato"
+                title="Underline"
               >
                 <Underline className="h-4 w-4" />
               </button>
@@ -127,21 +142,21 @@ export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEdit
               <button
                 onClick={() => handleCommand('justifyLeft')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Allinea a sinistra"
+                title="Align Left"
               >
                 <AlignLeft className="h-4 w-4" />
               </button>
               <button
                 onClick={() => handleCommand('justifyCenter')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Allinea al centro"
+                title="Align Center"
               >
                 <AlignCenter className="h-4 w-4" />
               </button>
               <button
                 onClick={() => handleCommand('justifyRight')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Allinea a destra"
+                title="Align Right"
               >
                 <AlignRight className="h-4 w-4" />
               </button>
@@ -152,14 +167,14 @@ export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEdit
               <button
                 onClick={() => handleCommand('insertUnorderedList')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Elenco puntato"
+                title="Bullet List"
               >
                 <List className="h-4 w-4" />
               </button>
               <button
                 onClick={() => handleCommand('insertOrderedList')}
                 className="p-2 rounded hover:bg-gray-200 transition-colors"
-                title="Elenco numerato"
+                title="Numbered List"
               >
                 <Type className="h-4 w-4" />
               </button>
@@ -201,28 +216,28 @@ export default function NotesEditor({ unit, isOpen, onClose, onSave }: NotesEdit
             style={{ lineHeight: '1.6' }}
             onInput={handleInput}
             suppressContentEditableWarning={true}
-            data-placeholder="Inserisci le tue note qui..."
+            data-placeholder="Enter your notes here..."
           />
         </div>
 
         {/* Footer */}
         <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-600">
-            Usa la barra degli strumenti per formattare il testo. Le note verranno salvate automaticamente.
+            Use the toolbar to format text. Notes will be saved when you click Save.
           </div>
           <div className="flex space-x-3">
             <button
               onClick={onClose}
               className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Annulla
+              Cancel
             </button>
             <button
               onClick={handleSave}
               className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center"
             >
               <Save className="h-4 w-4 mr-2" />
-              Salva Note
+              Save Notes
             </button>
           </div>
         </div>
