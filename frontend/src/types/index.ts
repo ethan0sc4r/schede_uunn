@@ -102,6 +102,7 @@ export interface CreateNavalUnitRequest {
   silhouette_zoom?: string;
   silhouette_position_x?: string;
   silhouette_position_y?: string;
+  notes?: string;
   characteristics: CreateCharacteristicRequest[];
 }
 
