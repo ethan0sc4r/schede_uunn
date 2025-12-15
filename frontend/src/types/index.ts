@@ -14,7 +14,7 @@ export interface IdentificationElement {
   id: string;
   element: string;
 }
-
+ 
 export interface NavalData {
   type: 'naval_data';
   version: string;
