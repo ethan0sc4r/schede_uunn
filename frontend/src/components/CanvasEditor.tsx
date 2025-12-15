@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Palette, Save, Images, Ship, Anchor, Plane } from 'lucide-react';
+import { Palette, Save, Images, Ship, Anchor, Plane, Search, FileText } from 'lucide-react';
 import type { NavalUnit } from '../types/index.ts';
 import TemplateManager, { type Template, CANVAS_SIZES, DEFAULT_TEMPLATES } from './TemplateManager';
 import UnitGalleryModal from './UnitGalleryModal';
+import ShipIdentificationEditor from './ShipIdentificationEditor';
+import NotesEditor from './NotesEditor';
 
 import { getImageUrl } from '../utils/imageUtils';
 import { navalUnitsApi, templatesApi } from '../services/api';
@@ -161,6 +163,8 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
   const [editingTableCell, setEditingTableCell] = useState<{elementId: string, row: number, col: number} | null>(null);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [showIdentificationEditor, setShowIdentificationEditor] = useState(false);
+  const [showNotesEditor, setShowNotesEditor] = useState(false);
   const [flagSearchTerm, setFlagSearchTerm] = useState('');
   const [customFlags, setCustomFlags] = useState<Array<{name: string, url: string}>>([]);
   
@@ -1384,11 +1388,32 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           <div className="space-y-2 mb-4">
             <button
               onClick={() => setShowTemplateManager(true)}
-              className="w-full flex items-center justify-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              className="w-full flex items-center justify-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
             >
               <Palette className="h-4 w-4 mr-2" />
               Manage Templates
             </button>
+
+            {/* Identification and Notes buttons */}
+            {unit && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  onClick={() => setShowIdentificationEditor(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
+                >
+                  <Search className="h-4 w-4 mr-1" />
+                  Identification
+                </button>
+                <button
+                  onClick={() => setShowNotesEditor(true)}
+                  className="flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Notes
+                </button>
+              </div>
+            )}
+
             <div className="flex space-x-2">
               <button
                 onClick={onCancel}
@@ -2476,6 +2501,44 @@ export default function CanvasEditor({ unit, onSave, onCancel }: CanvasEditorPro
           unitName={unit.name}
           isOpen={showGalleryModal}
           onClose={() => setShowGalleryModal(false)}
+        />
+      )}
+
+      {/* Identification Editor */}
+      {unit && (
+        <ShipIdentificationEditor
+          unit={unit}
+          isOpen={showIdentificationEditor}
+          onClose={() => setShowIdentificationEditor(false)}
+          onSave={async (notes: string) => {
+            try {
+              await navalUnitsApi.update(unit.id, { notes });
+              success('Identification saved successfully');
+              setShowIdentificationEditor(false);
+            } catch (error) {
+              showError('Error saving identification');
+              console.error('Error saving identification:', error);
+            }
+          }}
+        />
+      )}
+
+      {/* Notes Editor */}
+      {unit && (
+        <NotesEditor
+          unit={unit}
+          isOpen={showNotesEditor}
+          onClose={() => setShowNotesEditor(false)}
+          onSave={async (notes: string) => {
+            try {
+              await navalUnitsApi.update(unit.id, { notes });
+              success('Notes saved successfully');
+              setShowNotesEditor(false);
+            } catch (error) {
+              showError('Error saving notes');
+              console.error('Error saving notes:', error);
+            }
+          }}
         />
       )}
     </div>
